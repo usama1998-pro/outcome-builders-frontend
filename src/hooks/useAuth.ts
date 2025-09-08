@@ -31,6 +31,10 @@ export function useRequireAuth(redirectTo: string = "/signin") {
   return { token };
 }
 
+// export function useSignup() {
+//   return; // placeholder to avoid TS error
+// }
+
 // ✅ Login helper (now uses API's `data.token`)
 export function useLogin() {
   const { setToken } = useAuth();

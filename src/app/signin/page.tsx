@@ -1,42 +1,70 @@
 "use client";
 
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@/components/ui/button"
 import styles from "./page.module.css";
 import { useSignin } from "../../hooks/useSignin";
 import { useState } from "react";
+import { SigninPayloadSchema, SigninPayload } from "../../schemas/signin";
 
-export default function LoginForm() {
-    const login = useSignin();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+export default function SignInForm() {
+    const signIn = useSignin();
+
+    // setup form with zod validation
+    const {
+        register,
+        handleSubmit,
+        formState: { errors },
+    } = useForm<SigninPayload>({
+        resolver: zodResolver(SigninPayloadSchema),
+    });
+
+    const onSubmit = (data: SigninPayload) => {
+        signIn.mutate(data); // email + password are already validated here
+    };
 
     return (
-        <form
-            onSubmit={(e) => {
-                e.preventDefault();
-                login.mutate({ email, password });
-            }}
-            className="flex flex-col gap-4 p-6"
-        >
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 p-6">
+            {/* Email input */}
             <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email"
+                {...register("email")}
                 className="border p-2"
             />
+            {errors.email && (
+                <p className="text-red-500 text-sm">{errors.email.message}</p>
+            )}
+
+            {/* Password input */}
             <input
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
+                {...register("password")}
                 className="border p-2"
             />
-            <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded"
-            >
-                {login.isPending ? "Logging in..." : "Login"}
-            </button>
+            {errors.password && (
+                <p className="text-red-500 text-sm">{errors.password.message}</p>
+            )}
+
+            {/* Mutation error (server validation or network issues) */}
+            {signIn.isError && (
+                <p className="text-red-500 text-sm">
+                    {(signIn.error as any)?.response?.data?.detail ||
+                        signIn.error.message ||
+                        "Something went wrong"}
+                </p>
+            )}
+
+            {/* Submit */}
+            <Button type="submit" disabled={signIn.isPending}>
+                {signIn.isPending ? "Signing Up..." : "Sign Up"}
+            </Button>
+
+            <a href="/signup" className="text-sm text-blue-500 hover:underline mt-2">
+                Don't have an account? Sign Up
+            </a>
         </form>
     );
 }
