@@ -22,8 +22,32 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ token: null });
   },
 
-  hydrate: () => {
+  hydrate: async () => {
     const storedToken = localStorage.getItem("access_token");
-    set({ token: storedToken, hydrated: true });
+    if (!storedToken) {
+    set({ token: null, hydrated: true });
+    return;
+  }
+
+  try {
+    // call your FastAPI verify endpoint
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/user/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: storedToken }), // adjust payload to your API
+    });
+    const data = await res.json();
+
+    if (res.ok && data.status === true) {
+      set({ token: storedToken, hydrated: true });
+    } else {
+      // invalid token → remove it
+      localStorage.removeItem("access_token");
+      set({ token: null, hydrated: true });
+    }
+  } catch (err) {
+    localStorage.removeItem("access_token");
+    set({ token: null, hydrated: true });
+  }
   },
 }));

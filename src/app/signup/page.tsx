@@ -25,46 +25,56 @@ export default function SignUpForm() {
     };
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 p-6">
-            {/* Email input */}
-            <input
-                type="email"
-                placeholder="Email"
-                {...register("email")}
-                className="border p-2"
-            />
-            {errors.email && (
-                <p className="text-red-500 text-sm">{errors.email.message}</p>
-            )}
+        <>
+            <div className="flex items-center justify-center h-screen flex-col">
+                <div className="w-64 h-64 flex items-center justify-center flex-col">
+                    <h1 className="font-bold text-6xl">O.B</h1>
 
-            {/* Password input */}
-            <input
-                type="password"
-                placeholder="Password"
-                {...register("password")}
-                className="border p-2"
-            />
-            {errors.password && (
-                <p className="text-red-500 text-sm">{errors.password.message}</p>
-            )}
+                    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 p-6">
+                        {/* Email input */}
+                        <input
+                            type="email"
+                            placeholder="Email"
+                            {...register("email")}
+                            className="border p-2"
+                        />
+                        {errors.email && (
+                            <p className="text-red-500 text-sm">{errors.email.message}</p>
+                        )}
 
-            {/* Mutation error (server validation or network issues) */}
-            {signUp.isError && (
-                <p className="text-red-500 text-sm">
-                    {(signUp.error as any)?.response?.data?.detail ||
-                        signUp.error.message ||
-                        "Something went wrong"}
-                </p>
-            )}
+                        {/* Password input */}
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            {...register("password")}
+                            className="border p-2"
+                        />
+                        {errors.password && (
+                            <p className="text-red-500 text-sm">{errors.password.message}</p>
+                        )}
 
-            {/* Submit */}
-            <Button type="submit" disabled={signUp.isPending}>
-                {signUp.isPending ? "Signing in..." : "Sign In"}
-            </Button>
+                        {/* Mutation error (server validation or network issues) */}
+                        {signUp.isError && (
+                            <p className="text-red-500 text-sm">
+                                {(signUp.error as any)?.response?.data?.detail ||
+                                    signUp.error.message ||
+                                    "Something went wrong"}
+                            </p>
+                        )}
 
-            <a href="/signin" className="text-sm text-blue-500 hover:underline mt-2">
-                Already have an account? Sign In
-            </a>
-        </form>
+                        {/* Submit */}
+                        <Button type="submit" disabled={signUp.isPending}>
+                            {signUp.isPending ? "Signing in..." : "Sign In"}
+                        </Button>
+
+                        <a href="/signin" className="text-sm text-blue-500 hover:underline mt-2">
+                            Already have an account? Sign In
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </>
+
+
     );
 }

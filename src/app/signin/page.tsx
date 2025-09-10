@@ -25,46 +25,55 @@ export default function SignInForm() {
     };
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 p-6">
-            {/* Email input */}
-            <input
-                type="email"
-                placeholder="Email"
-                {...register("email")}
-                className="border p-2"
-            />
-            {errors.email && (
-                <p className="text-red-500 text-sm">{errors.email.message}</p>
-            )}
+        <>
+            <div className="flex items-center justify-center h-screen">
+                <div className="w-64 h-64 flex items-center justify-center flex-col">
+                    <h1 className="font-bold text-6xl">O.B</h1>
+                    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 p-6">
+                        {/* Email input */}
+                        <input
+                            type="email"
+                            placeholder="Email"
+                            {...register("email")}
+                            className="border p-2"
+                        />
+                        {errors.email && (
+                            <p className="text-red-500 text-sm">{errors.email.message}</p>
+                        )}
 
-            {/* Password input */}
-            <input
-                type="password"
-                placeholder="Password"
-                {...register("password")}
-                className="border p-2"
-            />
-            {errors.password && (
-                <p className="text-red-500 text-sm">{errors.password.message}</p>
-            )}
+                        {/* Password input */}
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            {...register("password")}
+                            className="border p-2"
+                        />
+                        {errors.password && (
+                            <p className="text-red-500 text-sm">{errors.password.message}</p>
+                        )}
 
-            {/* Mutation error (server validation or network issues) */}
-            {signIn.isError && (
-                <p className="text-red-500 text-sm">
-                    {(signIn.error as any)?.response?.data?.detail ||
-                        signIn.error.message ||
-                        "Something went wrong"}
-                </p>
-            )}
+                        {/* Mutation error (server validation or network issues) */}
+                        {signIn.isError && (
+                            <p className="text-red-500 text-sm">
+                                {(signIn.error as any)?.response?.data?.detail ||
+                                    signIn.error.message ||
+                                    "Something went wrong"}
+                            </p>
+                        )}
 
-            {/* Submit */}
-            <Button type="submit" disabled={signIn.isPending}>
-                {signIn.isPending ? "Signing Up..." : "Sign Up"}
-            </Button>
+                        {/* Submit */}
+                        <Button type="submit" disabled={signIn.isPending}>
+                            {signIn.isPending ? "Signing Up..." : "Sign Up"}
+                        </Button>
 
-            <a href="/signup" className="text-sm text-blue-500 hover:underline mt-2">
-                Don't have an account? Sign Up
-            </a>
-        </form>
+                        <a href="/signup" className="text-sm text-blue-500 hover:underline mt-2">
+                            {"Don't have an account? Sign Up"}
+                        </a>
+                    </form>
+                </div>
+            </div>
+
+        </>
+
     );
 }
