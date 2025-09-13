@@ -1,5 +1,7 @@
 "use client";
 
+import Image from 'next/image';
+import { useTheme } from "next-themes"
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button"
@@ -7,9 +9,11 @@ import styles from "./page.module.css";
 import { useSignup } from "../../hooks/useSignup";
 import { useState } from "react";
 import { SignupPayloadSchema, SignupPayload } from "../../schemas/signup";
+import { ToggleThemeButton } from '@/components/ToggleThemeButton';
 
 export default function SignUpForm() {
     const signUp = useSignup();
+    const { theme, setTheme } = useTheme()
 
     // setup form with zod validation
     const {
@@ -26,9 +30,26 @@ export default function SignUpForm() {
 
     return (
         <>
+            <div className="absolute top-4 right-4">
+                <ToggleThemeButton />
+            </div>
             <div className="flex items-center justify-center h-screen flex-col">
                 <div className="w-64 h-64 flex items-center justify-center flex-col">
-                    <h1 className="font-bold text-6xl">O.B</h1>
+
+                    <Image
+                        src="/assets/Primary-Logo-Stacked-Black.png"
+                        alt="logo black"
+                        className="dark:hidden"
+                        width={300}
+                        height={300}
+                    />
+                    <Image
+                        src="/assets/Primary-Logo-Stacked-White.png"
+                        alt="logo white"
+                        className="hidden dark:block"
+                        width={300}
+                        height={300}
+                    />
 
                     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 p-6">
                         {/* Email input */}
