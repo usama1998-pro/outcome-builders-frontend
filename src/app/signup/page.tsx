@@ -13,7 +13,7 @@ import { ToggleThemeButton } from '@/components/ToggleThemeButton';
 
 export default function SignUpForm() {
     const signUp = useSignup();
-    const { theme, setTheme } = useTheme()
+    // const { theme, setTheme } = useTheme()
 
     // setup form with zod validation
     const {
@@ -77,7 +77,9 @@ export default function SignUpForm() {
                         {/* Mutation error (server validation or network issues) */}
                         {signUp.isError && (
                             <p className="text-red-500 text-sm">
-                                {(signUp.error as any)?.response?.data?.detail ||
+                                {
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    (signUp.error as any)?.response?.data?.detail ||
                                     signUp.error.message ||
                                     "Something went wrong"}
                             </p>

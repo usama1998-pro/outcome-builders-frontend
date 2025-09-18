@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from "next/link";
-import { useTheme } from "next-themes"
+// import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils";
 import {
     NavigationMenu,
@@ -15,7 +15,7 @@ import { useAuthStore } from "../../store/useAuth";
 
 export default function Navbar() {
     const token = useAuthStore((s) => s.token);
-    const { theme, setTheme } = useTheme()
+    // const { theme, setTheme } = useTheme()
     // console.log("theme in navbar", theme);
 
     return (

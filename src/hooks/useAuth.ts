@@ -74,7 +74,7 @@ export function useVerifyToken() {
     queryFn: () => verifyToken({token: token! as string}),
     enabled: !!token, // only run if token exists
     retry: false,
-    throwOnError(error, query) {
+    throwOnError(error) {
         console.error("Token verification failed:", error.message);
         clearToken();
         return true; // re-throw to set isError

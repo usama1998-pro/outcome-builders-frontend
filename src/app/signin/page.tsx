@@ -74,7 +74,10 @@ export default function SignInForm() {
                         {/* Mutation error (server validation or network issues) */}
                         {signIn.isError && (
                             <p className="text-red-500 text-sm">
-                                {(signIn.error as any)?.response?.data?.detail ||
+
+                                {
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    (signIn.error as any)?.response?.data?.detail ||
                                     signIn.error.message ||
                                     "Something went wrong"}
                             </p>
