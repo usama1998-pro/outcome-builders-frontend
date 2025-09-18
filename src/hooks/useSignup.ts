@@ -15,7 +15,7 @@ export function useSignup() {
       console.log("🚀 useSignup calling signup()", payload);
       return signup(payload);
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       router.push("/signin");
       console.log("Signup successful, please sign in.");
     },

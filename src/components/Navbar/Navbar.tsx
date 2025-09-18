@@ -11,7 +11,6 @@ import {
     // NavigationMenuLink,
 } from "@/components/ui/navigation-menu";
 import { ToggleThemeButton } from "../../../components/ToggleThemeButton";
-import { use } from "react";
 import { useAuthStore } from "../../store/useAuth";
 
 export default function Navbar() {

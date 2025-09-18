@@ -5,7 +5,10 @@ import { useEffect } from "react";
 import { useAuthStore } from "../store/useAuth"; // adjust path if needed
 import { useQuery } from "@tanstack/react-query";
 import { verifyToken } from "../api/auth";
-import { VerifyPayload, AuthResponse } from "../types/auth";
+import { 
+//  VerifyPayload, 
+  AuthResponse 
+} from "../types/auth";
 // ------------------
 //  Custom Hooks
 // ------------------

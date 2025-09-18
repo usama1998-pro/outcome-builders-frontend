@@ -46,6 +46,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ token: null, hydrated: true });
     }
   } catch (err) {
+    console.log("Error verifying token:", err);
     localStorage.removeItem("access_token");
     set({ token: null, hydrated: true });
   }

@@ -5,9 +5,9 @@ import { useTheme } from "next-themes"
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button"
-import styles from "./page.module.css";
+// import styles from "./page.module.css";
 import { useSignup } from "../../hooks/useSignup";
-import { useState } from "react";
+// import { useState } from "react";
 import { SignupPayloadSchema, SignupPayload } from "../../schemas/signup";
 import { ToggleThemeButton } from '@/components/ToggleThemeButton';
 
