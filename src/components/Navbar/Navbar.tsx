@@ -45,14 +45,20 @@ export default function Navbar() {
                     {/* Navigation Links */}
                     <NavigationMenu>
                         <NavigationMenuList>
-                            {
+                            {/* {
                                 token && <NavigationMenuItem>
                                     <Link href="/dashboard" className={cn("px-3 py-2 hover:underline")} passHref>
                                         Dashboard
                                     </Link>
                                 </NavigationMenuItem>
 
-                            }
+                            } */}
+
+                            <NavigationMenuItem>
+                                <Link href="/dashboard" className={cn("px-3 py-2 hover:underline")} passHref>
+                                    Dashboard
+                                </Link>
+                            </NavigationMenuItem>
 
 
                             <NavigationMenuItem>
