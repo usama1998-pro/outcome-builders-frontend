@@ -11,10 +11,10 @@ import {
     // NavigationMenuLink,
 } from "@/components/ui/navigation-menu";
 import { ToggleThemeButton } from "../../../components/ToggleThemeButton";
-import { useAuthStore } from "../../store/useAuth";
+// import { useAuthStore } from "../../store/useAuth";
 
 export default function Navbar() {
-    const token = useAuthStore((s) => s.token);
+    // const token = useAuthStore((s) => s.token);
     // const { theme, setTheme } = useTheme()
     // console.log("theme in navbar", theme);
 

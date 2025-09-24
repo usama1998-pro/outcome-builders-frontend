@@ -3,7 +3,7 @@ import Navbar from "@/src/components/Navbar/Navbar";
 // import RequireAuth from "../components/auth/requireAuth";
 
 
-export default function Home({ children }: { children: React.ReactNode }) {
+export default function Home() {
     return (
         <>
             <Navbar />
