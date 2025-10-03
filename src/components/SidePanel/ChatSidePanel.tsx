@@ -15,7 +15,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ChevronUp, User2 } from "lucide-react";
 
-export default function SidePanel() {
+export default function ChatSidePanel() {
     const pathname = usePathname();
     const links = [
         { href: "/dashboard", label: "Home" },

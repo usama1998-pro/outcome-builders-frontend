@@ -9,7 +9,7 @@ export default function DashboardHome() {
 
     return (
         // <RequireAuth>
-        <div className="">
+        <div className="flex flex-col w-full h-full items-center justify-center border border-border p-5">
             <h1>Outcome Builder Dashboard Home</h1>
             <p>Welcome to the Outcome Builder application!</p>
             <p>This is the home page.</p>
