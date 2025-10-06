@@ -11,9 +11,11 @@ import BlurText from "../../components/BlurText";
 
 
 export default function LandingPage() {
+
   const handleAnimationComplete = () => {
     console.log('Animation completed!');
   };
+
   return (
     <>
       <Navbar />

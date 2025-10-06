@@ -1,6 +1,7 @@
 
 import ChatSidePanel from "@/src/components/SidePanel/ChatSidePanel";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { ToggleThemeButton } from "@/components/ToggleThemeButton";
 
 // import styles from "./page.module.css";
 // import RequireAuth from "../components/auth/requireAuth";
@@ -9,6 +10,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
     return (
         <SidebarProvider>
+            <div className="absolute top-4 right-4">
+                <ToggleThemeButton />
+            </div>
             <div className="flex flex-row w-screen h-screen p-0 m-0">
                 {/* Sidebar */}
                 <ChatSidePanel />
