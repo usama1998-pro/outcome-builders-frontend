@@ -311,10 +311,33 @@ export default function ChatSidePanel() {
             <SidebarFooter>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton>
-                            <User2 /> Username
-                            <ChevronUp className="ml-auto" />
-                        </SidebarMenuButton>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <SidebarMenuButton>
+                                    <User2 /> Anonymous
+                                    <ChevronUp className="ml-auto" />
+                                </SidebarMenuButton>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                side="top"
+                                className="w-[--radix-popper-anchor-width]"
+                            >
+                                <DropdownMenuItem>
+                                    <span>Profile</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                    <span>Billing</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                    <span>Sign out</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                    <span>Create Account</span>
+                                </DropdownMenuItem>
+
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarFooter>

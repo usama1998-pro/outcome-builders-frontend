@@ -70,7 +70,7 @@ export default function SidePanel() {
                                 className="w-[--radix-popper-anchor-width]"
                             >
                                 <DropdownMenuItem>
-                                    <span>Account</span>
+                                    <Link href={'/dashboard/profile'}>Profile</Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem>
                                     <span>Billing</span>
