@@ -11,7 +11,7 @@ const routes = {
     }
   },
   user: {
-    account: "/user/account",
+    account: "/user/profile",
   },
   tenant: {
     create: "/tenants/create",
