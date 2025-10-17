@@ -8,7 +8,9 @@ const routes = {
     get: {
       user: "/workspace/get/user",
       tenant: "/workspace/get/tenant"
-    }
+    },
+
+    create: "/workspace/create",
   },
   user: {
     account: "/user/profile",

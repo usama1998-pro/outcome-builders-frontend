@@ -1,9 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import api from "../lib/axios";
 import routes from "../lib/routes";
 import { WorkSpaceList } from "../types/workspaces";
+import { 
+    // ToastContainer, 
+    toast 
+} from 'react-toastify';
 
 interface WorkspaceResponse { 
     status: boolean;
@@ -22,6 +26,13 @@ interface WorkspaceResponse {
     pagination: number | null; 
 } 
 
+interface CreateWorkspaceResponse { 
+    status: boolean;
+    message: string; 
+    data: Map<string, any>; 
+    pagination: number | null; 
+} 
+
 // ------------------ // Fetch Function // ------------------ 
 async function fetchUserWorkspaces(): Promise<WorkSpaceList[]> { 
     const { data } = await api.get<WorkspaceResponse>(routes.workspace.get.user); 
@@ -35,7 +46,14 @@ async function fetchUserWorkspaces(): Promise<WorkSpaceList[]> {
         members: item.workspace.members_count, avatarUrl: "/default-avatar.png", 
         // placeholder (update if backend returns one) 
     })); }
+
     
+async function createUserWorkspace(name: string): Promise<CreateWorkspaceResponse> { 
+    const { data } = await api.post<CreateWorkspaceResponse>(routes.workspace.create, {name: name}); 
+    // Map backend → WorkSpaceList
+    return data;
+}
+
 // ------------------ // Hook // ------------------ 
 export function useUserWorkspaces() { 
     const { data, isLoading, isError, error, } = useQuery<WorkSpaceList[], Error>({ 
@@ -44,4 +62,11 @@ export function useUserWorkspaces() {
     }); 
     
     return { data, isLoading, isError, error };
+}
+
+
+export function useCreateUserWorkspace() {
+  return useMutation({
+    mutationFn: createUserWorkspace,
+  });
 }

@@ -3,7 +3,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
-import { WorkSpaceList } from "@/src/types/workspaces";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
 import Link from "next/link";
 import { useEffect } from "react";
@@ -11,7 +10,7 @@ import { BsThreeDotsVertical } from "react-icons/bs";
 import { FaUser } from "react-icons/fa";
 import BlocksLoader from "../../Loaders/BlocksLoader/BlocksLoader";
 
-export default function WorkSpacesList({ workspaces }: { workspaces: Array<WorkSpaceList> }) {
+export default function WorkSpacesList() {
     const { data: workspaceData, isLoading, isError, error } = useUserWorkspaces()
 
     useEffect(() => {
