@@ -1,29 +1,114 @@
+"use client";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import Collections from "@/src/types/collections";
+import { formatDateTime } from "@/src/utils/dateTimeFormat";
 import Link from "next/link";
+import { useState } from "react";
 import { BsThreeDotsVertical } from "react-icons/bs";
-import { FaUser } from "react-icons/fa";
+import { FaUser, FaTrash } from "react-icons/fa";
+import { useDeleteUserCollection } from "@/src/hooks/useCollection";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 
 type CollectionListProps = {
     collections: Array<Collections>;
     workspace: { id: number };
+    onDelete?: () => void;
 };
 
-export function CollectionList({ collections, workspace }: CollectionListProps) {
-    return (<div className="w-full h-full flex flex-row flex-wrap gap-5 items-center justify-center p-5">
-        {
-            collections.map((collection, key) => (
-                <Link href={`/dashboard/workspaces/${workspace.id}/collections/${collection.id}/notes`} key={key} className="no-underline">
-                    <Card key={key} className="w-[300px] h-[200px] flex flex-col justify-between">
-                        <CardHeader >
+export function CollectionList({ collections, workspace, onDelete }: CollectionListProps) {
+    const { mutate: deleteCollection, isPending: isDeleting } = useDeleteUserCollection();
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [collectionToDelete, setCollectionToDelete] = useState<number | null>(null);
+
+    const handleDeleteClick = (collectionId: number, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setCollectionToDelete(collectionId);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDelete = () => {
+        if (collectionToDelete) {
+            deleteCollection(collectionToDelete, {
+                onSuccess: (res) => {
+                    if (res?.status) {
+                        toast.success(res.message || "Collection deleted successfully!");
+                        setDeleteDialogOpen(false);
+                        setCollectionToDelete(null);
+                        if (onDelete) onDelete();
+                    } else {
+                        toast.error(res?.message || "Could not delete collection.");
+                    }
+                },
+                onError: (err: any) => {
+                    toast.error(err?.response?.data?.detail || "Failed to delete collection.");
+                },
+            });
+        }
+    };
+
+    return (
+        <>
+            <div className="w-full h-full flex flex-row flex-wrap gap-5 items-center justify-center p-5">
+                {collections.map((collection, key) => (
+                    <div key={key} className="relative">
+                        <Link
+                            href={`/dashboard/workspaces/${workspace.id}/collections/${collection.id}/notes`}
+                            className="no-underline"
+                        >
+                            <Card className="w-[300px] h-[220px] flex flex-col justify-between">
+                                <CardHeader>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-md">
+                                            {collection.workspaceName}
+                                        </span>
+                                    </div>
                             <CardTitle>{collection.title}</CardTitle>
-                            <CardDescription>{collection.createdAt}</CardDescription>
-                            <CardAction><BsThreeDotsVertical /></CardAction>
+                                    <CardDescription>{formatDateTime(collection.createdAt)}</CardDescription>
+                                    <CardAction>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                }}
+                                                className="focus:outline-none"
+                                            >
+                                                <BsThreeDotsVertical />
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                <DropdownMenuItem
+                                                    onClick={(e) => handleDeleteClick(collection.id, e)}
+                                                    className="text-red-600 focus:text-red-600 cursor-pointer"
+                                                >
+                                                    <FaTrash className="mr-2" />
+                                                    Delete Collection
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </CardAction>
                         </CardHeader>
                         <CardContent>
-                            <p>{collection.description}</p>
+                                    <p>{collection.description || "No description"}</p>
                         </CardContent>
                         <CardFooter>
                             <Avatar>
@@ -31,15 +116,34 @@ export function CollectionList({ collections, workspace }: CollectionListProps) 
                                 <AvatarFallback>CN</AvatarFallback>
                             </Avatar>
                             <FaUser className="ml-auto" /> <span> {collection.members}</span>
-
                         </CardFooter>
                     </Card>
                 </Link>
-            )
+                    </div>
+                ))}
+            </div>
 
-            )
-
-        }
-    </div>
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Collection</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this collection? This action cannot be undone.
+                            All notes within this collection will also be deleted.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            disabled={isDeleting}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            {isDeleting ? "Deleting..." : "Delete"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }

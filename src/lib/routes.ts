@@ -9,8 +9,15 @@ const routes = {
       user: "/workspace/get/user",
       tenant: "/workspace/get/tenant"
     },
-
     create: "/workspace/create",
+    delete: (id: number) => `/workspace/delete/${id}`,
+  },
+  collection: {
+    get: {
+      user: "/collection/get/user",
+    },
+    create: "/collection/create",
+    delete: (id: number) => `/collection/delete/${id}`,
   },
   user: {
     account: "/user/profile",

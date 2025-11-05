@@ -1,13 +1,13 @@
-"use client";
+// "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../lib/axios";
 import routes from "../lib/routes";
 import { WorkSpaceList } from "../types/workspaces";
-import { 
-    // ToastContainer, 
-    toast 
-} from 'react-toastify';
+// import { 
+//     // ToastContainer, 
+//     toast 
+// } from 'react-toastify';
 
 interface WorkspaceResponse { 
     status: boolean;
@@ -68,5 +68,22 @@ export function useUserWorkspaces() {
 export function useCreateUserWorkspace() {
   return useMutation({
     mutationFn: createUserWorkspace,
+  });
+}
+
+async function deleteUserWorkspace(workspaceId: number): Promise<{ status: boolean; message: string }> {
+  const { data } = await api.delete(routes.workspace.delete(workspaceId));
+  return data;
+}
+
+export function useDeleteUserWorkspace() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: deleteUserWorkspace,
+    onSuccess: () => {
+      // Invalidate and refetch workspaces after successful deletion
+      queryClient.invalidateQueries({ queryKey: ["userWorkspaces"] });
+    },
   });
 }

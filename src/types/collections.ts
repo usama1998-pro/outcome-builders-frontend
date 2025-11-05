@@ -6,4 +6,6 @@ export default interface Collections {
     createdBy: string;
     members: number;
     avatarUrl: string;
+    workspaceId: number;
+    workspaceName: string;
 }
