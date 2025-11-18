@@ -8,14 +8,15 @@ import {
     CardHeader,
     CardTitle
 } from "@/components/ui/card";
-import Collections from "@/src/types/collections";
+import Notes from "@/src/types/notes";
 import Link from "next/link";
 import { BsThreeDotsVertical } from "react-icons/bs";
+import { formatDateTime } from "@/src/utils/dateTimeFormat";
 // import { FaUser } from "react-icons/fa";
 
 
 type NotesListProps = {
-    notes: Array<Collections>;
+    notes?: Array<Notes>;
     collection: { id: number };
     workspace: { id: number };
 };
@@ -23,12 +24,12 @@ type NotesListProps = {
 export function NotesList({ workspace, collection, notes }: NotesListProps) {
     return (<div className="w-full h-full flex flex-row flex-wrap gap-5 items-center justify-center p-5">
         {
-            notes.map((note, key) => (
+            notes?.map((note, key) => (
                 <Link href={`/dashboard/workspace/${workspace.id}/collection/${collection.id}`} key={key} className="no-underline">
                     <Card key={key} className="w-[300px] h-[200px] flex flex-col justify-between">
                         <CardHeader >
                             <CardTitle>{note.title}</CardTitle>
-                            <CardDescription>{note.createdAt}</CardDescription>
+                            <CardDescription>{formatDateTime(note.createdAt)}</CardDescription>
                             <CardAction><BsThreeDotsVertical /></CardAction>
                         </CardHeader>
                         {/* <CardContent>

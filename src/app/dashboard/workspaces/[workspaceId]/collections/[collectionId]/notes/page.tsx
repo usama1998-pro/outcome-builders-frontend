@@ -24,85 +24,13 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useCollectionNotes } from "@/src/hooks/useNotes";
 export default function NotesPage() {
     const params = useParams();
     const workspaceId = Array.isArray(params.workspaceId) ? params.workspaceId[0] : params.workspaceId; // workspace id from URL
     const collectionId = Array.isArray(params.collectionId) ? params.collectionId[0] : params.collectionId;
 
-    const notes = [
-        {
-            id: 1,
-            title: "Notes 1",
-            createdAt: "24 Sep, 2025 at 10:05 PM",
-            createdBy: "usama",
-            description: "This is Notes 1",
-            members: 10,
-            avatarUrl: "https://github.com/shadcn.png"
-        },
-        {
-            id: 2,
-            title: "Notes 2",
-            createdAt: "24 Sep, 2025 at 10:05 PM",
-            createdBy: "usama",
-            description: "This is Notes 2",
-            members: 12,
-            avatarUrl: "https://github.com/shadcn.png"
-        },
-        {
-            id: 3,
-            title: "Notes 3",
-            createdAt: "24 Sep, 2025 at 10:05 PM",
-            createdBy: "usama",
-            description: "This is Notes 3",
-            members: 13,
-            avatarUrl: "https://github.com/shadcn.png"
-        },
-        {
-            id: 4,
-            title: "Notes 4",
-            createdAt: "24 Sep, 2025 at 10:05 PM",
-            createdBy: "usama",
-            description: "This is Notes 4",
-            members: 14,
-            avatarUrl: "https://github.com/shadcn.png"
-        },
-        {
-            id: 5,
-            title: "Notes 5",
-            createdAt: "24 Sep, 2025 at 10:05 PM",
-            createdBy: "usama",
-            description: "This is Notes 5",
-            members: 5,
-            avatarUrl: "https://github.com/shadcn.png"
-        },
-        {
-            id: 6,
-            title: "Notes 6",
-            createdAt: "24 Sep, 2025 at 10:05 PM",
-            createdBy: "usama",
-            description: "This is Notes 6",
-            members: 3,
-            avatarUrl: "https://github.com/shadcn.png"
-        },
-        {
-            id: 7,
-            title: "Notes 7",
-            createdAt: "24 Sep, 2025 at 10:05 PM",
-            createdBy: "usama",
-            description: "This is Notes 7",
-            members: 4,
-            avatarUrl: "https://github.com/shadcn.png"
-        },
-        {
-            id: 8,
-            title: "Notes 8",
-            createdAt: "24 Sep, 2025 at 10:05 PM",
-            createdBy: "usama",
-            description: "This is Notes 8",
-            members: 6,
-            avatarUrl: "https://github.com/shadcn.png"
-        }
-    ];
+    const { data: notes, isLoading, isError, error, refetch } = useCollectionNotes(Number(collectionId));
 
 
 
@@ -157,3 +85,95 @@ export default function NotesPage() {
         </div>
     );
 }
+
+
+// const notes = [
+//     {
+//         id: 1,
+//         title: "Notes 1",
+//         createdAt: "24 Sep, 2025 at 10:05 PM",
+//         createdBy: "usama",
+//         description: "This is Notes 1",
+//         members: 10,
+//         avatarUrl: "https://github.com/shadcn.png",
+//         workspaceId: Number(workspaceId),
+//         workspaceName: "Workspace"
+//     },
+//     {
+//         id: 2,
+//         title: "Notes 2",
+//         createdAt: "24 Sep, 2025 at 10:05 PM",
+//         createdBy: "usama",
+//         description: "This is Notes 2",
+//         members: 12,
+//         avatarUrl: "https://github.com/shadcn.png",
+//         workspaceId: Number(workspaceId),
+//         workspaceName: "Workspace"
+//     },
+//     {
+//         id: 3,
+//         title: "Notes 3",
+//         createdAt: "24 Sep, 2025 at 10:05 PM",
+//         createdBy: "usama",
+//         description: "This is Notes 3",
+//         members: 13,
+//         avatarUrl: "https://github.com/shadcn.png",
+//         workspaceId: Number(workspaceId),
+//         workspaceName: "Workspace"
+//     },
+//     {
+//         id: 4,
+//         title: "Notes 4",
+//         createdAt: "24 Sep, 2025 at 10:05 PM",
+//         createdBy: "usama",
+//         description: "This is Notes 4",
+//         members: 14,
+//         avatarUrl: "https://github.com/shadcn.png",
+//         workspaceId: Number(workspaceId),
+//         workspaceName: "Workspace"
+//     },
+//     {
+//         id: 5,
+//         title: "Notes 5",
+//         createdAt: "24 Sep, 2025 at 10:05 PM",
+//         createdBy: "usama",
+//         description: "This is Notes 5",
+//         members: 5,
+//         avatarUrl: "https://github.com/shadcn.png",
+//         workspaceId: Number(workspaceId),
+//         workspaceName: "Workspace"
+//     },
+//     {
+//         id: 6,
+//         title: "Notes 6",
+//         createdAt: "24 Sep, 2025 at 10:05 PM",
+//         createdBy: "usama",
+//         description: "This is Notes 6",
+//         members: 3,
+//         avatarUrl: "https://github.com/shadcn.png",
+//         workspaceId: Number(workspaceId),
+//         workspaceName: "Workspace"
+//     },
+//     {
+//         id: 7,
+//         title: "Notes 7",
+//         createdAt: "24 Sep, 2025 at 10:05 PM",
+//         createdBy: "usama",
+//         description: "This is Notes 7",
+//         members: 4,
+//         avatarUrl: "https://github.com/shadcn.png",
+//         workspaceId: Number(workspaceId),
+//         workspaceName: "Workspace"
+//     },
+//     {
+//         id: 8,
+//         title: "Notes 8",
+//         createdAt: "24 Sep, 2025 at 10:05 PM",
+//         createdBy: "usama",
+//         description: "This is Notes 8",
+//         members: 6,
+//         avatarUrl: "https://github.com/shadcn.png",
+//         workspaceId: Number(workspaceId),
+//         workspaceName: "Workspace"
+//     }
+// ];

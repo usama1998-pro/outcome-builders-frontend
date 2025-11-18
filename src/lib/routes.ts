@@ -25,6 +25,11 @@ const routes = {
   tenant: {
     create: "/tenants/create",
   },
+  notes: {
+    get: "/notes/get",
+    create: "/notes/create",
+    delete: "/notes/delete",
+  },
 };
 
 export default routes;
