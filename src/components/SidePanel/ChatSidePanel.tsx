@@ -25,10 +25,12 @@ import { ChevronUp, ChevronDown, User2, MessageSquare, MoreHorizontal } from "lu
 import { useState } from "react";
 import { ChatTab } from "../../types/chat";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useSignOut } from "@/src/hooks/useAuth";
 
 export default function ChatSidePanel() {
     const pathname = usePathname();
     const [chatsOpen, setChatsOpen] = useState(true);
+    const signOut = useSignOut();
 
     const links = [
         { href: "/", icon: Home, label: "Home" },
@@ -328,7 +330,7 @@ export default function ChatSidePanel() {
                                 <DropdownMenuItem>
                                     <span>Billing</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={signOut}>
                                     <span>Sign out</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem>

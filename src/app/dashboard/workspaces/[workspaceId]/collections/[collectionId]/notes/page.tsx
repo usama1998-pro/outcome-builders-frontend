@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { NotesList } from "@/src/components/List/Notes/NotesList";
 import { useParams } from "next/navigation";
 import { FaPlus } from "react-icons/fa";
+import { useState } from "react";
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -15,7 +16,6 @@ import {
 } from "@/components/ui/breadcrumb";
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -24,13 +24,65 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useCollectionNotes } from "@/src/hooks/useNotes";
+import { useCollectionNotes, useCreateNote } from "@/src/hooks/useNotes";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useForm } from "react-hook-form";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+const createNoteSchema = z.object({
+    title: z.string().min(1, "Title is required").max(200, "Title is too long"),
+    content: z.string().min(1, "Content is required"),
+});
+
+type CreateNoteFormValues = z.infer<typeof createNoteSchema>;
 export default function NotesPage() {
     const params = useParams();
     const workspaceId = Array.isArray(params.workspaceId) ? params.workspaceId[0] : params.workspaceId; // workspace id from URL
     const collectionId = Array.isArray(params.collectionId) ? params.collectionId[0] : params.collectionId;
 
     const { data: notes, isLoading, isError, error, refetch } = useCollectionNotes(Number(collectionId));
+    const { mutate: createNote, isPending } = useCreateNote();
+    const [open, setOpen] = useState(false);
+
+    const form = useForm<CreateNoteFormValues>({
+        resolver: zodResolver(createNoteSchema),
+        defaultValues: {
+            title: "",
+            content: "",
+        },
+    });
+
+    const onSubmit = (values: CreateNoteFormValues) => {
+        createNote(
+            {
+                title: values.title,
+                content: values.content,
+                collection_id: Number(collectionId),
+            },
+            {
+                onSuccess: (res) => {
+                    if (res?.status) {
+                        toast.success(res.message || "Note created successfully!");
+                        form.reset();
+                        setOpen(false);
+                        refetch(); // Refresh the notes list
+                    } else {
+                        toast.error(res?.message || "Could not create note.");
+                    }
+                },
+                onError: (err: unknown) => {
+                    const error = err as { message?: string };
+                    toast.error(error?.message || "Request failed, please try again.");
+                },
+            }
+        );
+    };
 
 
 
@@ -58,30 +110,111 @@ export default function NotesPage() {
                     className="px-4 py-2 border rounded-md w-1/3"
                 />
 
-                <AlertDialog>
+                <AlertDialog open={open} onOpenChange={setOpen}>
                     <AlertDialogTrigger asChild>
                         <Button>
                             <FaPlus className="mr-2" /> New Note
                         </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent>
+                    <AlertDialogContent className="max-w-2xl">
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogTitle>Create a new note</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete your
-                                account and remove your data from our servers.
+                                Enter a title and content for your new note below.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction>Continue</AlertDialogAction>
-                        </AlertDialogFooter>
+
+                        <form
+                            id="create-note-form"
+                            onSubmit={form.handleSubmit(onSubmit)}
+                            className="space-y-4"
+                        >
+                            <div>
+                                <Label className="pb-3" htmlFor="title">
+                                    Title
+                                </Label>
+                                <Input
+                                    id="title"
+                                    placeholder="e.g. Meeting Notes"
+                                    {...form.register("title")}
+                                    aria-invalid={!!form.formState.errors.title}
+                                />
+                                {form.formState.errors.title && (
+                                    <p className="text-sm !text-red-500 mt-1">
+                                        {form.formState.errors.title.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div>
+                                <Label className="pb-3" htmlFor="content">
+                                    Content
+                                </Label>
+                                <Textarea
+                                    id="content"
+                                    placeholder="Write your note content here..."
+                                    rows={8}
+                                    {...form.register("content")}
+                                    aria-invalid={!!form.formState.errors.content}
+                                />
+                                {form.formState.errors.content && (
+                                    <p className="text-sm !text-red-500 mt-1">
+                                        {form.formState.errors.content.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isPending}>
+                                    Cancel
+                                </AlertDialogCancel>
+                                <Button
+                                    type="submit"
+                                    disabled={isPending}
+                                    className="ml-2"
+                                >
+                                    {isPending ? "Creating..." : "Create"}
+                                </Button>
+                            </AlertDialogFooter>
+                        </form>
                     </AlertDialogContent>
                 </AlertDialog>
 
 
             </nav>
-            <NotesList notes={notes} collection={{ id: Number(collectionId) }} workspace={{ id: Number(workspaceId) }} />
+
+            {isLoading && (
+                <div className="w-full h-full flex items-center justify-center p-5">
+                    <BlocksLoader />
+                </div>
+            )}
+
+            {isError && (
+                <div className="w-full h-full flex items-center justify-center p-5">
+                    <Card className="w-[300px] h-[200px] flex flex-col border border-red-500 text-red-800 shadow-md">
+                        <CardHeader className="border-b border-red-800">
+                            <CardTitle className="text-lg font-semibold text-red-700">Error</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-1 flex items-center justify-center">
+                            <p>{error?.message || "Something went wrong."}</p>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {notes && notes.length > 0 && (
+                <NotesList notes={notes} collection={{ id: Number(collectionId) }} workspace={{ id: Number(workspaceId) }} />
+            )}
+
+            {notes && notes.length === 0 && !isLoading && (
+                <div className="w-full h-full flex items-center justify-center p-5">
+                    <Card className="w-[400px] p-6 text-center">
+                        <CardContent className="pt-6">
+                            <p className="text-muted-foreground">No notes yet. Create your first one!</p>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 }

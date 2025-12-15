@@ -7,12 +7,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button"
 // import styles from "./page.module.css";
 import { useSignup } from "../../hooks/useSignup";
-// import { useState } from "react";
+import { useState } from "react";
 import { SignupPayloadSchema, SignupPayload } from "../../schemas/signup";
 import { ToggleThemeButton } from '@/components/ToggleThemeButton';
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 export default function SignUpForm() {
     const signUp = useSignup();
+    const [showPassword, setShowPassword] = useState(false);
     // const { theme, setTheme } = useTheme()
 
     // setup form with zod validation
@@ -60,34 +62,33 @@ export default function SignUpForm() {
                             className="border p-2"
                         />
                         {errors.email && (
-                            <p className="text-red-500 text-sm">{errors.email.message}</p>
+                            <p style={{ color: "red" }}>{errors.email.message}</p>
                         )}
 
                         {/* Password input */}
-                        <input
-                            type="password"
-                            placeholder="Password"
-                            {...register("password")}
-                            className="border p-2"
-                        />
+                        <div className="relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Password"
+                                {...register("password")}
+                                className="border p-2 pr-10 w-full"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                            >
+                                {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                            </button>
+                        </div>
                         {errors.password && (
                             <p className="text-red-500 text-sm">{errors.password.message}</p>
                         )}
 
-                        {/* Mutation error (server validation or network issues) */}
-                        {signUp.isError && (
-                            <p className="text-red-500 text-sm">
-                                {
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    (signUp.error as any)?.response?.data?.detail ||
-                                    signUp.error.message ||
-                                    "Something went wrong"}
-                            </p>
-                        )}
-
                         {/* Submit */}
                         <Button type="submit" disabled={signUp.isPending}>
-                            {signUp.isPending ? "Signing in..." : "Sign In"}
+                            {signUp.isPending ? "Signing Up..." : "Sign Up"}
                         </Button>
 
                         <a href="/signin" className="text-sm text-blue-500 hover:underline mt-2">

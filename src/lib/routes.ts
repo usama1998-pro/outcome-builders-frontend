@@ -21,6 +21,7 @@ const routes = {
   },
   user: {
     account: "/user/profile",
+    tenants: "/user/tenants",
   },
   tenant: {
     create: "/tenants/create",

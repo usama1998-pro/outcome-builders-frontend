@@ -6,12 +6,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button"
 // import styles from "./page.module.css";
 import { useSignin } from "../../hooks/useSignin";
-// import { useState } from "react";
+import { useState } from "react";
 import { ToggleThemeButton } from '@/components/ToggleThemeButton';
 import { SigninPayloadSchema, SigninPayload } from "../../schemas/signin";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 export default function SignInForm() {
     const signIn = useSignin();
+    const [showPassword, setShowPassword] = useState(false);
 
     // setup form with zod validation
     const {
@@ -61,31 +63,29 @@ export default function SignInForm() {
                         )}
 
                         {/* Password input */}
-                        <input
-                            type="password"
-                            placeholder="Password"
-                            {...register("password")}
-                            className="border p-2"
-                        />
+                        <div className="relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Password"
+                                {...register("password")}
+                                className="border p-2 pr-10 w-full"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                            >
+                                {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                            </button>
+                        </div>
                         {errors.password && (
                             <p className="text-red-500 text-sm">{errors.password.message}</p>
                         )}
 
-                        {/* Mutation error (server validation or network issues) */}
-                        {signIn.isError && (
-                            <p className="text-red-500 text-sm">
-
-                                {
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    (signIn.error as any)?.response?.data?.detail ||
-                                    signIn.error.message ||
-                                    "Something went wrong"}
-                            </p>
-                        )}
-
                         {/* Submit */}
                         <Button type="submit" disabled={signIn.isPending}>
-                            {signIn.isPending ? "Signing Up..." : "Sign Up"}
+                            {signIn.isPending ? "Signing In..." : "Sign In"}
                         </Button>
 
                         <a href="/signup" className="text-sm text-blue-500 hover:underline mt-2">
