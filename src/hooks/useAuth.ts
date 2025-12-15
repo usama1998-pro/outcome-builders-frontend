@@ -61,12 +61,22 @@ export function useRequireAuth(redirectTo: string = "/signin") {
 // ✅ Login helper (now uses API's `data.token` and fetches tenant)
 export function useLogin() {
   const { setToken } = useAuth();
+  const setUserId = useAuthStore((s) => s.setUserId);
   const setTenantId = useAuthStore((s) => s.setTenantId);
   const router = useRouter();
 
-  return async (token: string, redirectTo: string = "/dashboard") => {
+  return async (
+    token: string,
+    userId?: number,
+    redirectTo: string = "/dashboard"
+  ) => {
     if (token) {
       setToken(token);
+
+      // Set user_id if provided
+      if (userId) {
+        setUserId(userId);
+      }
 
       // Fetch user's tenants and set the first one
       try {

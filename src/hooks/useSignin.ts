@@ -21,10 +21,12 @@ export function useSignin() {
         return;
       }
 
-      const tokenData = data?.data as { token: string } | undefined;
+      const tokenData = data?.data as
+        | { token: string; user_id?: number }
+        | undefined;
       if (tokenData && tokenData.token) {
         toast.success("Sign in successful! Redirecting...");
-        await login(tokenData.token); // ✅ delegate to useLogin (now async)
+        await login(tokenData.token, tokenData.user_id); // ✅ delegate to useLogin (now async)
       } else {
         console.error("Signin response did not include a token");
         toast.error("Sign in failed. No token received from server.");

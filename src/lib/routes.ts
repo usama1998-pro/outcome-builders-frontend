@@ -7,7 +7,7 @@ const routes = {
   workspace: {
     get: {
       user: "/workspace/get/user",
-      tenant: "/workspace/get/tenant"
+      tenant: "/workspace/get/tenant",
     },
     create: "/workspace/create",
     delete: (id: number) => `/workspace/delete/${id}`,
@@ -22,9 +22,11 @@ const routes = {
   user: {
     account: "/user/profile",
     tenants: "/user/tenants",
+    updateProfile: "/user/profile/update",
   },
   tenant: {
-    create: "/tenants/create",
+    create: "/tenant/register",
+    details: (id: number) => `/tenant/${id}`,
   },
   notes: {
     get: "/notes/get",

@@ -8,31 +8,45 @@ import { Button } from "@/components/ui/button";
 import { ToggleThemeButton } from '@/components/ToggleThemeButton';
 import { ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
+import { useRegisterOrganization } from "@/src/hooks/useOrganization";
+import { useAuthStore } from "@/src/store/useAuth";
 
 const RegisterOrganizationSchema = z.object({
     organizationName: z.string().min(2, "Organization name must be at least 2 characters"),
+    description: z.string().optional(),
     industry: z.string().optional(),
     size: z.string().optional(),
 });
 
-type RegisterOrganizationPayload = z.infer<typeof RegisterOrganizationSchema>;
+type RegisterOrganizationFormData = z.infer<typeof RegisterOrganizationSchema>;
 
 export default function RegisterOrganizationPage() {
     const router = useRouter();
+    const registerOrganization = useRegisterOrganization();
+    const userId = useAuthStore((state) => state.userId);
 
     const {
         register,
         handleSubmit,
         formState: { errors },
-    } = useForm<RegisterOrganizationPayload>({
+    } = useForm<RegisterOrganizationFormData>({
         resolver: zodResolver(RegisterOrganizationSchema),
     });
 
-    const onSubmit = (data: RegisterOrganizationPayload) => {
-        // TODO: Implement the API call to register organization
+    const onSubmit = (data: RegisterOrganizationFormData) => {
         console.log("Registering organization:", data);
-        // After successful registration, redirect to dashboard
-        // router.push('/dashboard');
+
+        // Build description from form data
+        const description = data.description ||
+            `${data.industry ? `Industry: ${data.industry}. ` : ''}${data.size ? `Size: ${data.size}.` : ''}`.trim();
+
+        registerOrganization.mutate({
+            company_name: data.organizationName,
+            description: description || undefined,
+            owner_role: "owner",
+            user_id: userId || undefined,
+            is_active: true,
+        });
     };
 
     return (
@@ -92,6 +106,20 @@ export default function RegisterOrganizationPage() {
                                 )}
                             </div>
 
+                            {/* Description */}
+                            <div>
+                                <label htmlFor="description" className="block text-sm font-medium mb-2">
+                                    Description (Optional)
+                                </label>
+                                <textarea
+                                    id="description"
+                                    placeholder="Describe your organization"
+                                    {...register("description")}
+                                    rows={3}
+                                    className="border p-3 w-full rounded-md dark:bg-gray-800 dark:border-gray-700"
+                                />
+                            </div>
+
                             {/* Industry */}
                             <div>
                                 <label htmlFor="industry" className="block text-sm font-medium mb-2">
@@ -126,8 +154,13 @@ export default function RegisterOrganizationPage() {
                             </div>
 
                             {/* Submit */}
-                            <Button type="submit" className="w-full mt-2" size="lg">
-                                Create Organization
+                            <Button
+                                type="submit"
+                                className="w-full mt-2"
+                                size="lg"
+                                disabled={registerOrganization.isPending}
+                            >
+                                {registerOrganization.isPending ? "Creating Organization..." : "Create Organization"}
                             </Button>
                         </form>
 

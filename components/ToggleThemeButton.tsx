@@ -14,6 +14,21 @@ import { Button } from "@/components/ui/button"
 
 export function ToggleThemeButton() {
     const { setTheme } = useTheme()
+    const [mounted, setMounted] = React.useState(false)
+
+    // useEffect only runs on the client, so now we can safely show the UI
+    React.useEffect(() => {
+        setMounted(true)
+    }, [])
+
+    if (!mounted) {
+        // Return a placeholder with the same dimensions to avoid layout shift
+        return (
+            <Button variant="outline" size="icon" disabled>
+                <span className="h-[1.2rem] w-[1.2rem]"></span>
+            </Button>
+        )
+    }
 
     return (
         <Button variant="outline" size="icon" onClick={

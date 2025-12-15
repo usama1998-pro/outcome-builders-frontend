@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-// import { useAuthStore } from "../store/useAuth";
+import { useAuthStore } from "../store/useAuth";
 import { signup } from "../api/auth";
 import { AuthResponse, SignupPayload } from "../types/auth";
 import { useRouter } from "next/navigation";
@@ -9,13 +9,28 @@ import { toast } from "sonner";
 
 export function useSignup() {
   const router = useRouter();
+  const setToken = useAuthStore((state) => state.setToken);
+  const setUserId = useAuthStore((state) => state.setUserId);
 
   return useMutation<AuthResponse, Error, SignupPayload>({
     mutationFn: (payload) => {
       console.log("🚀 useSignup calling signup()", payload);
       return signup(payload);
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      // Store token and user_id
+      if (
+        response.data &&
+        typeof response.data === "object" &&
+        "token" in response.data
+      ) {
+        const data = response.data as { token: string; user_id?: number };
+        setToken(data.token);
+        if (data.user_id) {
+          setUserId(data.user_id);
+        }
+      }
+
       toast.success("Account created successfully! Redirecting...");
       router.push("/onboarding");
       console.log("Signup successful, redirecting to onboarding.");

@@ -1,5 +1,5 @@
 "use client";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
     Sidebar,
@@ -19,6 +19,7 @@ import { useAuthStore } from "@/src/store/useAuth";
 
 export default function SidePanel() {
     const pathname = usePathname();
+    const router = useRouter();
     const signOut = useSignOut();
     const currentTenantId = useAuthStore((s) => s.tenantId);
     const setTenantId = useAuthStore((s) => s.setTenantId);
@@ -33,10 +34,12 @@ export default function SidePanel() {
         { href: "/chat", label: "Chat" },
     ];
 
-    const handleTenantSwitch = (tenantId: number) => {
-        setTenantId(tenantId);
-        // Optionally reload or refresh data here
-        window.location.reload(); // Reload to fetch data for new tenant
+    const handleTenantClick = (tenantId: number) => {
+        if (tenantId !== currentTenantId) {
+            setTenantId(tenantId);
+        }
+        // Navigate to organization page
+        router.push("/dashboard/organization");
     };
 
     return (
@@ -70,7 +73,7 @@ export default function SidePanel() {
                                             tenants.map((tenant) => (
                                                 <DropdownMenuItem
                                                     key={tenant.id}
-                                                    onClick={() => handleTenantSwitch(tenant.id)}
+                                                    onClick={() => handleTenantClick(tenant.id)}
                                                     className="cursor-pointer"
                                                 >
                                                     <div className="flex items-center justify-between w-full">
