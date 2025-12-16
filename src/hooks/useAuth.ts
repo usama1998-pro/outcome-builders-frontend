@@ -12,6 +12,9 @@ import {
   AuthResponse,
 } from "../types/auth";
 
+// Time threshold in hours - don't redirect if last visit was more than this long ago
+const ONBOARDING_EXPIRY_HOURS = 48;
+
 // ------------------
 //  Types for Tenant
 // ------------------
@@ -58,6 +61,38 @@ export function useRequireAuth(redirectTo: string = "/signin") {
 //   return; // placeholder to avoid TS error
 // }
 
+// Helper function to get onboarding redirect path
+function getOnboardingRedirectPath(): string | null {
+  const storedOnboarding = localStorage.getItem("onboarding_state");
+  
+  if (!storedOnboarding) {
+    return null;
+  }
+
+  try {
+    const onboarding = JSON.parse(storedOnboarding);
+    
+    // If onboarding is complete, no redirect needed
+    if (onboarding.isComplete) {
+      return null;
+    }
+
+    // Check if last visit is within the expiry threshold
+    if (onboarding.lastVisit) {
+      const hoursSinceVisit = (Date.now() - onboarding.lastVisit) / (1000 * 60 * 60);
+      if (hoursSinceVisit > ONBOARDING_EXPIRY_HOURS) {
+        // Too old, don't redirect
+        return null;
+      }
+    }
+
+    // Return the last path or default to /onboarding
+    return onboarding.lastPath || "/onboarding";
+  } catch {
+    return null;
+  }
+}
+
 // ✅ Login helper (now uses API's `data.token` and fetches tenant)
 export function useLogin() {
   const { setToken } = useAuth();
@@ -92,8 +127,16 @@ export function useLogin() {
         console.error("Failed to fetch tenants:", error);
       }
 
-      router.push(redirectTo);
-      console.log("Login successful, token set.", redirectTo);
+      // Check if user has incomplete onboarding
+      const onboardingPath = getOnboardingRedirectPath();
+      const finalRedirect = onboardingPath || redirectTo;
+
+      router.push(finalRedirect);
+      console.log("Login successful, token set.", finalRedirect);
+      
+      if (onboardingPath) {
+        console.log("Redirecting to incomplete onboarding:", onboardingPath);
+      }
     } else {
       console.error("No token found in API response");
     }

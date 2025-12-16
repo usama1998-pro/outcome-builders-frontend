@@ -5,9 +5,13 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { ToggleThemeButton } from '@/components/ToggleThemeButton';
 import { Building2, Users } from 'lucide-react';
+import { useTrackOnboarding } from '@/src/hooks/useOnboarding';
 
 export default function OnboardingPage() {
     const router = useRouter();
+    
+    // Track that user is on onboarding page
+    useTrackOnboarding();
 
     const handleRegisterOrganization = () => {
         router.push('/register-company');

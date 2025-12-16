@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleThemeButton } from '@/components/ToggleThemeButton';
 import { ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
+import { useTrackOnboarding, useCompleteOnboarding } from '@/src/hooks/useOnboarding';
 
 const JoinWorkspaceSchema = z.object({
     invitationCode: z.string().min(1, "Invitation code is required"),
@@ -17,6 +18,10 @@ type JoinWorkspacePayload = z.infer<typeof JoinWorkspaceSchema>;
 
 export default function JoinWorkspacePage() {
     const router = useRouter();
+    
+    // Track that user is on join-workspace page
+    useTrackOnboarding();
+    const completeOnboarding = useCompleteOnboarding();
 
     const {
         register,
@@ -29,7 +34,11 @@ export default function JoinWorkspacePage() {
     const onSubmit = (data: JoinWorkspacePayload) => {
         // TODO: Implement the API call to join workspace with invitation code
         console.log("Joining workspace with code:", data.invitationCode);
-        // After successful join, redirect to dashboard
+        // After successful join:
+        // 1. Call completeOnboarding() to mark onboarding as complete
+        // 2. Redirect to dashboard
+        // Example:
+        // completeOnboarding();
         // router.push('/dashboard');
     };
 

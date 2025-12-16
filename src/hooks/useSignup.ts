@@ -6,11 +6,13 @@ import { signup } from "../api/auth";
 import { AuthResponse, SignupPayload } from "../types/auth";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useStartOnboarding } from "./useOnboarding";
 
 export function useSignup() {
   const router = useRouter();
   const setToken = useAuthStore((state) => state.setToken);
   const setUserId = useAuthStore((state) => state.setUserId);
+  const startOnboarding = useStartOnboarding();
 
   return useMutation<AuthResponse, Error, SignupPayload>({
     mutationFn: (payload) => {
@@ -30,6 +32,9 @@ export function useSignup() {
           setUserId(data.user_id);
         }
       }
+
+      // Start onboarding tracking for new users
+      startOnboarding();
 
       toast.success("Account created successfully! Redirecting...");
       router.push("/onboarding");

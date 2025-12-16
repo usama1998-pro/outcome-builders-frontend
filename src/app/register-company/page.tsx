@@ -10,6 +10,7 @@ import { ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 import { useRegisterOrganization } from "@/src/hooks/useOrganization";
 import { useAuthStore } from "@/src/store/useAuth";
+import { useTrackOnboarding } from '@/src/hooks/useOnboarding';
 
 const RegisterOrganizationSchema = z.object({
     organizationName: z.string().min(2, "Organization name must be at least 2 characters"),
@@ -24,6 +25,9 @@ export default function RegisterOrganizationPage() {
     const router = useRouter();
     const registerOrganization = useRegisterOrganization();
     const userId = useAuthStore((state) => state.userId);
+    
+    // Track that user is on register-company page
+    useTrackOnboarding();
 
     const {
         register,

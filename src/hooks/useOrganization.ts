@@ -10,6 +10,7 @@ import { registerOrganization } from "../api/tenant";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "../store/useAuth";
+import { useCompleteOnboarding } from "./useOnboarding";
 
 // ------------------
 //  Types
@@ -48,6 +49,7 @@ export function useOrganizationDetails(tenantId: number) {
 export function useRegisterOrganization() {
   const router = useRouter();
   const setTenantId = useAuthStore((s) => s.setTenantId);
+  const completeOnboarding = useCompleteOnboarding();
 
   return useMutation<
     RegisterOrganizationResponse,
@@ -69,6 +71,9 @@ export function useRegisterOrganization() {
       if (data.tenant_id) {
         setTenantId(data.tenant_id);
       }
+
+      // Mark onboarding as complete
+      completeOnboarding();
 
       // Redirect to dashboard after successful registration
       router.push("/dashboard");
