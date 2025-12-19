@@ -4,8 +4,8 @@
 import { Button } from "@/components/ui/button";
 import { NotesList } from "@/src/components/List/Notes/NotesList";
 import { useParams } from "next/navigation";
-import { FaPlus } from "react-icons/fa";
-import { useState } from "react";
+import { FaPlus, FaFile, FaTimes } from "react-icons/fa";
+import { useState, useRef } from "react";
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -34,6 +34,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import RequireAuth from "@/src/components/auth/requireAuth";
+
+const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1 MB
+const ALLOWED_FILE_TYPES = [".pdf", ".txt", ".doc", ".docx"];
+const ALLOWED_MIME_TYPES = [
+    "application/pdf",
+    "text/plain",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
 
 const createNoteSchema = z.object({
     title: z.string().min(1, "Title is required").max(200, "Title is too long"),
@@ -49,6 +59,10 @@ export default function NotesPage() {
     const { data: notes, isLoading, isError, error, refetch } = useCollectionNotes(Number(collectionId));
     const { mutate: createNote, isPending } = useCreateNote();
     const [open, setOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [fileError, setFileError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const form = useForm<CreateNoteFormValues>({
         resolver: zodResolver(createNoteSchema),
@@ -58,18 +72,76 @@ export default function NotesPage() {
         },
     });
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        setFileError(null);
+        
+        if (file) {
+            // Check file extension
+            const fileExt = "." + file.name.split(".").pop()?.toLowerCase();
+            if (!ALLOWED_FILE_TYPES.includes(fileExt)) {
+                setFileError("Only PDF, TXT, DOC, and DOCX files are allowed.");
+                setSelectedFile(null);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                }
+                return;
+            }
+            
+            // Check MIME type
+            if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+                setFileError("Only PDF, TXT, DOC, and DOCX files are allowed.");
+                setSelectedFile(null);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                }
+                return;
+            }
+            
+            // Check file size
+            if (file.size > MAX_FILE_SIZE) {
+                setFileError(`File size exceeds 1 MB limit. Your file is ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
+                setSelectedFile(null);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                }
+                return;
+            }
+            setSelectedFile(file);
+        }
+    };
+
+    const removeFile = () => {
+        setSelectedFile(null);
+        setFileError(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
+
+    const formatFileSize = (bytes: number) => {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+    };
+
     const onSubmit = (values: CreateNoteFormValues) => {
         createNote(
             {
                 title: values.title,
                 content: values.content,
                 collection_id: Number(collectionId),
+                file: selectedFile,
             },
             {
                 onSuccess: (res) => {
                     if (res?.status) {
                         toast.success(res.message || "Note created successfully!");
                         form.reset();
+                        setSelectedFile(null);
+                        if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                        }
                         setOpen(false);
                         refetch(); // Refresh the notes list
                     } else {
@@ -87,6 +159,7 @@ export default function NotesPage() {
 
 
     return (
+        <RequireAuth>
         <div className="flex flex-col items-center justify-center p-6">
             <Breadcrumb>
                 <BreadcrumbList>
@@ -104,10 +177,12 @@ export default function NotesPage() {
                 </BreadcrumbList>
             </Breadcrumb>
             <nav className="sticky top-0 w-[90%] mx-auto self-center px-15 flex justify-between items-center bg-background border-b border-border py-5">
-                <input
+                <Input
                     type="text"
-                    placeholder="Search..."
-                    className="px-4 py-2 border rounded-md w-1/3"
+                    placeholder="Search notes..."
+                    className="w-64"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                 />
 
                 <AlertDialog open={open} onOpenChange={setOpen}>
@@ -164,6 +239,43 @@ export default function NotesPage() {
                                 )}
                             </div>
 
+                            <div>
+                                <Label className="pb-3" htmlFor="file">
+                                    Attachment (optional, max 1 MB - PDF, TXT, DOC, DOCX only)
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        id="file"
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleFileChange}
+                                        className="flex-1"
+                                        accept=".pdf,.txt,.doc,.docx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                    />
+                                </div>
+                                {fileError && (
+                                    <p className="text-sm !text-red-500 mt-1">
+                                        {fileError}
+                                    </p>
+                                )}
+                                {selectedFile && !fileError && (
+                                    <div className="mt-2 flex items-center gap-2 p-2 bg-muted rounded-md">
+                                        <FaFile className="text-blue-500" />
+                                        <span className="text-sm truncate flex-1">{selectedFile.name}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {formatFileSize(selectedFile.size)}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={removeFile}
+                                            className="text-red-500 hover:text-red-700"
+                                        >
+                                            <FaTimes />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
                             <AlertDialogFooter>
                                 <AlertDialogCancel disabled={isPending}>
                                     Cancel
@@ -203,7 +315,7 @@ export default function NotesPage() {
             )}
 
             {notes && notes.length > 0 && (
-                <NotesList notes={notes} collection={{ id: Number(collectionId) }} workspace={{ id: Number(workspaceId) }} />
+                <NotesList notes={notes} collection={{ id: Number(collectionId) }} workspace={{ id: Number(workspaceId) }} searchQuery={searchQuery} />
             )}
 
             {notes && notes.length === 0 && !isLoading && (
@@ -216,6 +328,7 @@ export default function NotesPage() {
                 </div>
             )}
         </div>
+        </RequireAuth>
     );
 }
 

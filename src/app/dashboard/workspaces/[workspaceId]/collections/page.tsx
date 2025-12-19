@@ -47,6 +47,7 @@ export default function WorkspacePage() {
     const { data: allCollections, isLoading, isError, error, refetch } = useUserCollections();
     const { mutate: createCollection, isPending } = useCreateUserCollection();
     const [open, setOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
 
     // Filter collections for current workspace only
     const collections = allCollections?.filter(
@@ -107,10 +108,12 @@ export default function WorkspacePage() {
                 </Breadcrumb>
 
                 <nav className="sticky top-0 w-[90%] mx-auto self-center px-15 flex justify-between items-center bg-background border-b border-border py-5">
-                    <input
+                    <Input
                         type="text"
-                        placeholder="Search..."
-                        className="px-4 py-2 border rounded-md w-1/3"
+                        placeholder="Search collections..."
+                        className="w-64"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                     />
 
                     <AlertDialog open={open} onOpenChange={setOpen}>
@@ -224,7 +227,7 @@ export default function WorkspacePage() {
                 )}
 
                 {collections && collections.length > 0 && (
-                    <CollectionList collections={collections} workspace={{ id: Number(workspaceId) }} />
+                    <CollectionList collections={collections} workspace={{ id: Number(workspaceId) }} searchQuery={searchQuery} />
                 )}
 
                 {collections && collections.length === 0 && !isLoading && (

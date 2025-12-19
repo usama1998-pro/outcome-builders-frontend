@@ -6,18 +6,18 @@ const routes = {
   },
   workspace: {
     get: {
-      user: "/workspace/get/user",
-      tenant: "/workspace/get/tenant",
+      user: "/workspace/user",
+      tenant: "/workspace/tenant",
     },
-    create: "/workspace/create",
-    delete: (id: number) => `/workspace/delete/${id}`,
+    create: "/workspace",
+    delete: (id: number) => `/workspace/${id}`,
   },
   collection: {
     get: {
-      user: "/collection/get/user",
+      user: "/collection/user",
     },
-    create: "/collection/create",
-    delete: (id: number) => `/collection/delete/${id}`,
+    create: "/collection",
+    delete: (id: number) => `/collection/${id}`,
   },
   user: {
     account: "/user/profile",
@@ -25,13 +25,16 @@ const routes = {
     updateProfile: "/user/profile/update",
   },
   tenant: {
-    create: "/tenant/register",
+    create: "/tenant",
     details: (id: number) => `/tenant/${id}`,
+    overview: "/tenant/overview",
   },
   notes: {
-    get: "/notes/get",
-    create: "/notes/create",
-    delete: "/notes/delete",
+    get: "/note",
+    getById: (id: number) => `/note/${id}`,
+    create: "/note",
+    update: (id: number) => `/note/${id}`,
+    delete: (id: number) => `/note/${id}`,
   },
 };
 

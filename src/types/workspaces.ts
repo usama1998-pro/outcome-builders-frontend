@@ -1,3 +1,8 @@
+export interface TenantInfo {
+    id: number;
+    company_name: string;
+}
+
 export interface WorkSpaceList {
     id: number;
     title: string;
@@ -6,5 +11,6 @@ export interface WorkSpaceList {
     description: string;
     members: number;
     avatarUrl: string;
-
+    tenantId: number;
+    tenant: TenantInfo;
 }

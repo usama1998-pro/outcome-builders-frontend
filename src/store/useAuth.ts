@@ -86,6 +86,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     const storedTenantId = localStorage.getItem("tenant_id");
     const storedOnboarding = localStorage.getItem("onboarding_state");
 
+    console.log(
+      "[hydrate] storedToken:",
+      !!storedToken,
+      "storedTenantId:",
+      storedTenantId
+    );
+
     // Parse onboarding state
     let onboardingState: OnboardingState = {
       isComplete: true,
@@ -117,14 +124,20 @@ export const useAuthStore = create<AuthState>((set) => ({
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/user/verify`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: storedToken }), // adjust payload to your API
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${storedToken}`,
+          },
         }
       );
       const data = await res.json();
 
       if (res.ok && data.status === true) {
+        console.log(
+          "[hydrate] Token valid, setting tenantId:",
+          storedTenantId ? Number(storedTenantId) : null
+        );
         set({
           token: storedToken,
           userId: storedUserId ? Number(storedUserId) : null,
@@ -133,6 +146,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           onboarding: onboardingState,
         });
       } else {
+        console.log("[hydrate] Token invalid, clearing credentials");
         // invalid token → remove it
         localStorage.removeItem("access_token");
         localStorage.removeItem("user_id");
@@ -146,8 +160,8 @@ export const useAuthStore = create<AuthState>((set) => ({
           onboarding: { isComplete: true, lastPath: null, lastVisit: null },
         });
       }
-    } catch (err) {
-      console.log("Error verifying token:", err);
+    } catch {
+      // Token verification failed - clear stored credentials
       localStorage.removeItem("access_token");
       localStorage.removeItem("user_id");
       localStorage.removeItem("tenant_id");

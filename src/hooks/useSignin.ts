@@ -16,7 +16,6 @@ export function useSignin() {
     mutationFn: signin,
     onSuccess: async (data) => {
       if (!data?.data) {
-        console.error("No data in signin response");
         toast.error("Sign in failed. No data received from server.");
         return;
       }
@@ -26,9 +25,8 @@ export function useSignin() {
         | undefined;
       if (tokenData && tokenData.token) {
         toast.success("Sign in successful! Redirecting...");
-        await login(tokenData.token, tokenData.user_id); // ✅ delegate to useLogin (now async)
+        await login(tokenData.token, tokenData.user_id);
       } else {
-        console.error("Signin response did not include a token");
         toast.error("Sign in failed. No token received from server.");
       }
     },

@@ -1,33 +1,32 @@
 "use client";
 
 import Image from 'next/image';
-// import { _useTheme } from "next-themes"
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button"
-// import styles from "./page.module.css";
 import { useSignup } from "../../hooks/useSignup";
 import { useState } from "react";
-import { SignupPayloadSchema, SignupPayload } from "../../schemas/signup";
+import { SignupFormSchema, SignupFormData } from "../../schemas/signup";
 import { ToggleThemeButton } from '@/components/ToggleThemeButton';
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 export default function SignUpForm() {
     const signUp = useSignup();
     const [showPassword, setShowPassword] = useState(false);
-    // const { theme, setTheme } = useTheme()
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     // setup form with zod validation
     const {
         register,
         handleSubmit,
         formState: { errors },
-    } = useForm<SignupPayload>({
-        resolver: zodResolver(SignupPayloadSchema),
+    } = useForm<SignupFormData>({
+        resolver: zodResolver(SignupFormSchema),
     });
 
-    const onSubmit = (data: SignupPayload) => {
-        signUp.mutate(data); // email + password are already validated here
+    const onSubmit = (data: SignupFormData) => {
+        // Only send email and password to API (not confirmPassword)
+        signUp.mutate({ email: data.email, password: data.password });
     };
 
     return (
@@ -84,6 +83,27 @@ export default function SignUpForm() {
                         </div>
                         {errors.password && (
                             <p className="text-red-500 text-sm">{errors.password.message}</p>
+                        )}
+
+                        {/* Confirm Password input */}
+                        <div className="relative">
+                            <input
+                                type={showConfirmPassword ? "text" : "password"}
+                                placeholder="Confirm Password"
+                                {...register("confirmPassword")}
+                                className="border p-2 pr-10 w-full"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                            >
+                                {showConfirmPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                            </button>
+                        </div>
+                        {errors.confirmPassword && (
+                            <p className="text-red-500 text-sm">{errors.confirmPassword.message}</p>
                         )}
 
                         {/* Submit */}

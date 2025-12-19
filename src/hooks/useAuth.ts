@@ -119,12 +119,9 @@ export function useLogin() {
         if (data.status && data.data && data.data.length > 0) {
           // Set the first tenant as default
           setTenantId(data.data[0].id);
-          console.log("Tenant set:", data.data[0].id);
-        } else {
-          console.warn("No tenants found for user");
         }
-      } catch (error) {
-        console.error("Failed to fetch tenants:", error);
+      } catch {
+        // Tenant fetch failed - user may not have any tenants yet
       }
 
       // Check if user has incomplete onboarding
@@ -132,13 +129,6 @@ export function useLogin() {
       const finalRedirect = onboardingPath || redirectTo;
 
       router.push(finalRedirect);
-      console.log("Login successful, token set.", finalRedirect);
-      
-      if (onboardingPath) {
-        console.log("Redirecting to incomplete onboarding:", onboardingPath);
-      }
-    } else {
-      console.error("No token found in API response");
     }
   };
 }
@@ -160,11 +150,10 @@ export function useVerifyToken() {
 
   return useQuery<AuthResponse, Error>({
     queryKey: ["verifyToken", token],
-    queryFn: () => verifyToken({ token: token! as string }),
+    queryFn: () => verifyToken(),
     enabled: !!token, // only run if token exists
     retry: false,
-    throwOnError(error) {
-      console.error("Token verification failed:", error.message);
+    throwOnError() {
       clearToken();
       return true; // re-throw to set isError
     },

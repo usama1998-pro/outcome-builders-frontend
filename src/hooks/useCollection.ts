@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../lib/axios";
 import routes from "../lib/routes";
 import Collections from "../types/collections";
+import { useAuthStore } from "../store/useAuth";
 
 
 interface CollectionApiItem {
@@ -64,9 +65,14 @@ async function createUserCollection(payload: CreateCollectionPayload): Promise<C
 // ------------------ // Hooks // ------------------ 
 
 export function useUserCollections() {
+    const tenantId = useAuthStore((state) => state.tenantId);
+    const hydrated = useAuthStore((state) => state.hydrated);
+    
     const { data, isLoading, isError, error, refetch } = useQuery<Collections[], Error>({
-        queryKey: ["userCollections"],
+        queryKey: ["userCollections", tenantId],
         queryFn: fetchUserCollections,
+        // Only run query if tenantId is available and store is hydrated
+        enabled: !!tenantId && hydrated,
     });
 
     return { data, isLoading, isError, error, refetch };

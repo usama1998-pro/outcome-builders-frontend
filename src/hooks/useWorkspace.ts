@@ -20,7 +20,12 @@ interface WorkspaceResponse {
         workspace: { 
             id: number; 
             name: string; 
-            members_count: number; 
+            members_count: number;
+            tenant_id: number;
+            tenant: {
+                id: number;
+                company_name: string;
+            } | null;
         }; 
     }[]; 
     pagination: number | null; 
@@ -43,9 +48,12 @@ async function fetchUserWorkspaces(): Promise<WorkSpaceList[]> {
         createdAt: item.joined_at, 
         createdBy: item.role, 
         description: `Workspace owned by ${item.role}`, 
-        members: item.workspace.members_count, avatarUrl: "/default-avatar.png", 
-        // placeholder (update if backend returns one) 
-    })); }
+        members: item.workspace.members_count, 
+        avatarUrl: "/default-avatar.png",
+        tenantId: item.workspace.tenant_id,
+        tenant: item.workspace.tenant || { id: item.workspace.tenant_id, company_name: "Unknown" },
+    })); 
+}
 
     
 async function createUserWorkspace(name: string): Promise<CreateWorkspaceResponse> { 
@@ -66,8 +74,14 @@ export function useUserWorkspaces() {
 
 
 export function useCreateUserWorkspace() {
+  const queryClient = useQueryClient();
+  
   return useMutation({
     mutationFn: createUserWorkspace,
+    onSuccess: () => {
+      // Invalidate and refetch workspaces after successful creation
+      queryClient.invalidateQueries({ queryKey: ["userWorkspaces"] });
+    },
   });
 }
 

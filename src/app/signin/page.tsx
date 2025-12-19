@@ -83,12 +83,19 @@ export default function SignInForm() {
                             <p className="text-red-500 text-sm">{errors.password.message}</p>
                         )}
 
+                        {/* Forgot Password Link */}
+                        <div className="text-right">
+                            <a href="/forgot-password" className="text-sm text-blue-500 hover:underline">
+                                Forgot Password?
+                            </a>
+                        </div>
+
                         {/* Submit */}
                         <Button type="submit" disabled={signIn.isPending}>
                             {signIn.isPending ? "Signing In..." : "Sign In"}
                         </Button>
 
-                        <a href="/signup" className="text-sm text-blue-500 hover:underline mt-2">
+                        <a href="/signup" className="text-sm text-blue-500 hover:underline mt-2 text-center">
                             {"Don't have an account? Sign Up"}
                         </a>
                     </form>

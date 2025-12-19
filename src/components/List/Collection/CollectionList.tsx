@@ -5,7 +5,7 @@ import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader,
 import Collections from "@/src/types/collections";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { BsThreeDotsVertical } from "react-icons/bs";
 import { FaUser, FaTrash } from "react-icons/fa";
 import { useDeleteUserCollection } from "@/src/hooks/useCollection";
@@ -32,12 +32,25 @@ type CollectionListProps = {
     collections: Array<Collections>;
     workspace: { id: number };
     onDelete?: () => void;
+    searchQuery?: string;
 };
 
-export function CollectionList({ collections, workspace, onDelete }: CollectionListProps) {
+export function CollectionList({ collections, workspace, onDelete, searchQuery = "" }: CollectionListProps) {
     const { mutate: deleteCollection, isPending: isDeleting } = useDeleteUserCollection();
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [collectionToDelete, setCollectionToDelete] = useState<number | null>(null);
+
+    // Filter collections based on search query
+    const filteredCollections = useMemo(() => {
+        if (!searchQuery.trim()) return collections;
+        
+        const query = searchQuery.toLowerCase().trim();
+        return collections.filter(collection => 
+            collection.title.toLowerCase().includes(query) ||
+            collection.description?.toLowerCase().includes(query) ||
+            collection.workspaceName?.toLowerCase().includes(query)
+        );
+    }, [collections, searchQuery]);
 
     const handleDeleteClick = (collectionId: number, e: React.MouseEvent) => {
         e.preventDefault();
@@ -69,7 +82,20 @@ export function CollectionList({ collections, workspace, onDelete }: CollectionL
     return (
         <>
             <div className="w-full h-full flex flex-row flex-wrap gap-5 items-center justify-center p-5">
-                {collections.map((collection, key) => (
+                {filteredCollections.length === 0 && searchQuery.trim() && (
+                    <Card className="w-[300px] h-[200px] flex flex-col border border-muted shadow-md">
+                        <CardHeader className="border-b border-muted">
+                            <CardTitle className="text-lg font-semibold text-muted-foreground">No Results</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-1 flex items-center justify-center">
+                            <p className="text-muted-foreground text-center">
+                                No collections found matching &quot;{searchQuery}&quot;.
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {filteredCollections.map((collection, key) => (
                     <div key={key} className="relative">
                         <Link
                             href={`/dashboard/workspaces/${workspace.id}/collections/${collection.id}/notes`}
@@ -78,11 +104,11 @@ export function CollectionList({ collections, workspace, onDelete }: CollectionL
                             <Card className="w-[300px] h-[220px] flex flex-col justify-between">
                                 <CardHeader>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-md">
+                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-md truncate max-w-[150px]" title={collection.workspaceName}>
                                             {collection.workspaceName}
                                         </span>
                                     </div>
-                            <CardTitle>{collection.title}</CardTitle>
+                                    <CardTitle className="truncate max-w-[250px]" title={collection.title}>{collection.title}</CardTitle>
                                     <CardDescription>{formatDateTime(collection.createdAt)}</CardDescription>
                                     <CardAction>
                                         <DropdownMenu>
@@ -108,7 +134,7 @@ export function CollectionList({ collections, workspace, onDelete }: CollectionL
                                     </CardAction>
                         </CardHeader>
                         <CardContent>
-                                    <p>{collection.description || "No description"}</p>
+                                    <p className="line-clamp-2" title={collection.description || "No description"}>{collection.description || "No description"}</p>
                         </CardContent>
                         <CardFooter>
                             <Avatar>

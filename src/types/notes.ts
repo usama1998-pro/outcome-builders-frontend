@@ -3,4 +3,8 @@ export default interface Notes {
     title: string;
     createdAt: string;
     createdBy: string;
+    fileName?: string | null;
+    fileSize?: number | null;
+    fileType?: string | null;
+    hasFile?: boolean;
 }

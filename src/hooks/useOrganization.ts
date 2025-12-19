@@ -56,16 +56,9 @@ export function useRegisterOrganization() {
     Error,
     RegisterOrganizationPayload
   >({
-    mutationFn: (payload) => {
-      console.log(
-        "🚀 useRegisterOrganization calling registerOrganization()",
-        payload
-      );
-      return registerOrganization(payload);
-    },
+    mutationFn: registerOrganization,
     onSuccess: (data) => {
       toast.success("Organization registered successfully! Redirecting...");
-      console.log("Organization registration successful:", data);
 
       // Store the tenant_id
       if (data.tenant_id) {
@@ -79,7 +72,6 @@ export function useRegisterOrganization() {
       router.push("/dashboard");
     },
     onError: (error: unknown) => {
-      console.error("Organization registration failed:", error);
 
       // Handle error response from API
       const axiosError = error as {

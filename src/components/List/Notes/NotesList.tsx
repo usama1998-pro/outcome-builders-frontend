@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     Card,
     CardAction,
-    //    CardContent, 
+    CardContent, 
     CardDescription,
     CardFooter,
     CardHeader,
@@ -14,8 +14,8 @@ import Notes from "@/src/types/notes";
 import Link from "next/link";
 import { BsThreeDotsVertical } from "react-icons/bs";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
-import { FaTrash } from "react-icons/fa";
-import { useState } from "react";
+import { FaTrash, FaPaperclip, FaEdit, FaEye } from "react-icons/fa";
+import { useState, useMemo } from "react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -41,12 +41,24 @@ type NotesListProps = {
     notes?: Array<Notes>;
     collection: { id: number };
     workspace: { id: number };
+    searchQuery?: string;
 };
 
-export function NotesList({ workspace, collection, notes }: NotesListProps) {
+export function NotesList({ workspace, collection, notes, searchQuery = "" }: NotesListProps) {
     const { mutate: deleteNote, isPending: isDeleting } = useDeleteNote();
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [noteToDelete, setNoteToDelete] = useState<number | null>(null);
+
+    // Filter notes based on search query
+    const filteredNotes = useMemo(() => {
+        if (!notes || !searchQuery.trim()) return notes || [];
+        
+        const query = searchQuery.toLowerCase().trim();
+        return notes.filter(note => 
+            note.title.toLowerCase().includes(query) ||
+            note.createdBy?.toLowerCase().includes(query)
+        );
+    }, [notes, searchQuery]);
 
     const handleDeleteClick = (noteId: number, e: React.MouseEvent) => {
         e.preventDefault();
@@ -78,13 +90,33 @@ export function NotesList({ workspace, collection, notes }: NotesListProps) {
     return (
         <>
             <div className="w-full h-full flex flex-row flex-wrap gap-5 items-center justify-center p-5">
+                {filteredNotes.length === 0 && searchQuery.trim() && (
+                    <Card className="w-[300px] h-[200px] flex flex-col border border-muted shadow-md">
+                        <CardHeader className="border-b border-muted">
+                            <CardTitle className="text-lg font-semibold text-muted-foreground">No Results</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-1 flex items-center justify-center">
+                            <p className="text-muted-foreground text-center">
+                                No notes found matching &quot;{searchQuery}&quot;.
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {
-                    notes?.map((note, key) => (
+                    filteredNotes.map((note, key) => (
                         <div key={key} className="relative">
-                            <Link href={`/dashboard/workspace/${workspace.id}/collection/${collection.id}`} className="no-underline">
+                            <Link href={`/dashboard/workspaces/${workspace.id}/collections/${collection.id}/notes/${note.id}`} className="no-underline">
                                 <Card className="w-[300px] h-[200px] flex flex-col justify-between">
                                     <CardHeader>
-                                        <CardTitle>{note.title}</CardTitle>
+                                        <div className="flex items-center gap-2">
+                                            <CardTitle className="truncate max-w-[200px]" title={note.title}>{note.title}</CardTitle>
+                                            {note.hasFile && (
+                                                <span title={note.fileName || "Attachment"} className="text-blue-500">
+                                                    <FaPaperclip size={14} />
+                                                </span>
+                                            )}
+                                        </div>
                                         <CardDescription>{formatDateTime(note.createdAt)}</CardDescription>
                                         <CardAction>
                                             <DropdownMenu>
@@ -99,6 +131,28 @@ export function NotesList({ workspace, collection, notes }: NotesListProps) {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent>
                                                     <DropdownMenuItem
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            window.location.href = `/dashboard/workspaces/${workspace.id}/collections/${collection.id}/notes/${note.id}`;
+                                                        }}
+                                                        className="cursor-pointer"
+                                                    >
+                                                        <FaEye className="mr-2" />
+                                                        View Note
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            window.location.href = `/dashboard/workspaces/${workspace.id}/collections/${collection.id}/notes/${note.id}?edit=true`;
+                                                        }}
+                                                        className="cursor-pointer"
+                                                    >
+                                                        <FaEdit className="mr-2" />
+                                                        Edit Note
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
                                                         onClick={(e) => handleDeleteClick(note.id, e)}
                                                         className="text-red-600 focus:text-red-600 cursor-pointer"
                                                     >
@@ -109,15 +163,11 @@ export function NotesList({ workspace, collection, notes }: NotesListProps) {
                                             </DropdownMenu>
                                         </CardAction>
                                     </CardHeader>
-                                    {/* <CardContent>
-                                        <p>{note.description}</p>
-                                    </CardContent> */}
                                     <CardFooter>
                                         <Avatar>
                                             <AvatarImage src={note.createdBy} />
                                             <AvatarFallback>CN</AvatarFallback>
                                         </Avatar>
-                                        {/* <FaUser className="ml-auto" /> <span> {note.members}</span> */}
                                     </CardFooter>
                                 </Card>
                             </Link>

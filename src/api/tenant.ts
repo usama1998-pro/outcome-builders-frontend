@@ -8,11 +8,6 @@ import {
 export async function registerOrganization(
   payload: RegisterOrganizationPayload
 ): Promise<RegisterOrganizationResponse> {
-  console.log(
-    "📡 Calling register organization endpoint:",
-    routes.tenant.create,
-    payload
-  );
   const { data } = await api.post(routes.tenant.create, payload);
   return data.data; // Extract data from SuccessResponse wrapper
 }

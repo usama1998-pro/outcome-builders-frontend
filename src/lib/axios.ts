@@ -8,22 +8,15 @@ const api = axios.create({
 
 // Attach token and tenant automatically
 api.interceptors.request.use((config) => {
-  // Priority: 1. Static token from env (for development/testing)
-  //           2. Dynamic token from auth store (for production)
-  const staticToken = process.env.NEXT_PUBLIC_STATIC_TOKEN;
-  const dynamicToken = useAuthStore.getState().token;
-
-  const token = staticToken || dynamicToken;
+  // Use token from auth store (secure - not exposed in client bundle)
+  const token = useAuthStore.getState().token;
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
   // Add tenant header (required for multi-tenant endpoints)
-  const staticTenantId = process.env.NEXT_PUBLIC_STATIC_TENANT_ID;
-  const dynamicTenantId = useAuthStore.getState().tenantId;
-
-  const tenantId = staticTenantId || dynamicTenantId;
+  const tenantId = useAuthStore.getState().tenantId;
 
   if (tenantId) {
     config.headers["x-tenant"] = String(tenantId);
@@ -32,11 +25,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle authentication failures
+// Handle response errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Check if the error is due to authentication failure
+    // Handle rate limiting (429 Too Many Requests)
+    if (error.response?.status === 429) {
+      const retryAfter = error.response.headers["retry-after"];
+      const waitTime = retryAfter ? parseInt(retryAfter, 10) : 60;
+
+      // Create a more user-friendly error
+      error.message = `Too many requests. Please wait ${waitTime} seconds before trying again.`;
+      error.isRateLimited = true;
+      error.retryAfter = waitTime;
+    }
+
+    // Handle authentication failures
     if (
       error.response &&
       (error.response.status === 401 || error.response.status === 403)

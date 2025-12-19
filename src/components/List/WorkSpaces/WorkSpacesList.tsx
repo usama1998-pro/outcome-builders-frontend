@@ -1,11 +1,12 @@
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUserWorkspaces, useDeleteUserWorkspace } from "@/src/hooks/useWorkspace";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { BsThreeDotsVertical } from "react-icons/bs";
 import { FaUser, FaTrash } from "react-icons/fa";
 import BlocksLoader from "../../Loaders/BlocksLoader/BlocksLoader";
@@ -26,12 +27,51 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { WorkspaceFilter } from "@/src/app/dashboard/workspaces/page";
 
-export default function WorkSpacesList() {
+interface WorkSpacesListProps {
+    filter: WorkspaceFilter;
+    currentTenantId: number | null;
+    searchQuery: string;
+}
+
+export default function WorkSpacesList({ filter, currentTenantId, searchQuery }: WorkSpacesListProps) {
     const { data: workspaceData, isLoading, isError, error } = useUserWorkspaces();
     const { mutate: deleteWorkspace, isPending: isDeleting } = useDeleteUserWorkspace();
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [workspaceToDelete, setWorkspaceToDelete] = useState<number | null>(null);
+
+    // Filter workspaces based on selection and search query
+    const filteredWorkspaces = useMemo(() => {
+        if (!workspaceData) return [];
+        
+        let result = workspaceData;
+        
+        // Apply filter
+        switch (filter) {
+            case "all":
+                break;
+            case "my":
+                // Show workspaces from current tenant
+                result = result.filter(ws => ws.tenantId === currentTenantId);
+                break;
+            default:
+                // Filter is a tenant ID number
+                result = result.filter(ws => ws.tenantId === filter);
+        }
+        
+        // Apply search query
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase().trim();
+            result = result.filter(ws => 
+                ws.title.toLowerCase().includes(query) ||
+                ws.description?.toLowerCase().includes(query) ||
+                ws.tenant?.company_name?.toLowerCase().includes(query)
+            );
+        }
+        
+        return result;
+    }, [workspaceData, filter, currentTenantId, searchQuery]);
 
     useEffect(() => {
         console.log(workspaceData);
@@ -79,12 +119,34 @@ export default function WorkSpacesList() {
                     </Card>
                 )}
 
-                {workspaceData && workspaceData.map((workspace, key) => (
+                {filteredWorkspaces.length === 0 && !isLoading && !isError && (
+                    <Card className="w-[300px] h-[200px] flex flex-col border border-muted shadow-md">
+                        <CardHeader className="border-b border-muted">
+                            <CardTitle className="text-lg font-semibold text-muted-foreground">No Workspaces</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-1 flex items-center justify-center">
+                            <p className="text-muted-foreground text-center">
+                                {searchQuery.trim() 
+                                    ? `No workspaces found matching "${searchQuery}".`
+                                    : "No workspaces found for this filter."}
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {filteredWorkspaces.map((workspace, key) => (
                     <div key={key} className="relative">
                         <Link href={`/dashboard/workspaces/${workspace.id}/collections`} className="no-underline">
-                            <Card className="w-[300px] h-[200px] flex flex-col justify-between">
+                            <Card className="w-[300px] h-[220px] flex flex-col justify-between">
                                 <CardHeader>
-                                    <CardTitle>{workspace.title}</CardTitle>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <CardTitle className="truncate max-w-[150px]" title={workspace.title}>
+                                            {workspace.title}
+                                        </CardTitle>
+                                        <Badge variant="outline" className="text-xs shrink-0 truncate max-w-[100px]" title={workspace.tenant?.company_name || "Unknown"}>
+                                            {workspace.tenant?.company_name || "Unknown"}
+                                        </Badge>
+                                    </div>
                                     <CardDescription>{formatDateTime(workspace.createdAt)}</CardDescription>
                                     <CardAction>
                                         <DropdownMenu>
@@ -110,7 +172,7 @@ export default function WorkSpacesList() {
                                     </CardAction>
                                 </CardHeader>
                                 <CardContent>
-                                    <p>{workspace.description}</p>
+                                    <p className="line-clamp-2" title={workspace.description}>{workspace.description}</p>
                                 </CardContent>
                                 <CardFooter>
                                     <Avatar>

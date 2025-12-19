@@ -13,6 +13,13 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { FaPlus } from "react-icons/fa";
 import {
     Breadcrumb,
@@ -20,7 +27,9 @@ import {
     BreadcrumbLink,
     BreadcrumbList,
 } from "@/components/ui/breadcrumb";
-import { useCreateUserWorkspace } from "@/src/hooks/useWorkspace";
+import { useCreateUserWorkspace, useUserWorkspaces } from "@/src/hooks/useWorkspace";
+import { useUserTenants } from "@/src/hooks/useAuth";
+import { useAuthStore } from "@/src/store/useAuth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useForm } from "react-hook-form";
@@ -28,6 +37,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import RequireAuth from "@/src/components/auth/requireAuth";
+
+export type WorkspaceFilter = "all" | "my" | number; // number = specific tenant id
 
 const createWorkspaceSchema = z.object({
     name: z.string().min(1, "Name is required").max(100, "Name is too long"),
@@ -37,12 +48,19 @@ type CreateWorkspaceFormValues = z.infer<typeof createWorkspaceSchema>;
 
 export default function DashboardWorkspace() {
     const { mutate: createWorkspace, isPending } = useCreateUserWorkspace();
+    const { data: tenants } = useUserTenants();
+    const currentTenantId = useAuthStore((s) => s.tenantId);
     const [open, setOpen] = useState(false); // ✅ manual control
+    const [filter, setFilter] = useState<WorkspaceFilter>("all");
+    const [searchQuery, setSearchQuery] = useState("");
 
     const form = useForm<CreateWorkspaceFormValues>({
         resolver: zodResolver(createWorkspaceSchema),
         defaultValues: { name: "" },
     });
+
+    // Get unique organizations from tenants for the filter
+    const otherOrganizations = tenants?.filter(t => t.id !== currentTenantId) || [];
 
     const onSubmit = (values: CreateWorkspaceFormValues) => {
         createWorkspace(values.name, {
@@ -76,11 +94,42 @@ export default function DashboardWorkspace() {
                 </Breadcrumb>
 
                 <nav className="sticky top-0 w-[90%] mx-auto self-center flex justify-between items-center bg-background border-b border-border py-5">
-                    <input
-                        type="text"
-                        placeholder="Search..."
-                        className="px-4 py-2 border rounded-md w-1/3"
-                    />
+                    <div className="flex items-center gap-4">
+                        <Input
+                            type="text"
+                            placeholder="Search workspaces..."
+                            className="w-64"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <Select 
+                            value={typeof filter === "number" ? String(filter) : filter} 
+                            onValueChange={(value) => {
+                                if (value === "all" || value === "my") {
+                                    setFilter(value);
+                                } else {
+                                    setFilter(Number(value));
+                                }
+                            }}
+                        >
+                            <SelectTrigger className="w-56">
+                                <SelectValue placeholder="Filter workspaces" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Workspaces</SelectItem>
+                                <SelectItem value="my">My Workspaces</SelectItem>
+                                {otherOrganizations.length > 0 && (
+                                    <>
+                                        {otherOrganizations.map((org) => (
+                                            <SelectItem key={org.id} value={String(org.id)}>
+                                                {org.company_name}
+                                            </SelectItem>
+                                        ))}
+                                    </>
+                                )}
+                            </SelectContent>
+                        </Select>
+                    </div>
 
                     {/* ✅ Controlled dialog */}
                     <AlertDialog open={open} onOpenChange={setOpen}>
@@ -138,7 +187,7 @@ export default function DashboardWorkspace() {
                     </AlertDialog>
                 </nav>
 
-                <WorkSpacesList />
+                <WorkSpacesList filter={filter} currentTenantId={currentTenantId} searchQuery={searchQuery} />
             </div>
         </RequireAuth>
     );

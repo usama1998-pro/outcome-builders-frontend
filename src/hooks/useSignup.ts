@@ -15,10 +15,7 @@ export function useSignup() {
   const startOnboarding = useStartOnboarding();
 
   return useMutation<AuthResponse, Error, SignupPayload>({
-    mutationFn: (payload) => {
-      console.log("🚀 useSignup calling signup()", payload);
-      return signup(payload);
-    },
+    mutationFn: signup,
     onSuccess: (response) => {
       // Store token and user_id
       if (
@@ -38,10 +35,8 @@ export function useSignup() {
 
       toast.success("Account created successfully! Redirecting...");
       router.push("/onboarding");
-      console.log("Signup successful, redirecting to onboarding.");
     },
     onError: (error: unknown) => {
-      console.error("Signup failed:", error);
 
       // Handle error response from API
       const axiosError = error as {
