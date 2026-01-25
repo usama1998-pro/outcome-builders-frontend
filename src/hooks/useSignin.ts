@@ -1,16 +1,24 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-// import { useAuthStore } from "../store/useAuth";
+import { useRouter } from "next/navigation";
 import { signin } from "../api/auth";
 import { AuthResponse, SignupPayload } from "../types/auth";
 import { useLogin } from "../hooks/useAuth";
 import { toast } from "sonner";
-// import { da } from "zod/v4/locales";
+
+interface SigninResponseData {
+  token?: string | null;
+  user_id?: number;
+  email?: string;
+  requires_2fa?: boolean;
+  can_resend_in?: number;
+  message?: string;
+}
 
 export function useSignin() {
-  // const { setToken } = useAuthStore();
   const login = useLogin();
+  const router = useRouter();
 
   return useMutation<AuthResponse, Error, SignupPayload>({
     mutationFn: signin,
@@ -20,12 +28,21 @@ export function useSignin() {
         return;
       }
 
-      const tokenData = data?.data as
-        | { token: string; user_id?: number }
-        | undefined;
-      if (tokenData && tokenData.token) {
+      const responseData = data.data as SigninResponseData;
+
+      // Check if 2FA is required
+      if (responseData.requires_2fa) {
+        toast.info("Verification code sent to your email.");
+        // Redirect to 2FA verification page
+        const cooldown = responseData.can_resend_in || 60;
+        router.push(`/verify-2fa?email=${encodeURIComponent(responseData.email || '')}&cooldown=${cooldown}`);
+        return;
+      }
+
+      // No 2FA - proceed with normal login
+      if (responseData.token) {
         toast.success("Sign in successful! Redirecting...");
-        await login(tokenData.token, tokenData.user_id);
+        await login(responseData.token, responseData.user_id);
       } else {
         toast.error("Sign in failed. No token received from server.");
       }

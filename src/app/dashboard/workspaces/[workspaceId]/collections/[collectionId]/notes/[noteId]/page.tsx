@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { FaEdit, FaArrowLeft, FaPaperclip, FaFile, FaTimes } from "react-icons/fa";
+import { FaEdit, FaArrowLeft, FaPaperclip, FaFile, FaTimes, FaBrain } from "react-icons/fa";
 import { useState, useRef, useEffect } from "react";
 import {
     Breadcrumb,
@@ -20,7 +20,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useUpdateNote } from "@/src/hooks/useNotes";
+import { useUpdateNote, useToggleTrainNote } from "@/src/hooks/useNotes";
 import api from "@/src/lib/axios";
 import routes from "@/src/lib/routes";
 import { Label } from "@/components/ui/label";
@@ -59,6 +59,7 @@ export default function NoteViewPage() {
     const [isError, setIsError] = useState(false);
     const [error, setError] = useState<Error | null>(null);
     const { mutate: updateNote, isPending: isUpdating } = useUpdateNote();
+    const { mutate: toggleTrain, isPending: isTraining } = useToggleTrainNote();
     
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [editTitle, setEditTitle] = useState("");
@@ -204,13 +205,33 @@ export default function NoteViewPage() {
         setEditDialogOpen(true);
     };
 
+    const handleToggleTrain = () => {
+        if (!noteId) return;
+        
+        toggleTrain(noteId, {
+            onSuccess: (res) => {
+                if (res?.status) {
+                    toast.success(res.data.message);
+                    // Update local state
+                    setNote((prev: any) => prev ? { ...prev, is_trained: res.data.is_trained } : prev);
+                } else {
+                    toast.error("Could not update training status.");
+                }
+            },
+            onError: (err: unknown) => {
+                const error = err as { message?: string };
+                toast.error(error?.message || "Request failed, please try again.");
+            },
+        });
+    };
+
     return (
         <RequireAuth>
         <div className="flex flex-col items-center p-6">
             <Breadcrumb>
                 <BreadcrumbList>
                     <BreadcrumbItem>
-                        <BreadcrumbLink href="/dashboard/workspaces">Workspaces</BreadcrumbLink>
+                        <BreadcrumbLink href="/dashboard/workspaces">Brainspaces</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
@@ -237,11 +258,24 @@ export default function NoteViewPage() {
                     <FaArrowLeft className="mr-2" /> Back to Notes
                 </Button>
 
-                {note?.is_owner && (
-                    <Button onClick={openEditDialog}>
-                        <FaEdit className="mr-2" /> Edit Note
-                    </Button>
-                )}
+                <div className="flex gap-2">
+                    {note?.is_owner && (
+                        <Button 
+                            variant={note?.is_trained ? "default" : "outline"}
+                            onClick={handleToggleTrain}
+                            disabled={isTraining}
+                            className={note?.is_trained ? "bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 text-white border-0 hover:opacity-90" : ""}
+                        >
+                            <FaBrain className="mr-2" /> 
+                            {isTraining ? "Processing..." : note?.is_trained ? "Trained" : "Train"}
+                        </Button>
+                    )}
+                    {note?.is_owner && (
+                        <Button onClick={openEditDialog}>
+                            <FaEdit className="mr-2" /> Edit Note
+                        </Button>
+                    )}
+                </div>
             </nav>
 
             {(!mounted || isLoading) && (
@@ -278,7 +312,11 @@ export default function NoteViewPage() {
                             </div>
                             <div className="flex gap-2">
                                 {note.is_pinned && <Badge>Pinned</Badge>}
-                                {note.is_trained && <Badge variant="secondary">Trained</Badge>}
+                                {note.is_trained && (
+                                    <Badge className="bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 text-white border-0">
+                                        <FaBrain className="mr-1" size={10} /> Trained
+                                    </Badge>
+                                )}
                             </div>
                         </div>
                         <CardDescription>

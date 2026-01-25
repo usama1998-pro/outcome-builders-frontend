@@ -158,3 +158,44 @@ a {
     @apply bg-background text-foreground;
   }
 }
+
+/* Toast Styles with Linear Gradients */
+.toast-error {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.toast-error [data-icon] {
+  color: #ffffff !important;
+}
+
+.toast-success {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 50%, #166534 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.toast-success [data-icon] {
+  color: #ffffff !important;
+}
+
+.toast-info {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.toast-info [data-icon] {
+  color: #ffffff !important;
+}
+
+.toast-warning {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.toast-warning [data-icon] {
+  color: #ffffff !important;
+}

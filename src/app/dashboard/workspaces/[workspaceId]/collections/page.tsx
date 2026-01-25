@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CollectionList } from "@/src/components/List/Collection/CollectionList";
 import { useParams } from "next/navigation";
 import { FaPlus } from "react-icons/fa";
+import { Layers, FolderOpen } from "lucide-react";
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -32,6 +33,7 @@ import { toast } from "sonner";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import RequireAuth from "@/src/components/auth/requireAuth";
+import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
 
 const createCollectionSchema = z.object({
     name: z.string().min(1, "Name is required").max(100, "Name is too long"),
@@ -48,6 +50,12 @@ export default function WorkspacePage() {
     const { mutate: createCollection, isPending } = useCreateUserCollection();
     const [open, setOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+
+    // Permission checks - hide elements until permissions are loaded and confirmed
+    const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
+    const canCreateCollection = !permissionsLoading && (
+        hasPermission(PERMISSIONS.COLLECTION_CREATE) || isOwnerOrAdmin
+    );
 
     // Filter collections for current workspace only
     const collections = allCollections?.filter(
@@ -96,7 +104,7 @@ export default function WorkspacePage() {
                 <Breadcrumb>
                     <BreadcrumbList>
                         <BreadcrumbItem>
-                            <BreadcrumbLink href="/dashboard/workspaces">Workspaces</BreadcrumbLink>
+                            <BreadcrumbLink href="/dashboard/workspaces">Brainspaces</BreadcrumbLink>
                         </BreadcrumbItem>
                         <BreadcrumbSeparator />
                         <BreadcrumbItem>
@@ -116,6 +124,7 @@ export default function WorkspacePage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
 
+                    {canCreateCollection && (
                     <AlertDialog open={open} onOpenChange={setOpen}>
                         <AlertDialogTrigger asChild>
                             <Button className="outline">
@@ -205,6 +214,7 @@ export default function WorkspacePage() {
                             </form>
                         </AlertDialogContent>
                     </AlertDialog>
+                    )}
                 </nav>
 
                 {isLoading && (
@@ -231,12 +241,37 @@ export default function WorkspacePage() {
                 )}
 
                 {collections && collections.length === 0 && !isLoading && (
-                    <div className="w-full h-full flex items-center justify-center p-5">
-                        <Card className="w-[400px] p-6 text-center">
-                            <CardContent className="pt-6">
-                                <p className="text-muted-foreground">No collections yet. Create your first one!</p>
-                            </CardContent>
-                        </Card>
+                    <div className="w-full flex items-center justify-center p-10 mt-10">
+                        <div className="flex flex-col items-center text-center max-w-md">
+                            {/* Empty State Icon */}
+                            <div className="relative mb-6">
+                                <div className="w-24 h-24 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center">
+                                    <Layers className="w-12 h-12 text-violet-500 dark:text-violet-400" />
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center shadow-lg">
+                                    <FolderOpen className="w-5 h-5 text-white" />
+                                </div>
+                            </div>
+                            
+                            {/* Text Content */}
+                            <h3 className="text-xl font-semibold text-foreground mb-2">
+                                No Collections Yet
+                            </h3>
+                            <p className="text-muted-foreground mb-6">
+                                Collections help you organize your notes and resources. Create your first collection to get started!
+                            </p>
+                            
+                            {/* CTA Button - only show if user can create */}
+                            {canCreateCollection && (
+                                <Button 
+                                    onClick={() => setOpen(true)}
+                                    className="bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0 hover:from-violet-600 hover:to-purple-600"
+                                >
+                                    <FaPlus className="mr-2 h-4 w-4" />
+                                    Create Your First Collection
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

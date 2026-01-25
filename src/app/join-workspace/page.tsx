@@ -74,9 +74,9 @@ export default function JoinWorkspacePage() {
                             Back
                         </Button>
 
-                        <h1 className="text-3xl font-bold mb-2">Join Workspace</h1>
+                        <h1 className="text-3xl font-bold mb-2">Join Brainspace</h1>
                         <p className="text-gray-600 dark:text-gray-400 mb-6">
-                            Enter the invitation code you received to join a workspace
+                            Enter the invitation code you received to join a brainspace
                         </p>
 
                         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -101,7 +101,7 @@ export default function JoinWorkspacePage() {
 
                             {/* Submit */}
                             <Button type="submit" className="w-full" size="lg">
-                                Join Workspace
+                                Join Brainspace
                             </Button>
                         </form>
 

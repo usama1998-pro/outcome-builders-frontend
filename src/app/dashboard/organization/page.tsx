@@ -3,7 +3,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Users, Crown, Shield, ImageIcon } from "lucide-react";
+import { Building2, Users, Crown, Shield, ImageIcon, Settings } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/src/store/useAuth";
 import { useOrganizationDetails } from "@/src/hooks/useOrganization";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
@@ -134,31 +136,47 @@ export default function OrganizationPage() {
                                 </div>
                             </div>
 
-                            {/* Admins/Contributors */}
+                            {/* Team Members */}
                             <div>
-                                <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
-                                    <Shield className="h-4 w-4 text-blue-500" />
-                                    Administrators ({organization.admins?.length || 0})
-                                </p>
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                        <Users className="h-4 w-4 text-emerald-500" />
+                                        Team Members ({organization.admins?.length || 0})
+                                    </p>
+                                    <Link href="/dashboard/admins">
+                                        <Button variant="outline" size="sm" className="text-xs">
+                                            <Settings className="h-3 w-3 mr-1" />
+                                            Manage
+                                        </Button>
+                                    </Link>
+                                </div>
                                 <div className="space-y-2 max-h-64 overflow-y-auto">
                                     {organization.admins && organization.admins.length > 0 ? (
-                                        organization.admins.map((admin, index) => (
-                                            <div key={index} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                                                <Avatar>
-                                                    <AvatarImage src="" alt={admin.name} />
-                                                    <AvatarFallback>
-                                                        {admin.name.charAt(0).toUpperCase()}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <div className="flex-1">
-                                                    <p className="font-medium">{admin.name}</p>
-                                                    <p className="text-xs text-muted-foreground">{admin.email}</p>
+                                        organization.admins.map((member, index) => {
+                                            const isAdmin = member.role.toLowerCase() === "admin";
+                                            return (
+                                                <div key={index} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                                                    <Avatar>
+                                                        <AvatarImage src="" alt={member.name} />
+                                                        <AvatarFallback>
+                                                            {member.name.charAt(0).toUpperCase()}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex-1">
+                                                        <p className="font-medium">{member.name}</p>
+                                                        <p className="text-xs text-muted-foreground">{member.email}</p>
+                                                    </div>
+                                                    <Badge 
+                                                        variant="secondary"
+                                                        className={isAdmin ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600"}
+                                                    >
+                                                        {member.role}
+                                                    </Badge>
                                                 </div>
-                                                <Badge variant="secondary">{admin.role}</Badge>
-                                            </div>
-                                        ))
+                                            );
+                                        })
                                     ) : (
-                                        <p className="text-sm text-muted-foreground italic">No administrators assigned.</p>
+                                        <p className="text-sm text-muted-foreground italic">No team members assigned.</p>
                                     )}
                                 </div>
                             </div>

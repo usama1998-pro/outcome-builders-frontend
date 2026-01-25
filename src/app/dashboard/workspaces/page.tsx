@@ -37,6 +37,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import RequireAuth from "@/src/components/auth/requireAuth";
+import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
 
 export type WorkspaceFilter = "all" | "my" | number; // number = specific tenant id
 
@@ -54,6 +55,12 @@ export default function DashboardWorkspace() {
     const [filter, setFilter] = useState<WorkspaceFilter>("all");
     const [searchQuery, setSearchQuery] = useState("");
 
+    // Permission checks - hide elements until permissions are loaded and confirmed
+    const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
+    const canCreateBrainspace = !permissionsLoading && (
+        hasPermission(PERMISSIONS.BRAINSPACE_CREATE) || isOwnerOrAdmin
+    );
+
     const form = useForm<CreateWorkspaceFormValues>({
         resolver: zodResolver(createWorkspaceSchema),
         defaultValues: { name: "" },
@@ -66,12 +73,12 @@ export default function DashboardWorkspace() {
         createWorkspace(values.name, {
             onSuccess: (res) => {
                 if (res?.status) {
-                    toast.success(res.message || "Workspace created successfully!");
+                    toast.success(res.message || "Brainspace created successfully!");
                     form.reset();
                     setOpen(false); // ✅ close only when success
                 } else {
                     form.reset();
-                    toast.error(res?.message || "Could not create workspace.");
+                    toast.error(res?.message || "Could not create brainspace.");
                 }
             },
             onError: (err: any) => {
@@ -87,7 +94,7 @@ export default function DashboardWorkspace() {
                     <BreadcrumbList>
                         <BreadcrumbItem>
                             <BreadcrumbLink href="/dashboard/workspaces">
-                                Workspaces
+                                Brainspaces
                             </BreadcrumbLink>
                         </BreadcrumbItem>
                     </BreadcrumbList>
@@ -97,7 +104,7 @@ export default function DashboardWorkspace() {
                     <div className="flex items-center gap-4">
                         <Input
                             type="text"
-                            placeholder="Search workspaces..."
+                            placeholder="Search brainspaces..."
                             className="w-64"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -113,11 +120,11 @@ export default function DashboardWorkspace() {
                             }}
                         >
                             <SelectTrigger className="w-56">
-                                <SelectValue placeholder="Filter workspaces" />
+                                <SelectValue placeholder="Filter brainspaces" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All Workspaces</SelectItem>
-                                <SelectItem value="my">My Workspaces</SelectItem>
+                                <SelectItem value="all">All Brainspaces</SelectItem>
+                                <SelectItem value="my">My Brainspaces</SelectItem>
                                 {otherOrganizations.length > 0 && (
                                     <>
                                         {otherOrganizations.map((org) => (
@@ -131,19 +138,20 @@ export default function DashboardWorkspace() {
                         </Select>
                     </div>
 
-                    {/* ✅ Controlled dialog */}
+                    {/* ✅ Controlled dialog - Only show if user can create brainspaces */}
+                    {canCreateBrainspace && (
                     <AlertDialog open={open} onOpenChange={setOpen}>
                         <AlertDialogTrigger asChild>
                             <Button className="outline">
-                                <FaPlus className="mr-2" /> New Workspace
+                                <FaPlus className="mr-2" /> New Brainspace
                             </Button>
                         </AlertDialogTrigger>
 
                         <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>Create a new workspace</AlertDialogTitle>
+                                <AlertDialogTitle>Create a new brainspace</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    Enter a name for your new workspace below.
+                                    Enter a name for your new brainspace below.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
 
@@ -154,11 +162,11 @@ export default function DashboardWorkspace() {
                             >
                                 <div>
                                     <Label className="pb-3" htmlFor="name">
-                                        Workspace name
+                                        Brainspace name
                                     </Label>
                                     <Input
                                         id="name"
-                                        placeholder="e.g. ai-workspace"
+                                        placeholder="e.g. ai-brainspace"
                                         {...form.register("name")}
                                         aria-invalid={!!form.formState.errors.name}
                                     />
@@ -185,6 +193,7 @@ export default function DashboardWorkspace() {
                             </form>
                         </AlertDialogContent>
                     </AlertDialog>
+                    )}
                 </nav>
 
                 <WorkSpacesList filter={filter} currentTenantId={currentTenantId} searchQuery={searchQuery} />

@@ -101,3 +101,85 @@ export function useDeleteUserWorkspace() {
     },
   });
 }
+
+
+// ============ Workspace Assignments ============
+
+interface TenantWorkspace {
+  id: number;
+  name: string;
+  tenant_id: number;
+}
+
+interface TenantWorkspacesResponse {
+  status: boolean;
+  message: string;
+  data: { message: TenantWorkspace[] };
+}
+
+interface WorkspaceAssignment {
+  workspace_id: number;
+  workspace_name: string;
+  role: string;
+  joined_at: string | null;
+}
+
+interface WorkspaceAssignmentsResponse {
+  status: boolean;
+  message: string;
+  data: WorkspaceAssignment[];
+}
+
+// Fetch all workspaces in a tenant (for admins to select from)
+async function fetchTenantWorkspaces(tenantId: number): Promise<TenantWorkspace[]> {
+  const { data } = await api.get<TenantWorkspacesResponse>(routes.workspace.get.tenant, {
+    headers: { "x-tenant": tenantId.toString() }
+  });
+  return data.data.message;
+}
+
+export function useTenantWorkspaces(tenantId: number | null) {
+  return useQuery<TenantWorkspace[], Error>({
+    queryKey: ["tenantWorkspaces", tenantId],
+    queryFn: () => fetchTenantWorkspaces(tenantId!),
+    enabled: !!tenantId,
+  });
+}
+
+// Fetch workspace assignments for a specific user
+async function fetchUserWorkspaceAssignments(tenantId: number, userId: number): Promise<WorkspaceAssignment[]> {
+  const { data } = await api.get<WorkspaceAssignmentsResponse>(routes.workspace.assignments(tenantId, userId));
+  return data.data;
+}
+
+export function useUserWorkspaceAssignments(tenantId: number | null, userId: number | null) {
+  return useQuery<WorkspaceAssignment[], Error>({
+    queryKey: ["workspaceAssignments", tenantId, userId],
+    queryFn: () => fetchUserWorkspaceAssignments(tenantId!, userId!),
+    enabled: !!tenantId && !!userId,
+  });
+}
+
+// Update workspace assignments for a user
+interface UpdateAssignmentsPayload {
+  user_id: number;
+  workspace_ids: number[];
+}
+
+async function updateWorkspaceAssignments(tenantId: number, payload: UpdateAssignmentsPayload): Promise<{ message: string }> {
+  const { data } = await api.put(routes.workspace.updateAssignments(tenantId), payload);
+  return data.data;
+}
+
+export function useUpdateWorkspaceAssignments() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ tenantId, payload }: { tenantId: number; payload: UpdateAssignmentsPayload }) => 
+      updateWorkspaceAssignments(tenantId, payload),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["workspaceAssignments", variables.tenantId, variables.payload.user_id] });
+      queryClient.invalidateQueries({ queryKey: ["userWorkspaces"] });
+    },
+  });
+}

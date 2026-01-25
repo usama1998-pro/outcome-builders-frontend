@@ -14,7 +14,7 @@ import Notes from "@/src/types/notes";
 import Link from "next/link";
 import { BsThreeDotsVertical } from "react-icons/bs";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
-import { FaTrash, FaPaperclip, FaEdit, FaEye } from "react-icons/fa";
+import { FaTrash, FaPaperclip, FaEdit, FaEye, FaBrain } from "react-icons/fa";
 import { useState, useMemo } from "react";
 import {
     DropdownMenu,
@@ -33,7 +33,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { useDeleteNote } from "@/src/hooks/useNotes";
+import { useDeleteNote, useToggleTrainNote } from "@/src/hooks/useNotes";
 // import { FaUser } from "react-icons/fa";
 
 
@@ -46,6 +46,7 @@ type NotesListProps = {
 
 export function NotesList({ workspace, collection, notes, searchQuery = "" }: NotesListProps) {
     const { mutate: deleteNote, isPending: isDeleting } = useDeleteNote();
+    const { mutate: toggleTrain } = useToggleTrainNote();
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [noteToDelete, setNoteToDelete] = useState<number | null>(null);
 
@@ -65,6 +66,24 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
         e.stopPropagation();
         setNoteToDelete(noteId);
         setDeleteDialogOpen(true);
+    };
+
+    const handleTrainClick = (noteId: number, isTrained: boolean, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleTrain(noteId, {
+            onSuccess: (res) => {
+                if (res?.status) {
+                    toast.success(res.data.message);
+                } else {
+                    toast.error("Could not update training status.");
+                }
+            },
+            onError: (err: unknown) => {
+                const error = err as { message?: string };
+                toast.error(error?.message || "Request failed, please try again.");
+            },
+        });
     };
 
     const confirmDelete = () => {
@@ -110,10 +129,18 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                                 <Card className="w-[300px] h-[200px] flex flex-col justify-between">
                                     <CardHeader>
                                         <div className="flex items-center gap-2">
-                                            <CardTitle className="truncate max-w-[200px]" title={note.title}>{note.title}</CardTitle>
+                                            <CardTitle className="truncate max-w-[180px]" title={note.title}>{note.title}</CardTitle>
                                             {note.hasFile && (
                                                 <span title={note.fileName || "Attachment"} className="text-blue-500">
                                                     <FaPaperclip size={14} />
+                                                </span>
+                                            )}
+                                            {note.is_trained && (
+                                                <span 
+                                                    title="Trained" 
+                                                    className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500"
+                                                >
+                                                    <FaBrain size={12} className="text-white" />
                                                 </span>
                                             )}
                                         </div>
@@ -151,6 +178,13 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                                                     >
                                                         <FaEdit className="mr-2" />
                                                         Edit Note
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={(e) => handleTrainClick(note.id, note.is_trained || false, e)}
+                                                        className={`cursor-pointer ${note.is_trained ? "text-cyan-600 focus:text-cyan-600" : ""}`}
+                                                    >
+                                                        <FaBrain className="mr-2" />
+                                                        {note.is_trained ? "Untrain Note" : "Train Note"}
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                         onClick={(e) => handleDeleteClick(note.id, e)}

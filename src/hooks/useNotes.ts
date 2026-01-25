@@ -15,6 +15,8 @@ interface NoteApiItem {
   file_size: number | null;
   file_type: string | null;
   has_file: boolean;
+  is_trained: boolean;
+  is_pinned: boolean;
 }
 
 interface NotesApiResponse {
@@ -91,6 +93,8 @@ async function fetchCollectionNotes(collectionId: number): Promise<Notes[]> {
     fileSize: n.file_size,
     fileType: n.file_type,
     hasFile: n.has_file,
+    is_trained: n.is_trained,
+    is_pinned: n.is_pinned,
   }));
 }
 
@@ -252,6 +256,35 @@ export function useDeleteNote() {
     onSuccess: () => {
       // Invalidate all collection notes queries after successful deletion
       queryClient.invalidateQueries({ queryKey: ["collectionNotes"] });
+    },
+  });
+}
+
+interface TrainNoteResponse {
+  status: boolean;
+  message: string;
+  data: {
+    id: number;
+    is_trained: boolean;
+    message: string;
+  };
+}
+
+async function toggleTrainNote(noteId: number): Promise<TrainNoteResponse> {
+  const { data } = await api.post<TrainNoteResponse>(routes.notes.train(noteId));
+  return data;
+}
+
+export function useToggleTrainNote() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: toggleTrainNote,
+    onSuccess: (_, noteId) => {
+      // Invalidate the specific note and collection notes
+      queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+      queryClient.invalidateQueries({ queryKey: ["collectionNotes"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
     },
   });
 }

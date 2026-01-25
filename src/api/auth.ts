@@ -16,3 +16,56 @@ export async function verifyToken(): Promise<AuthResponse> {
   const { data } = await api.get(routes.auth.verify);
   return data;
 }
+
+export interface ForgotPasswordPayload {
+  email: string;
+}
+
+export interface ResetPasswordPayload {
+  token: string;
+  new_password: string;
+}
+
+export async function forgotPassword(payload: ForgotPasswordPayload): Promise<AuthResponse> {
+  const { data } = await api.post(routes.auth.forgotPassword, payload);
+  return data;
+}
+
+export async function resetPassword(payload: ResetPasswordPayload): Promise<AuthResponse> {
+  const { data } = await api.post(routes.auth.resetPassword, payload);
+  return data;
+}
+
+// Two-Factor Authentication
+export interface TwoFAVerifyPayload {
+  email: string;
+  code: string;
+}
+
+export interface TwoFATogglePayload {
+  enable: boolean;
+}
+
+export interface TwoFAResendPayload {
+  email: string;
+}
+
+export async function verify2FA(payload: TwoFAVerifyPayload): Promise<AuthResponse> {
+  const { data } = await api.post(routes.auth.twoFAVerify, payload);
+  return data;
+}
+
+export async function toggle2FA(payload: TwoFATogglePayload): Promise<AuthResponse> {
+  const { data } = await api.post(routes.auth.twoFAToggle, payload);
+  return data;
+}
+
+export async function get2FAStatus(): Promise<AuthResponse> {
+  const { data } = await api.get(routes.auth.twoFAStatus);
+  return data;
+}
+
+export async function resend2FACode(payload: TwoFAResendPayload): Promise<AuthResponse> {
+  const { data } = await api.post(routes.auth.twoFAResend, payload);
+  return data;
+}

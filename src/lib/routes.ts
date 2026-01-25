@@ -3,6 +3,12 @@ const routes = {
     signup: "/user/signup",
     signin: "/user/signin",
     verify: "/user/verify",
+    forgotPassword: "/user/forgot-password",
+    resetPassword: "/user/reset-password",
+    twoFAVerify: "/user/2fa/verify",
+    twoFAToggle: "/user/2fa/toggle",
+    twoFAStatus: "/user/2fa/status",
+    twoFAResend: "/user/2fa/resend",
   },
   workspace: {
     get: {
@@ -11,6 +17,8 @@ const routes = {
     },
     create: "/workspace",
     delete: (id: number) => `/workspace/${id}`,
+    assignments: (tenantId: number, userId: number) => `/workspace/assignments/${tenantId}/${userId}`,
+    updateAssignments: (tenantId: number) => `/workspace/assignments/${tenantId}`,
   },
   collection: {
     get: {
@@ -23,11 +31,21 @@ const routes = {
     account: "/user/profile",
     tenants: "/user/tenants",
     updateProfile: "/user/profile/update",
+    createRole: "/user/role",
+    updateRole: "/user/role",
+    permissions: "/user/permissions",
+    myPermissions: (tenantId: number) => `/user/my-permissions/${tenantId}`,
+    customRoles: (tenantId: number) => `/user/custom-roles/${tenantId}`,
+    customRole: (tenantId: number, roleId: number) => `/user/custom-roles/${tenantId}/${roleId}`,
+    invite: (tenantId: number) => `/user/invite/${tenantId}`,
+    removeMember: (tenantId: number, userId: number) => `/user/member/${tenantId}/${userId}`,
+    updateMember: (tenantId: number, userId: number) => `/user/member/${tenantId}/${userId}`,
   },
   tenant: {
     create: "/tenant",
     details: (id: number) => `/tenant/${id}`,
     overview: "/tenant/overview",
+    analytics: "/tenant/analytics/overview",
   },
   notes: {
     get: "/note",
@@ -35,6 +53,7 @@ const routes = {
     create: "/note",
     update: (id: number) => `/note/${id}`,
     delete: (id: number) => `/note/${id}`,
+    train: (id: number) => `/note/${id}/train`,
   },
 };
 

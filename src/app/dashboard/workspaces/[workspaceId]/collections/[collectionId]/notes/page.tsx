@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import RequireAuth from "@/src/components/auth/requireAuth";
+import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
 
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1 MB
 const ALLOWED_FILE_TYPES = [".pdf", ".txt", ".doc", ".docx"];
@@ -63,6 +64,12 @@ export default function NotesPage() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [fileError, setFileError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Permission checks - hide elements until permissions are loaded and confirmed
+    const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
+    const canCreateNote = !permissionsLoading && (
+        hasPermission(PERMISSIONS.NOTE_CREATE) || isOwnerOrAdmin
+    );
 
     const form = useForm<CreateNoteFormValues>({
         resolver: zodResolver(createNoteSchema),
@@ -164,7 +171,7 @@ export default function NotesPage() {
             <Breadcrumb>
                 <BreadcrumbList>
                     <BreadcrumbItem>
-                        <BreadcrumbLink href="/dashboard/workspaces">Workspaces</BreadcrumbLink>
+                        <BreadcrumbLink href="/dashboard/workspaces">Brainspaces</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
@@ -185,6 +192,7 @@ export default function NotesPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
 
+                {canCreateNote && (
                 <AlertDialog open={open} onOpenChange={setOpen}>
                     <AlertDialogTrigger asChild>
                         <Button>
@@ -291,7 +299,7 @@ export default function NotesPage() {
                         </form>
                     </AlertDialogContent>
                 </AlertDialog>
-
+                )}
 
             </nav>
 

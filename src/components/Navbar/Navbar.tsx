@@ -2,21 +2,17 @@
 
 import Image from 'next/image';
 import Link from "next/link";
-// import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils";
 import {
     NavigationMenu,
     NavigationMenuList,
     NavigationMenuItem,
-    // NavigationMenuLink,
 } from "@/components/ui/navigation-menu";
 import { ToggleThemeButton } from "../../../components/ToggleThemeButton";
-// import { useAuthStore } from "../../store/useAuth";
+import { useAuthStore } from "../../store/useAuth";
 
 export default function Navbar() {
-    // const token = useAuthStore((s) => s.token);
-    // const { theme, setTheme } = useTheme()
-    // console.log("theme in navbar", theme);
+    const token = useAuthStore((s) => s.token);
 
     return (
         <>
@@ -25,19 +21,18 @@ export default function Navbar() {
                     {/* Logo / Brand */}
                     <Link href="/" className="flex items-center space-x-2" passHref>
                         <Image
-                            src="/assets/Primary-Logo-Line-White.png"      // path inside /public
+                            src="/assets/Primary-Logo-Line-White.png"
                             alt="outcome builder logo"
                             className="hidden dark:block"
-                            width={200}              // required: image width
-                            height={200}             // required: image height
-
+                            width={200}
+                            height={200}
                         />
 
                         <Image
-                            src="/assets/Primary-Logo-Line-Black.png"       // path inside /public
+                            src="/assets/Primary-Logo-Line-Black.png"
                             alt="outcome builder logo"
-                            width={200}              // required: image width
-                            height={200}             // required: image height
+                            width={200}
+                            height={200}
                             className="dark:hidden"
                         />
                     </Link>
@@ -45,34 +40,27 @@ export default function Navbar() {
                     {/* Navigation Links */}
                     <NavigationMenu>
                         <NavigationMenuList>
-                            {/* {
-                                token && <NavigationMenuItem>
+                            {token ? (
+                                <NavigationMenuItem>
                                     <Link href="/dashboard" className={cn("px-3 py-2 hover:underline")} passHref>
                                         Dashboard
                                     </Link>
                                 </NavigationMenuItem>
+                            ) : (
+                                <>
+                                    <NavigationMenuItem>
+                                        <Link href="/signin" className={cn("px-3 py-2 hover:underline")} passHref>
+                                            Sign In
+                                        </Link>
+                                    </NavigationMenuItem>
 
-                            } */}
-
-                            <NavigationMenuItem>
-                                <Link href="/dashboard" className={cn("px-3 py-2 hover:underline")} passHref>
-                                    Dashboard
-                                </Link>
-                            </NavigationMenuItem>
-
-
-                            <NavigationMenuItem>
-                                <Link href="/signup" className={cn("px-3 py-2 hover:underline")} passHref>
-                                    Signup
-                                </Link>
-                            </NavigationMenuItem>
-
-                            <NavigationMenuItem>
-                                <Link href="/signin" className={cn("px-3 py-2 hover:underline")} passHref>
-                                    Signin
-                                </Link>
-                            </NavigationMenuItem>
-
+                                    <NavigationMenuItem>
+                                        <Link href="/signup" className={cn("px-3 py-2 hover:underline")} passHref>
+                                            Sign Up
+                                        </Link>
+                                    </NavigationMenuItem>
+                                </>
+                            )}
                         </NavigationMenuList>
                     </NavigationMenu>
 

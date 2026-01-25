@@ -7,4 +7,6 @@ export default interface Notes {
     fileSize?: number | null;
     fileType?: string | null;
     hasFile?: boolean;
+    is_trained?: boolean;
+    is_pinned?: boolean;
 }

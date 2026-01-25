@@ -1,5 +1,5 @@
 "use client";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
     Sidebar,
@@ -13,89 +13,72 @@ import {
     SidebarMenuItem
 } from "@/components/ui/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ChevronUp, User2, Building2, ChevronDown, Check, UserPlus, Users, Home, Briefcase, MessageSquare } from "lucide-react";
+import { ChevronUp, User2, Building2, UserPlus, Users, LayoutDashboard, Brain, MessageSquare, FolderOpen } from "lucide-react";
 import { useSignOut, useUserTenants } from "@/src/hooks/useAuth";
 import { useAuthStore } from "@/src/store/useAuth";
+import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
+import { useUserProfile } from "@/src/hooks/useProfile";
+import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
 
 export default function SidePanel() {
     const pathname = usePathname();
-    const router = useRouter();
     const signOut = useSignOut();
     const currentTenantId = useAuthStore((s) => s.tenantId);
-    const setTenantId = useAuthStore((s) => s.setTenantId);
     const { data: tenants } = useUserTenants();
+    const { data: userProfile } = useUserProfile();
+    const { data: workspaces } = useUserWorkspaces();
+
+    // Permission checks - hide elements until permissions are loaded and confirmed
+    const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
+
+    // Get display name - prefer full_name, fallback to email, truncate if too long
+    const getDisplayName = () => {
+        const name = userProfile?.data?.full_name || userProfile?.data?.email || "User";
+        if (name.length > 20) {
+            return name.substring(0, 17) + "...";
+        }
+        return name;
+    };
+
+    // Truncate text helper
+    const truncateText = (text: string, maxLength: number) => {
+        if (text.length > maxLength) {
+            return text.substring(0, maxLength - 3) + "...";
+        }
+        return text;
+    };
+    
+    // Only show once permissions are loaded AND user has access
+    const canViewTeam = !permissionsLoading && (
+        hasPermission(PERMISSIONS.ADMIN_MANAGE) || 
+        hasPermission(PERMISSIONS.USER_INVITE) || 
+        isOwnerOrAdmin
+    );
 
     // Find the current tenant
     const currentTenant = tenants?.find((t) => t.id === currentTenantId);
 
-    const links = [
-        { href: "/dashboard", label: "Home" },
-        { href: "/dashboard/workspaces", label: "Workspace" },
-        { href: "/chat", label: "Chat" },
-    ];
-
-    const handleTenantClick = (tenantId: number) => {
-        if (tenantId !== currentTenantId) {
-            setTenantId(tenantId);
-        }
-        // Navigate to organization page
-        router.push("/dashboard/organization");
-    };
-
     return (
         <Sidebar>
             <SidebarContent>
-                {/* Organization Dropdown */}
+                {/* Organization */}
                 <SidebarGroup>
                     <SidebarGroupLabel>Organization</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             <SidebarMenuItem>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <SidebarMenuButton className="w-full">
-                                            <Building2 className="mr-2" />
-                                            <span className="flex-1 text-left truncate">
-                                                {currentTenant?.company_name || "Select Organization"}
-                                            </span>
-                                            <ChevronDown className="ml-auto h-4 w-4" />
-                                        </SidebarMenuButton>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        side="right"
-                                        align="start"
-                                        className="w-[250px]"
+                                <SidebarMenuButton asChild>
+                                    <Link
+                                        href="/dashboard/organization"
+                                        className={`px-2 py-1 rounded ${pathname === "/dashboard/organization" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                            }`}
                                     >
-                                        <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                                            Your Organizations ({tenants?.length || 0})
-                                        </div>
-                                        {tenants && tenants.length > 0 ? (
-                                            tenants.map((tenant) => (
-                                                <DropdownMenuItem
-                                                    key={tenant.id}
-                                                    onClick={() => handleTenantClick(tenant.id)}
-                                                    className="cursor-pointer"
-                                                >
-                                                    <div className="flex items-center justify-between w-full">
-                                                        <div className="flex flex-col">
-                                                            <span className="font-medium">{tenant.company_name}</span>
-                                                            <span className="text-xs text-muted-foreground">
-                                                                Role: {tenant.role}
-                                                            </span>
-                                                        </div>
-                                                        {tenant.id === currentTenantId && (
-                                                            <Check className="h-4 w-4 text-primary" />
-                                                        )}
-                                                    </div>
-                                                </DropdownMenuItem>
-                                            ))
-                                        ) : (
-                                            <DropdownMenuItem disabled>
-                                                No organizations found
-                                            </DropdownMenuItem>
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                        <Building2 className="mr-2 h-4 w-4" />
+                                        <span className="flex-1 text-left truncate">
+                                            {currentTenant?.company_name || "Organization"}
+                                        </span>
+                                    </Link>
+                                </SidebarMenuButton>
                             </SidebarMenuItem>
 
                             {/* Join Organization Link */}
@@ -127,8 +110,8 @@ export default function SidePanel() {
                                         className={`px-2 py-1 rounded ${pathname === "/dashboard" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                             }`}
                                     >
-                                        <Home className="mr-2 h-4 w-4" />
-                                        Home
+                                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                                        Dashboard
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -140,13 +123,13 @@ export default function SidePanel() {
                                         className={`px-2 py-1 rounded ${pathname === "/dashboard/workspaces" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                             }`}
                                     >
-                                        <Briefcase className="mr-2 h-4 w-4" />
-                                        Workspace
+                                        <Brain className="mr-2 h-4 w-4" />
+                                        Brainspace
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
 
-                            {/* Join Workspace Link */}
+                            {/* Join Brainspace Link */}
                             <SidebarMenuItem>
                                 <SidebarMenuButton asChild>
                                     <Link
@@ -155,7 +138,7 @@ export default function SidePanel() {
                                             }`}
                                     >
                                         <Users className="mr-2 h-4 w-4" />
-                                        Join Workspace
+                                        Join Brainspace
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -172,10 +155,61 @@ export default function SidePanel() {
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
+
+                            {canViewTeam && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/admins"
+                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/admins" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                                }`}
+                                        >
+                                            <Users className="mr-2 h-4 w-4" />
+                                            Team
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            )}
                         </SidebarMenu>
 
                     </SidebarGroupContent>
                 </SidebarGroup>
+
+                {/* My Brainspaces */}
+                {workspaces && workspaces.length > 0 && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel>My Brainspaces</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                {workspaces.map((workspace) => (
+                                    <SidebarMenuItem key={workspace.id}>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href={`/dashboard/workspaces/${workspace.id}/collections`}
+                                                className={`px-2 py-1 rounded flex flex-col items-start gap-0 ${
+                                                    pathname === `/dashboard/workspaces/${workspace.id}/collections` 
+                                                        ? "bg-gray-300 font-semibold" 
+                                                        : "hover:bg-gray-200"
+                                                }`}
+                                                title={`${workspace.title} - ${workspace.tenant?.company_name || "Unknown Org"}`}
+                                            >
+                                                <div className="flex items-center w-full">
+                                                    <FolderOpen className="mr-2 h-4 w-4 shrink-0" />
+                                                    <span className="truncate flex-1">
+                                                        {truncateText(workspace.title, 18)}
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground ml-6 truncate w-full">
+                                                    {truncateText(workspace.tenant?.company_name || "Unknown Org", 20)}
+                                                </span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                ))}
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
             </SidebarContent>
 
             <SidebarFooter>
@@ -183,9 +217,12 @@ export default function SidePanel() {
                     <SidebarMenuItem>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <SidebarMenuButton>
-                                    <User2 /> Username
-                                    <ChevronUp className="ml-auto" />
+                                <SidebarMenuButton className="w-full">
+                                    <User2 className="shrink-0" />
+                                    <span className="truncate flex-1 text-left" title={userProfile?.data?.full_name || userProfile?.data?.email}>
+                                        {getDisplayName()}
+                                    </span>
+                                    <ChevronUp className="ml-auto shrink-0" />
                                 </SidebarMenuButton>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent

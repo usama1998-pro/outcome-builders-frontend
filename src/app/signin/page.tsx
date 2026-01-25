@@ -34,7 +34,7 @@ export default function SignInForm() {
                 <ToggleThemeButton />
             </div>
             <div className="flex items-center justify-center h-screen">
-                <div className="w-64 h-64 flex items-center justify-center flex-col">
+                <div className="w-full max-w-md flex items-center justify-center flex-col px-4">
                     <Image
                         src="/assets/Primary-Logo-Stacked-Black.png"
                         alt="logo black"
@@ -50,16 +50,16 @@ export default function SignInForm() {
                         height={300}
                     />
 
-                    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 p-6">
+                    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 p-6 w-full">
                         {/* Email input */}
                         <input
                             type="email"
                             placeholder="Email"
                             {...register("email")}
-                            className="border p-2"
+                            className="border p-2 w-full rounded"
                         />
                         {errors.email && (
-                            <p className="text-red-500 text-sm">{errors.email.message}</p>
+                            <p className="!text-red-500 dark:!text-red-400 text-sm">{errors.email.message}</p>
                         )}
 
                         {/* Password input */}
@@ -68,7 +68,7 @@ export default function SignInForm() {
                                 type={showPassword ? "text" : "password"}
                                 placeholder="Password"
                                 {...register("password")}
-                                className="border p-2 pr-10 w-full"
+                                className="border p-2 pr-10 w-full rounded"
                             />
                             <button
                                 type="button"
@@ -80,7 +80,7 @@ export default function SignInForm() {
                             </button>
                         </div>
                         {errors.password && (
-                            <p className="text-red-500 text-sm">{errors.password.message}</p>
+                            <p className="!text-red-500 dark:!text-red-400 text-sm">{errors.password.message}</p>
                         )}
 
                         {/* Forgot Password Link */}
