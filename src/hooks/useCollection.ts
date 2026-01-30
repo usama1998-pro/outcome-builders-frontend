@@ -54,6 +54,7 @@ async function fetchUserCollections(): Promise<Collections[]> {
         avatarUrl: "/default-avatar.png",
         workspaceId: c.workspace_id,
         workspaceName: c.workspace_name,
+        visibility: c.visibility,
     }));
 }
 

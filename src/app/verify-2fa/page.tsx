@@ -97,10 +97,11 @@ function TwoFAVerificationContent() {
         
         try {
             const response = await verify2FA({ email, code: fullCode });
+            const data = response?.data as { token?: string; user_id?: number } | null;
             
-            if (response?.data?.token) {
+            if (data?.token) {
                 toast.success("Verification successful!");
-                await login(response.data.token, response.data.user_id);
+                await login(data.token, data.user_id);
             } else {
                 toast.error("Verification failed. Please try again.");
             }
@@ -131,7 +132,8 @@ function TwoFAVerificationContent() {
         
         try {
             const response = await resend2FACode({ email });
-            setCooldownSeconds(response?.data?.can_resend_in || 60);
+            const data = response?.data as { can_resend_in?: number } | null;
+            setCooldownSeconds(data?.can_resend_in || 60);
             toast.success("Verification code sent to your email.");
         } catch (error: unknown) {
             const axiosError = error as {

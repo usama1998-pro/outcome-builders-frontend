@@ -31,13 +31,17 @@ export function use2FAStatus() {
 export function useToggle2FA() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (payload: TwoFATogglePayload) => toggle2FA(payload),
+  return useMutation<AuthResponse<TwoFAData>, Error, TwoFATogglePayload>({
+    mutationFn: async (payload: TwoFATogglePayload) => {
+      const response = await toggle2FA(payload);
+      return response as AuthResponse<TwoFAData>;
+    },
     onSuccess: (data) => {
       // Invalidate and refetch 2FA status
       queryClient.invalidateQueries({ queryKey: ["2faStatus"] });
-      const message = data?.data?.message || data?.message || 
-        (data?.data?.two_fa_enabled ? "Two-factor authentication enabled successfully!" : "Two-factor authentication disabled successfully!");
+      const responseData = data?.data as TwoFAData | null;
+      const message = responseData?.message || data?.message || 
+        (responseData?.two_fa_enabled ? "Two-factor authentication enabled successfully!" : "Two-factor authentication disabled successfully!");
       toast.success(message);
     },
     onError: (error: unknown) => {
