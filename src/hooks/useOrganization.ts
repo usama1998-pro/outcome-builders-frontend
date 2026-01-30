@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "../store/useAuth";
 import { useCompleteOnboarding } from "./useOnboarding";
+import { useAssignWorkspacesFromInvitation } from "./useWorkspace";
 
 // ------------------
 //  Types
@@ -50,6 +51,7 @@ export function useRegisterOrganization() {
   const router = useRouter();
   const setTenantId = useAuthStore((s) => s.setTenantId);
   const completeOnboarding = useCompleteOnboarding();
+  const tenantId = useAuthStore((s) => s.tenantId);
 
   return useMutation<
     RegisterOrganizationResponse,
@@ -57,19 +59,17 @@ export function useRegisterOrganization() {
     RegisterOrganizationPayload
   >({
     mutationFn: registerOrganization,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast.success("Organization registered successfully! Redirecting...");
 
       // Store the tenant_id
-      if (data.tenant_id) {
-        setTenantId(data.tenant_id);
+      const finalTenantId = data.tenant_id || tenantId;
+      if (finalTenantId) {
+        setTenantId(finalTenantId);
       }
 
-      // Mark onboarding as complete
-      completeOnboarding();
-
-      // Redirect to dashboard after successful registration
-      router.push("/dashboard");
+      // Complete onboarding (this will handle workspace assignment if needed)
+      await completeOnboarding();
     },
     onError: (error: unknown) => {
 

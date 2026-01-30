@@ -9,6 +9,8 @@ const routes = {
     twoFAToggle: "/user/2fa/toggle",
     twoFAStatus: "/user/2fa/status",
     twoFAResend: "/user/2fa/resend",
+    verifyEmail: "/user/verify-email",
+    resendVerification: "/user/resend-verification",
   },
   workspace: {
     get: {
@@ -19,6 +21,8 @@ const routes = {
     delete: (id: number) => `/workspace/${id}`,
     assignments: (tenantId: number, userId: number) => `/workspace/assignments/${tenantId}/${userId}`,
     updateAssignments: (tenantId: number) => `/workspace/assignments/${tenantId}`,
+    assignFromInvitation: "/workspace/assign-from-invitation",
+    joinWithToken: "/workspace/join-with-token",
   },
   collection: {
     get: {
@@ -40,6 +44,9 @@ const routes = {
     invite: (tenantId: number) => `/user/invite/${tenantId}`,
     removeMember: (tenantId: number, userId: number) => `/user/member/${tenantId}/${userId}`,
     updateMember: (tenantId: number, userId: number) => `/user/member/${tenantId}/${userId}`,
+    invitations: (tenantId: number) => `/user/invitations/${tenantId}`,
+    resendInvitation: (tenantId: number, invitationId: number) => `/user/invitations/${tenantId}/${invitationId}/resend`,
+    sendWorkspaceTokens: (tenantId: number, invitationId: number) => `/user/invitations/${tenantId}/${invitationId}/send-tokens`,
   },
   tenant: {
     create: "/tenant",

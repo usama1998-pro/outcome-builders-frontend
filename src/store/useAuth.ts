@@ -12,10 +12,14 @@ type AuthState = {
   tenantId: number | null;
   hydrated: boolean;
   onboarding: OnboardingState;
+  pendingWorkspaceIds: number[] | null;  // Workspace IDs to assign after onboarding
+  workspaceJoiningToken: string | null;  // Single token to join all workspaces
   setToken: (token: string) => void;
   setUserId: (userId: number) => void;
   setTenantId: (tenantId: number) => void;
   setOnboardingPath: (path: string) => void;
+  setPendingWorkspaceIds: (workspaceIds: number[]) => void;
+  setWorkspaceJoiningToken: (token: string) => void;
   completeOnboarding: () => void;
   clearToken: () => void;
   hydrate: () => void;
@@ -26,6 +30,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   userId: null,
   tenantId: null,
   hydrated: false,
+  pendingWorkspaceIds: null,
+  workspaceJoiningToken: null,
   onboarding: {
     isComplete: true, // Default to true for existing users
     lastPath: null,
@@ -45,6 +51,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   setTenantId: (tenantId) => {
     localStorage.setItem("tenant_id", String(tenantId));
     set({ tenantId });
+  },
+
+  setPendingWorkspaceIds: (workspaceIds) => {
+    localStorage.setItem("pending_workspace_ids", JSON.stringify(workspaceIds));
+    set({ pendingWorkspaceIds: workspaceIds });
+  },
+
+  setWorkspaceJoiningToken: (token) => {
+    localStorage.setItem("workspace_joining_token", token);
+    set({ workspaceJoiningToken: token });
   },
 
   setOnboardingPath: (path) => {
@@ -72,10 +88,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem("user_id");
     localStorage.removeItem("tenant_id");
     localStorage.removeItem("onboarding_state");
+    localStorage.removeItem("pending_workspace_ids");
+    localStorage.removeItem("workspace_joining_token");
     set({
       token: null,
       userId: null,
       tenantId: null,
+      pendingWorkspaceIds: null,
+      workspaceJoiningToken: null,
       onboarding: { isComplete: true, lastPath: null, lastVisit: null },
     });
   },
@@ -85,6 +105,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     const storedUserId = localStorage.getItem("user_id");
     const storedTenantId = localStorage.getItem("tenant_id");
     const storedOnboarding = localStorage.getItem("onboarding_state");
+    const storedPendingWorkspaceIds = localStorage.getItem("pending_workspace_ids");
+    const storedWorkspaceJoiningToken = localStorage.getItem("workspace_joining_token");
 
     console.log(
       "[hydrate] storedToken:",
@@ -108,12 +130,27 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     }
 
+    // Parse pending workspace IDs
+    let pendingWorkspaceIds: number[] | null = null;
+    if (storedPendingWorkspaceIds) {
+      try {
+        pendingWorkspaceIds = JSON.parse(storedPendingWorkspaceIds);
+      } catch {
+        // Invalid JSON, use defaults
+      }
+    }
+
+    // Get workspace joining token (single string, not JSON)
+    const workspaceJoiningToken = storedWorkspaceJoiningToken || null;
+
     if (!storedToken) {
       set({
         token: null,
         userId: null,
         tenantId: null,
         hydrated: true,
+        pendingWorkspaceIds: null,
+        workspaceJoiningToken: null,
         onboarding: onboardingState,
       });
       return;
@@ -143,6 +180,8 @@ export const useAuthStore = create<AuthState>((set) => ({
           userId: storedUserId ? Number(storedUserId) : null,
           tenantId: storedTenantId ? Number(storedTenantId) : null,
           hydrated: true,
+          pendingWorkspaceIds: pendingWorkspaceIds,
+          workspaceJoiningToken: workspaceJoiningToken,
           onboarding: onboardingState,
         });
       } else {
@@ -152,11 +191,15 @@ export const useAuthStore = create<AuthState>((set) => ({
         localStorage.removeItem("user_id");
         localStorage.removeItem("tenant_id");
         localStorage.removeItem("onboarding_state");
+        localStorage.removeItem("pending_workspace_ids");
+        localStorage.removeItem("workspace_joining_token");
         set({
           token: null,
           userId: null,
           tenantId: null,
           hydrated: true,
+          pendingWorkspaceIds: null,
+          workspaceJoiningToken: null,
           onboarding: { isComplete: true, lastPath: null, lastVisit: null },
         });
       }
@@ -166,11 +209,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       localStorage.removeItem("user_id");
       localStorage.removeItem("tenant_id");
       localStorage.removeItem("onboarding_state");
+      localStorage.removeItem("pending_workspace_ids");
+      localStorage.removeItem("workspace_joining_token");
       set({
         token: null,
         userId: null,
         tenantId: null,
         hydrated: true,
+        pendingWorkspaceIds: null,
+        workspaceJoiningToken: null,
         onboarding: { isComplete: true, lastPath: null, lastVisit: null },
       });
     }

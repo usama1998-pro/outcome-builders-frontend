@@ -6,6 +6,7 @@ export interface SigninPayload {
 export interface SignupPayload {
   email: string;
   password: string;
+  invitation_token?: string;
 }
 
 

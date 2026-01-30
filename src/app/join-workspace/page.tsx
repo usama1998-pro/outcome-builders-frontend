@@ -9,6 +9,8 @@ import { ToggleThemeButton } from '@/components/ToggleThemeButton';
 import { ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 import { useTrackOnboarding, useCompleteOnboarding } from '@/src/hooks/useOnboarding';
+import { useJoinWorkspaceWithToken } from '@/src/hooks/useWorkspace';
+import { toast } from 'sonner';
 
 const JoinWorkspaceSchema = z.object({
     invitationCode: z.string().min(1, "Invitation code is required"),
@@ -22,6 +24,7 @@ export default function JoinWorkspacePage() {
     // Track that user is on join-workspace page
     useTrackOnboarding();
     const completeOnboarding = useCompleteOnboarding();
+    const { mutate: joinWorkspace, isPending } = useJoinWorkspaceWithToken();
 
     const {
         register,
@@ -31,15 +34,23 @@ export default function JoinWorkspacePage() {
         resolver: zodResolver(JoinWorkspaceSchema),
     });
 
+    // Note: Workspace joining tokens are stored but not auto-joined
+    // User must manually enter tokens to join workspaces
+
     const onSubmit = (data: JoinWorkspacePayload) => {
-        // TODO: Implement the API call to join workspace with invitation code
-        console.log("Joining workspace with code:", data.invitationCode);
-        // After successful join:
-        // 1. Call completeOnboarding() to mark onboarding as complete
-        // 2. Redirect to dashboard
-        // Example:
-        // completeOnboarding();
-        // router.push('/dashboard');
+        joinWorkspace(
+            { joining_token: data.invitationCode },
+            {
+                onSuccess: (result) => {
+                    toast.success(`Successfully joined ${result.workspace_name}`);
+                    completeOnboarding(`/dashboard?workspace=${result.workspace_id}`);
+                },
+                onError: (error: any) => {
+                    const errorMessage = error?.response?.data?.detail || error?.message || "Failed to join workspace";
+                    toast.error(errorMessage);
+                }
+            }
+        );
     };
 
     return (
@@ -76,32 +87,41 @@ export default function JoinWorkspacePage() {
 
                         <h1 className="text-3xl font-bold mb-2">Join Brainspace</h1>
                         <p className="text-gray-600 dark:text-gray-400 mb-6">
-                            Enter the invitation code you received to join a brainspace
+                            Enter the workspace joining token you received in your invitation email to join a brainspace
                         </p>
 
                         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-                            {/* Invitation Code input */}
+                            {/* Workspace Joining Token input */}
                             <div>
                                 <label htmlFor="invitationCode" className="block text-sm font-medium mb-2">
-                                    Invitation Code
+                                    Workspace Joining Token
                                 </label>
                                 <input
                                     id="invitationCode"
                                     type="text"
-                                    placeholder="Enter invitation code"
+                                    placeholder="Paste workspace joining token from your invitation email"
                                     {...register("invitationCode")}
                                     className="border p-3 w-full rounded-md dark:bg-gray-800 dark:border-gray-700"
+                                    disabled={isPending}
                                 />
                                 {errors.invitationCode && (
                                     <p className="text-red-500 text-sm mt-1">
                                         {errors.invitationCode.message}
                                     </p>
                                 )}
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                    You can find this token in the invitation email you received
+                                </p>
                             </div>
 
                             {/* Submit */}
-                            <Button type="submit" className="w-full" size="lg">
-                                Join Brainspace
+                            <Button 
+                                type="submit" 
+                                className="w-full" 
+                                size="lg"
+                                    disabled={isPending}
+                            >
+                                {isPending ? "Joining..." : "Join Brainspace"}
                             </Button>
                         </form>
 

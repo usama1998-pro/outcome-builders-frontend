@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
     Select,
     SelectContent,
@@ -13,16 +12,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { 
-    UserPlus, 
-    ArrowLeft, 
-    Mail, 
-    User, 
-    Lock, 
-    Shield,
-    Eye,
-    EyeOff,
-    CheckCircle2
+import {
+    UserPlus,
+    ArrowLeft,
+    Mail,
+    Shield
 } from "lucide-react";
 import { useAuthStore } from "@/src/store/useAuth";
 import { useCustomRoles } from "@/src/hooks/useRoles";
@@ -35,22 +29,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
+import { useTenantWorkspaces } from "@/src/hooks/useWorkspace";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Brain, Check } from "lucide-react";
 
 interface InviteUserPayload {
     email: string;
-    password: string;
-    full_name: string;
     role_name: string;
-    description?: string;
+    workspace_ids?: number[];
 }
 
 interface InviteUserResponse {
     status: boolean;
     message: string;
     data: {
-        user_id: number;
         email: string;
-        full_name: string;
         role: string;
         message: string;
     };
@@ -77,8 +70,10 @@ function useInviteUser() {
 
 export default function InviteAdminPage() {
     const router = useRouter();
+    const tenantId = useAuthStore((s) => s.tenantId);
     const { mutate: inviteUser, isPending } = useInviteUser();
     const { data: customRoles } = useCustomRoles();
+    const { data: tenantWorkspaces } = useTenantWorkspaces(tenantId);
 
     // Permission check
     const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
@@ -94,24 +89,8 @@ export default function InviteAdminPage() {
 
     // Form state
     const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [fullName, setFullName] = useState("");
-    const [role, setRole] = useState("admin");
-    const [description, setDescription] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-    // Password validation
-    const passwordRequirements = [
-        { label: "At least 8 characters", met: password.length >= 8 },
-        { label: "One uppercase letter", met: /[A-Z]/.test(password) },
-        { label: "One lowercase letter", met: /[a-z]/.test(password) },
-        { label: "One number", met: /\d/.test(password) },
-    ];
-
-    const allPasswordRequirementsMet = passwordRequirements.every(r => r.met);
-    const passwordsMatch = password === confirmPassword && password.length > 0;
+    const [role, setRole] = useState("member");
+    const [selectedWorkspaces, setSelectedWorkspaces] = useState<number[]>([]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -122,36 +101,26 @@ export default function InviteAdminPage() {
             return;
         }
 
-        if (!fullName.trim()) {
-            toast.error("Full name is required");
-            return;
-        }
-
-        if (!allPasswordRequirementsMet) {
-            toast.error("Password does not meet requirements");
-            return;
-        }
-
-        if (!passwordsMatch) {
-            toast.error("Passwords do not match");
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.trim())) {
+            toast.error("Please enter a valid email address");
             return;
         }
 
         inviteUser(
             {
                 email: email.trim(),
-                password,
-                full_name: fullName.trim(),
                 role_name: role,
-                description: description.trim() || undefined,
+                workspace_ids: selectedWorkspaces.length > 0 ? selectedWorkspaces : undefined,
             },
             {
                 onSuccess: (res) => {
-                    toast.success(res.data.message || "User invited successfully!");
+                    toast.success(res.data.message || "Invitation sent successfully!");
                     router.push("/dashboard/admins");
                 },
                 onError: (err: any) => {
-                    toast.error(err?.response?.data?.detail || "Failed to invite user. Please try again.");
+                    toast.error(err?.response?.data?.detail || "Failed to send invitation. Please try again.");
                 },
             }
         );
@@ -203,27 +172,13 @@ export default function InviteAdminPage() {
                 <div className="max-w-2xl mx-auto w-full">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Member Details</CardTitle>
+                            <CardTitle>Invite Member</CardTitle>
                             <CardDescription>
-                                Create a new account and assign a role to this member
+                                Send an invitation email to join your organization. The member will create their own account.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleSubmit} className="space-y-6">
-                                {/* Full Name */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="fullName" className="flex items-center gap-2">
-                                        <User className="h-4 w-4 text-muted-foreground" />
-                                        Full Name *
-                                    </Label>
-                                    <Input
-                                        id="fullName"
-                                        placeholder="John Doe"
-                                        value={fullName}
-                                        onChange={(e) => setFullName(e.target.value)}
-                                    />
-                                </div>
-
                                 {/* Email */}
                                 <div className="space-y-2">
                                     <Label htmlFor="email" className="flex items-center gap-2">
@@ -236,88 +191,11 @@ export default function InviteAdminPage() {
                                         placeholder="john@example.com"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
+                                        required
                                     />
-                                </div>
-
-                                {/* Password */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="password" className="flex items-center gap-2">
-                                        <Lock className="h-4 w-4 text-muted-foreground" />
-                                        Password *
-                                    </Label>
-                                    <div className="relative">
-                                        <Input
-                                            id="password"
-                                            type={showPassword ? "text" : "password"}
-                                            placeholder="Create a strong password"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="absolute right-0 top-0 h-full px-3"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                        >
-                                            {showPassword ? (
-                                                <EyeOff className="h-4 w-4 text-muted-foreground" />
-                                            ) : (
-                                                <Eye className="h-4 w-4 text-muted-foreground" />
-                                            )}
-                                        </Button>
-                                    </div>
-                                    {/* Password requirements */}
-                                    {password.length > 0 && (
-                                        <div className="grid grid-cols-2 gap-2 mt-2">
-                                            {passwordRequirements.map((req, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    className={`flex items-center gap-2 text-xs ${
-                                                        req.met ? "text-emerald-500" : "text-muted-foreground"
-                                                    }`}
-                                                >
-                                                    <CheckCircle2 className={`h-3 w-3 ${req.met ? "" : "opacity-30"}`} />
-                                                    {req.label}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Confirm Password */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="confirmPassword" className="flex items-center gap-2">
-                                        <Lock className="h-4 w-4 text-muted-foreground" />
-                                        Confirm Password *
-                                    </Label>
-                                    <div className="relative">
-                                        <Input
-                                            id="confirmPassword"
-                                            type={showConfirmPassword ? "text" : "password"}
-                                            placeholder="Confirm password"
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="absolute right-0 top-0 h-full px-3"
-                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                        >
-                                            {showConfirmPassword ? (
-                                                <EyeOff className="h-4 w-4 text-muted-foreground" />
-                                            ) : (
-                                                <Eye className="h-4 w-4 text-muted-foreground" />
-                                            )}
-                                        </Button>
-                                    </div>
-                                    {confirmPassword.length > 0 && (
-                                        <p className={`text-xs ${passwordsMatch ? "text-emerald-500" : "text-red-500"}`}>
-                                            {passwordsMatch ? "✓ Passwords match" : "✗ Passwords do not match"}
-                                        </p>
-                                    )}
+                                    <p className="text-xs text-muted-foreground">
+                                        An invitation email will be sent to this address
+                                    </p>
                                 </div>
 
                                 {/* Role Selection */}
@@ -331,8 +209,8 @@ export default function InviteAdminPage() {
                                             <SelectValue placeholder="Select a role" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="admin">Admin</SelectItem>
                                             <SelectItem value="member">Member</SelectItem>
+                                            <SelectItem value="admin">Admin</SelectItem>
                                             {customRoles?.map((customRole) => (
                                                 <SelectItem key={customRole.id} value={customRole.name.toLowerCase()}>
                                                     {customRole.name}
@@ -341,27 +219,98 @@ export default function InviteAdminPage() {
                                         </SelectContent>
                                     </Select>
                                     <p className="text-xs text-muted-foreground">
-                                        {role === "admin" 
+                                        {role === "admin"
                                             ? "Admins have full access to manage the organization"
                                             : role === "member"
-                                            ? "Members have standard access to the organization"
-                                            : "Custom role with specific permissions"
+                                                ? "Members have standard access to the organization"
+                                                : "Custom role with specific permissions"
                                         }
                                     </p>
                                 </div>
 
-                                {/* Description (Optional) */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">
-                                        Bio / Description (Optional)
-                                    </Label>
-                                    <Textarea
-                                        id="description"
-                                        placeholder="A brief description about this member..."
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        rows={3}
-                                    />
+                                {/* Workspace Selection */}
+                                {tenantWorkspaces && tenantWorkspaces.length > 0 && (
+                                    <div className="space-y-2">
+                                        <Label className="flex items-center gap-2">
+                                            <Brain className="h-4 w-4 text-muted-foreground" />
+                                            Brainspace Access (Optional)
+                                        </Label>
+                                        <div className="border rounded-lg bg-muted/30 overflow-hidden">
+                                            {/* Select All Header */}
+                                            <div className="flex items-center space-x-3 p-3 bg-muted/50 border-b">
+                                                <Checkbox
+                                                    id="select-all-workspaces-invite"
+                                                    checked={tenantWorkspaces.length > 0 && selectedWorkspaces.length === tenantWorkspaces.length}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) {
+                                                            setSelectedWorkspaces(tenantWorkspaces.map(w => w.id));
+                                                        } else {
+                                                            setSelectedWorkspaces([]);
+                                                        }
+                                                    }}
+                                                />
+                                                <label htmlFor="select-all-workspaces-invite" className="text-sm font-medium cursor-pointer">
+                                                    Select All Brainspaces
+                                                </label>
+                                            </div>
+                                            {/* Workspaces List */}
+                                            <div className="max-h-48 overflow-y-auto p-2 space-y-1">
+                                                {tenantWorkspaces.map((workspace) => {
+                                                    const isSelected = selectedWorkspaces.includes(workspace.id);
+                                                    return (
+                                                        <div
+                                                            key={workspace.id}
+                                                            className={`flex items-center space-x-3 p-2 rounded-md transition-colors ${isSelected
+                                                                    ? "bg-blue-500/10 border border-blue-500/20"
+                                                                    : "hover:bg-muted/50"
+                                                                }`}
+                                                        >
+                                                            <Checkbox
+                                                                id={`workspace-invite-${workspace.id}`}
+                                                                checked={isSelected}
+                                                                onCheckedChange={(checked) => {
+                                                                    setSelectedWorkspaces(prev =>
+                                                                        checked
+                                                                            ? [...prev, workspace.id]
+                                                                            : prev.filter(id => id !== workspace.id)
+                                                                    );
+                                                                }}
+                                                            />
+                                                            <Brain className={`h-4 w-4 ${isSelected ? "text-blue-500" : "text-muted-foreground"}`} />
+                                                            <label
+                                                                htmlFor={`workspace-invite-${workspace.id}`}
+                                                                className="text-sm flex-1 cursor-pointer"
+                                                            >
+                                                                {workspace.name}
+                                                            </label>
+                                                            {isSelected && (
+                                                                <Check className="h-4 w-4 text-blue-500" />
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Select which brainspaces the member will have access to. Leave empty to grant organization access only.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Info Box */}
+                                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                    <div className="flex items-start gap-3">
+                                        <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                                How it works
+                                            </p>
+                                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                                                The invited member will receive an email with a link to create their account.
+                                                Once they sign up, they&apos;ll automatically be added to your organization with the selected role.
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Actions */}
@@ -373,11 +322,11 @@ export default function InviteAdminPage() {
                                     </Link>
                                     <Button
                                         type="submit"
-                                        disabled={isPending || !allPasswordRequirementsMet || !passwordsMatch}
+                                        disabled={isPending || !email.trim()}
                                         className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0"
                                     >
                                         <UserPlus className="h-4 w-4 mr-2" />
-                                        {isPending ? "Inviting..." : "Invite Member"}
+                                        {isPending ? "Sending Invitation..." : "Send Invitation"}
                                     </Button>
                                 </div>
                             </form>

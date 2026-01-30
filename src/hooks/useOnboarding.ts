@@ -3,6 +3,9 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "../store/useAuth";
+import { useAssignWorkspacesFromInvitation } from "./useWorkspace";
+import api from "../lib/axios";
+import routes from "../lib/routes";
 
 // Time threshold in hours - don't redirect if last visit was more than this long ago
 const ONBOARDING_EXPIRY_HOURS = 48;
@@ -82,10 +85,59 @@ export function useHandlePostAuthRedirect() {
 /**
  * Hook to mark onboarding as complete
  * Call this when user finishes onboarding (e.g., after registering org or joining workspace)
+ * This will also assign any pending workspaces from invitation and redirect appropriately
  */
 export function useCompleteOnboarding() {
+  const router = useRouter();
   const completeOnboarding = useAuthStore((s) => s.completeOnboarding);
-  return completeOnboarding;
+  const pendingWorkspaceIds = useAuthStore((s) => s.pendingWorkspaceIds);
+  const setPendingWorkspaceIds = useAuthStore((s) => s.setPendingWorkspaceIds);
+  const userId = useAuthStore((s) => s.userId);
+  const tenantId = useAuthStore((s) => s.tenantId);
+  const { mutate: assignWorkspaces } = useAssignWorkspacesFromInvitation();
+
+  const completeOnboardingWithWorkspaceAssignment = async (redirectPath?: string) => {
+    // Assign workspaces from invitation if any
+    if (pendingWorkspaceIds && pendingWorkspaceIds.length > 0 && userId && tenantId) {
+      assignWorkspaces(
+        {
+          user_id: userId,
+          workspace_ids: pendingWorkspaceIds
+        },
+        {
+          onSuccess: (result) => {
+            // Clear pending workspace IDs
+            setPendingWorkspaceIds([]);
+            localStorage.removeItem("pending_workspace_ids");
+            
+            // Mark onboarding as complete
+            completeOnboarding();
+            
+            // Redirect to first workspace or provided path or dashboard
+            if (result.workspace_ids && result.workspace_ids.length > 0) {
+              router.push(redirectPath || `/dashboard?workspace=${result.workspace_ids[0]}`);
+            } else {
+              router.push(redirectPath || "/dashboard");
+            }
+          },
+          onError: (error) => {
+            console.error("Failed to assign workspaces:", error);
+            // Mark onboarding as complete anyway
+            completeOnboarding();
+            // Redirect to provided path or dashboard even if workspace assignment fails
+            router.push(redirectPath || "/dashboard");
+          }
+        }
+      );
+    } else {
+      // No pending workspaces, just complete onboarding
+      completeOnboarding();
+      // Always redirect to dashboard if no redirect path provided
+      router.push(redirectPath || "/dashboard");
+    }
+  };
+
+  return completeOnboardingWithWorkspaceAssignment;
 }
 
 /**

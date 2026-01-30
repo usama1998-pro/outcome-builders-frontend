@@ -69,3 +69,22 @@ export async function resend2FACode(payload: TwoFAResendPayload): Promise<AuthRe
   const { data } = await api.post(routes.auth.twoFAResend, payload);
   return data;
 }
+
+// Email Verification
+export interface VerifyEmailPayload {
+  token: string;
+}
+
+export interface ResendVerificationPayload {
+  email: string;
+}
+
+export async function verifyEmail(payload: VerifyEmailPayload): Promise<AuthResponse> {
+  const { data } = await api.post(routes.auth.verifyEmail, payload);
+  return data;
+}
+
+export async function resendVerificationEmail(payload: ResendVerificationPayload): Promise<AuthResponse> {
+  const { data } = await api.post(routes.auth.resendVerification, payload);
+  return data;
+}

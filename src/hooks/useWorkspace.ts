@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../lib/axios";
 import routes from "../lib/routes";
 import { WorkSpaceList } from "../types/workspaces";
+import { useAuthStore } from "../store/useAuth";
 // import { 
 //     // ToastContainer, 
 //     toast 
@@ -180,6 +181,52 @@ export function useUpdateWorkspaceAssignments() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["workspaceAssignments", variables.tenantId, variables.payload.user_id] });
       queryClient.invalidateQueries({ queryKey: ["userWorkspaces"] });
+    },
+  });
+}
+
+// Assign workspaces from invitation (self-assignment)
+async function assignWorkspacesFromInvitation(payload: UpdateAssignmentsPayload): Promise<{ message: string; workspace_ids: number[] }> {
+  const { data } = await api.post(routes.workspace.assignFromInvitation, payload);
+  return data.data;
+}
+
+export function useAssignWorkspacesFromInvitation() {
+  const queryClient = useQueryClient();
+  const tenantId = useAuthStore((s) => s.tenantId);
+  
+  return useMutation({
+    mutationFn: (payload: UpdateAssignmentsPayload) => {
+      if (!tenantId) {
+        throw new Error("Tenant ID is required to assign workspaces. Please ensure you're part of an organization.");
+      }
+      return assignWorkspacesFromInvitation(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userWorkspaces"] });
+      queryClient.invalidateQueries({ queryKey: ["workspaceAssignments"] });
+    },
+  });
+}
+
+// Join workspace with token
+interface JoinWorkspaceWithTokenPayload {
+  joining_token: string;
+}
+
+async function joinWorkspaceWithToken(payload: JoinWorkspaceWithTokenPayload): Promise<{ message: string; workspace_id: number; workspace_name: string }> {
+  const { data } = await api.post(routes.workspace.joinWithToken, payload);
+  return data.data;
+}
+
+export function useJoinWorkspaceWithToken() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: joinWorkspaceWithToken,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userWorkspaces"] });
+      queryClient.invalidateQueries({ queryKey: ["workspaceAssignments"] });
     },
   });
 }
