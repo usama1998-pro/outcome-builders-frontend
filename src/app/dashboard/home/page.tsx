@@ -85,8 +85,8 @@ export default function DashboardHome() {
             gradient: "bg-gradient-to-br from-amber-500 via-orange-500 to-red-500",
         },
         {
-            title: "Admins",
-            value: analytics.total_admins,
+            title: "Members",
+            value: analytics.total_members,
             icon: <Users className="w-5 h-5 text-white" />,
             gradient: "bg-gradient-to-br from-rose-500 via-pink-500 to-fuchsia-500",
         },

@@ -140,7 +140,7 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
         form.reset({
             name: collection.title,
             description: collection.description || "",
-            visibility: collection.visibility || "private",
+            visibility: (collection.visibility as "private" | "public" | "shared" | undefined) || "private",
         });
         setEditDialogOpen(true);
     };

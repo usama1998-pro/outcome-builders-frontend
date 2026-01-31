@@ -21,3 +21,21 @@ export interface AuthResponse<T = unknown> {
   pagination: null | Record<string, unknown>; // can extend later if API adds pagination
 }
 
+export interface TwoFAVerifyResponseData {
+  user_id: number;
+  email: string;
+  token: string;
+  message: string;
+}
+
+export interface TwoFAResendResponseData {
+  success: boolean;
+  message: string;
+  can_resend_in: number;
+}
+
+export interface TwoFAToggleResponseData {
+  two_fa_enabled: boolean;
+  message: string;
+}
+

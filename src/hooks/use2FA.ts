@@ -2,15 +2,10 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get2FAStatus, toggle2FA, TwoFATogglePayload } from "../api/auth";
-import { AuthResponse } from "../types/auth";
+import { AuthResponse, TwoFAToggleResponseData } from "../types/auth";
 import { toast } from "sonner";
 
-interface TwoFAData {
-  two_fa_enabled: boolean;
-  message?: string;
-}
-
-type TwoFAStatusResponse = AuthResponse<TwoFAData>;
+type TwoFAStatusResponse = AuthResponse<TwoFAToggleResponseData>;
 
 // ------------------ // Fetch Function // ------------------
 async function fetch2FAStatus(): Promise<TwoFAStatusResponse> {

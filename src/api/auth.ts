@@ -1,6 +1,6 @@
 import routes from "../lib/routes";
 import api from "../lib/axios";
-import { SignupPayload, SigninPayload, AuthResponse } from "../types/auth";
+import { SignupPayload, SigninPayload, AuthResponse, TwoFAVerifyResponseData, TwoFAResendResponseData, TwoFAToggleResponseData } from "../types/auth";
 
 export async function signup(payload: SignupPayload): Promise<AuthResponse> {
   const { data } = await api.post(routes.auth.signup, payload);
@@ -50,22 +50,22 @@ export interface TwoFAResendPayload {
   email: string;
 }
 
-export async function verify2FA(payload: TwoFAVerifyPayload): Promise<AuthResponse> {
+export async function verify2FA(payload: TwoFAVerifyPayload): Promise<AuthResponse<TwoFAVerifyResponseData>> {
   const { data } = await api.post(routes.auth.twoFAVerify, payload);
   return data;
 }
 
-export async function toggle2FA(payload: TwoFATogglePayload): Promise<AuthResponse> {
+export async function toggle2FA(payload: TwoFATogglePayload): Promise<AuthResponse<TwoFAToggleResponseData>> {
   const { data } = await api.post(routes.auth.twoFAToggle, payload);
   return data;
 }
 
-export async function get2FAStatus(): Promise<AuthResponse> {
+export async function get2FAStatus(): Promise<AuthResponse<TwoFAToggleResponseData>> {
   const { data } = await api.get(routes.auth.twoFAStatus);
   return data;
 }
 
-export async function resend2FACode(payload: TwoFAResendPayload): Promise<AuthResponse> {
+export async function resend2FACode(payload: TwoFAResendPayload): Promise<AuthResponse<TwoFAResendResponseData>> {
   const { data } = await api.post(routes.auth.twoFAResend, payload);
   return data;
 }

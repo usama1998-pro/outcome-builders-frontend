@@ -26,7 +26,6 @@ import {
     CardHeader as NoteCardHeader,
     CardTitle as NoteCardTitle
 } from "@/components/ui/card";
-import Notes from "@/src/types/notes";
 import Link from "next/link";
 import { BsThreeDotsVertical } from "react-icons/bs";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
