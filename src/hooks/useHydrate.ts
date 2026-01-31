@@ -15,6 +15,21 @@ export function useAuth() {
     hydrate();
   }, [hydrate]);
 
+  // Listen for storage changes to sync auth state across tabs
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "access_token" || e.key === "user_id" || e.key === "tenant_id") {
+        // Re-hydrate when auth-related storage changes
+        hydrate();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [hydrate]);
+
   return { token, setToken, clearToken, hydrated };
 }
 

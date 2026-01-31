@@ -29,6 +29,7 @@ const routes = {
       user: "/collection/user",
     },
     create: "/collection",
+    update: (id: number) => `/collection/${id}`,
     delete: (id: number) => `/collection/${id}`,
   },
   user: {
@@ -46,6 +47,7 @@ const routes = {
     updateMember: (tenantId: number, userId: number) => `/user/member/${tenantId}/${userId}`,
     invitations: (tenantId: number) => `/user/invitations/${tenantId}`,
     resendInvitation: (tenantId: number, invitationId: number) => `/user/invitations/${tenantId}/${invitationId}/resend`,
+    deleteInvitation: (tenantId: number, invitationId: number) => `/user/invitations/${tenantId}/${invitationId}`,
     sendWorkspaceTokens: (tenantId: number, invitationId: number) => `/user/invitations/${tenantId}/${invitationId}/send-tokens`,
   },
   tenant: {

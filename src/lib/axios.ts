@@ -41,10 +41,7 @@ api.interceptors.response.use(
     }
 
     // Handle authentication failures
-    if (
-      error.response &&
-      (error.response.status === 401 || error.response.status === 403)
-    ) {
+    if (error.response && error.response.status === 401) {
       // Get the request URL to check if it's an auth endpoint
       const requestUrl = error.config?.url || "";
 
@@ -64,6 +61,13 @@ api.interceptors.response.use(
           window.location.href = "/signin";
         }
       }
+    }
+
+    // Handle 403 Forbidden - don't sign out, let the UI handle permission errors
+    // 403 can be permission-related (not auth-related), so we shouldn't auto-signout
+    if (error.response && error.response.status === 403) {
+      // Let the UI handle 403 errors (show error message, etc.)
+      // Don't automatically sign out for permission errors
     }
 
     return Promise.reject(error);
