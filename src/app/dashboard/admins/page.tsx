@@ -58,7 +58,12 @@ import {
     Eye,
     EyeOff,
     User,
-    Lock
+    Lock,
+    Mail,
+    RefreshCw,
+    Clock,
+    CheckCircle2,
+    XCircle
 } from "lucide-react";
 import { useAuthStore } from "@/src/store/useAuth";
 import { useOrganizationDetails } from "@/src/hooks/useOrganization";
@@ -74,7 +79,7 @@ import {
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import RequireAuth from "@/src/components/auth/requireAuth";
 import { toast } from "sonner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import api from "@/src/lib/axios";
 import routes from "@/src/lib/routes";
@@ -139,6 +144,95 @@ export default function AdminsPage() {
         hasPermission(PERMISSIONS.USER_INVITE) ||
         hasPermission(PERMISSIONS.ROLE_MANAGE) ||
         isOwnerOrAdmin;
+
+    // Invitations interface and functions
+    interface Invitation {
+        id: number;
+        email: string;
+        role_name: string;
+        invitation_token: string;
+        invitation_expires: string;
+        invited_by: number;
+        invited_by_email: string | null;
+        workspace_ids: number[] | null;
+        workspace_joining_tokens: Record<string, string> | null;
+        created_at: string;
+        used: boolean;
+        is_expired: boolean;
+    }
+
+    // Fetch invitations
+    const { data: invitations, isLoading: invitationsLoading } = useQuery<Invitation[]>({
+        queryKey: ["invitations", currentTenantId],
+        queryFn: async () => {
+            if (!currentTenantId) return [];
+            const { data } = await api.get(routes.user.invitations(currentTenantId));
+            return data.data;
+        },
+        enabled: !!currentTenantId && canInviteUsers,
+    });
+
+    // Resend invitation mutation
+    const { mutate: resendInvitation, isPending: isResendingInvitation } = useMutation({
+        mutationFn: async (invitationId: number) => {
+            if (!currentTenantId) throw new Error("No tenant ID");
+            const { data } = await api.post(routes.user.resendInvitation(currentTenantId, invitationId));
+            return data.data;
+        },
+        onSuccess: (data) => {
+            toast.success(data.message || "Invitation resent successfully");
+            queryClient.invalidateQueries({ queryKey: ["invitations", currentTenantId] });
+        },
+        onError: (err: any) => {
+            toast.error(err?.response?.data?.detail || "Failed to resend invitation");
+        },
+    });
+
+    // Delete invitation mutation
+    const [invitationToDelete, setInvitationToDelete] = useState<Invitation | null>(null);
+    const { mutate: deleteInvitation, isPending: isDeletingInvitation } = useMutation({
+        mutationFn: async (invitationId: number) => {
+            if (!currentTenantId) throw new Error("No tenant ID");
+            const { data } = await api.delete(routes.user.deleteInvitation(currentTenantId, invitationId));
+            return data.data;
+        },
+        onSuccess: (data) => {
+            toast.success(data.message || "Invitation deleted successfully");
+            queryClient.invalidateQueries({ queryKey: ["invitations", currentTenantId] });
+            setInvitationToDelete(null);
+        },
+        onError: (err: any) => {
+            toast.error(err?.response?.data?.detail || "Failed to delete invitation");
+        },
+    });
+
+    // Format date helper
+    const formatDate = (dateString: string): string => {
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+            });
+        } catch {
+            return "N/A";
+        }
+    };
+
+    // Get workspace names from IDs
+    const getWorkspaceNames = (workspaceIds: number[]): string[] => {
+        if (!tenantWorkspaces || !workspaceIds) return [];
+        return workspaceIds
+            .map(id => {
+                const workspace = tenantWorkspaces.find(w => w.id === id);
+                return workspace?.name || `Workspace ${id}`;
+            })
+            .filter(Boolean);
+    };
 
     // Custom roles hooks
     const { data: permissions, isLoading: permissionsLoading } = usePermissions();
@@ -473,11 +567,17 @@ export default function AdminsPage() {
                 </div>
 
                 <Tabs defaultValue="admins" className="w-full flex flex-col items-center">
-                    <TabsList className={`grid w-full max-w-md ${canManageRoles ? "grid-cols-2" : "grid-cols-1"}`}>
+                    <TabsList className={`grid w-full max-w-2xl ${canManageRoles ? "grid-cols-3" : "grid-cols-2"}`}>
                         <TabsTrigger value="admins" className="flex items-center gap-2">
                             <Users className="h-4 w-4" />
                             Team Members
                         </TabsTrigger>
+                        {canInviteUsers && (
+                            <TabsTrigger value="invitations" className="flex items-center gap-2">
+                                <Mail className="h-4 w-4" />
+                                Invitations
+                            </TabsTrigger>
+                        )}
                         {canManageRoles && (
                             <TabsTrigger value="roles" className="flex items-center gap-2">
                                 <Key className="h-4 w-4" />
@@ -628,6 +728,140 @@ export default function AdminsPage() {
                             </Card>
                         </div>
                     </TabsContent>
+
+                    {/* Invitations Tab - Only show if user can invite users */}
+                    {canInviteUsers && (
+                        <TabsContent value="invitations" className="mt-6 w-full">
+                            <div className="max-w-4xl mx-auto space-y-6">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <Mail className="h-5 w-5 text-blue-500" />
+                                            Invitations ({invitations?.length || 0})
+                                        </CardTitle>
+                                        <CardDescription>
+                                            View and manage invitations sent to join your organization
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {invitationsLoading ? (
+                                            <div className="flex items-center justify-center py-12">
+                                                <BlocksLoader />
+                                            </div>
+                                        ) : !invitations || invitations.length === 0 ? (
+                                            <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed">
+                                                <Mail className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                                <p className="text-muted-foreground">No invitations found.</p>
+                                                <p className="text-sm text-muted-foreground mt-1">
+                                                    Click &quot;Invite New Member&quot; to send your first invitation.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {invitations.map((invitation: Invitation) => (
+                                                    <Card key={invitation.id} className="border-l-4 border-l-blue-500">
+                                                        <CardHeader>
+                                                            <div className="flex items-start justify-between">
+                                                                <div className="flex-1">
+                                                                    <CardTitle className="flex items-center gap-2 text-lg">
+                                                                        {invitation.email}
+                                                                        {invitation.used ? (
+                                                                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400">
+                                                                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                                                                Used
+                                                                            </Badge>
+                                                                        ) : invitation.is_expired ? (
+                                                                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400">
+                                                                                <XCircle className="w-3 h-3 mr-1" />
+                                                                                Expired
+                                                                            </Badge>
+                                                                        ) : (
+                                                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400">
+                                                                                <Clock className="w-3 h-3 mr-1" />
+                                                                                Pending
+                                                                            </Badge>
+                                                                        )}
+                                                                    </CardTitle>
+                                                                    <CardDescription className="mt-2">
+                                                                        Role: <span className="font-medium">{invitation.role_name}</span>
+                                                                        {invitation.invited_by_email && (
+                                                                            <> • Invited by: {invitation.invited_by_email}</>
+                                                                        )}
+                                                                    </CardDescription>
+                                                                </div>
+                                                            </div>
+                                                        </CardHeader>
+                                                        <CardContent>
+                                                            <div className="space-y-4">
+                                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                                    <div>
+                                                                        <p className="text-muted-foreground">Created</p>
+                                                                        <p className="font-medium">
+                                                                            {invitation.created_at ? formatDate(invitation.created_at) : "N/A"}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-muted-foreground">Expires</p>
+                                                                        <p className="font-medium">
+                                                                            {invitation.invitation_expires ? formatDate(invitation.invitation_expires) : "N/A"}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+
+                                                                {invitation.workspace_ids && invitation.workspace_ids.length > 0 && (
+                                                                    <div>
+                                                                        <p className="text-sm text-muted-foreground mb-2">
+                                                                            Workspaces:
+                                                                        </p>
+                                                                        <div className="flex flex-wrap gap-2">
+                                                                            {getWorkspaceNames(invitation.workspace_ids).map((name, idx) => (
+                                                                                <Badge
+                                                                                    key={idx}
+                                                                                    variant="outline"
+                                                                                    className="bg-transparent border-white/50 text-foreground rounded-full px-3 py-1"
+                                                                                >
+                                                                                    {name}
+                                                                                </Badge>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                <div className="flex gap-2 pt-2 border-t">
+                                                                    {!invitation.used && (
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => resendInvitation(invitation.id)}
+                                                                            disabled={isResendingInvitation}
+                                                                            className="flex items-center gap-2"
+                                                                        >
+                                                                            <RefreshCw className={`w-4 h-4 ${isResendingInvitation ? "animate-spin" : ""}`} />
+                                                                            {isResendingInvitation ? "Sending..." : "Resend Invitation"}
+                                                                        </Button>
+                                                                    )}
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => setInvitationToDelete(invitation)}
+                                                                        disabled={isDeletingInvitation}
+                                                                        className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                        Delete
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </TabsContent>
+                    )}
 
                     {/* Custom Roles Tab - Only show if user can manage roles */}
                     {canManageRoles && (
@@ -1142,6 +1376,32 @@ export default function AdminsPage() {
                                         Save Changes
                                     </>
                                 )}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                {/* Delete Invitation Confirmation Dialog */}
+                <AlertDialog open={!!invitationToDelete} onOpenChange={(open) => !open && setInvitationToDelete(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                                <Trash2 className="h-5 w-5" />
+                                Delete Invitation
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Are you sure you want to delete the invitation for <strong>{invitationToDelete?.email}</strong>?
+                                This action cannot be undone. The invitation link will no longer be valid.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isDeletingInvitation}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={() => invitationToDelete && deleteInvitation(invitationToDelete.id)}
+                                disabled={isDeletingInvitation}
+                                className="bg-red-500 hover:bg-red-600"
+                            >
+                                {isDeletingInvitation ? "Deleting..." : "Delete Invitation"}
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>

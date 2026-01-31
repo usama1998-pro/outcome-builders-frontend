@@ -8,4 +8,5 @@ export default interface Collections {
     avatarUrl: string;
     workspaceId: number;
     workspaceName: string;
+    visibility?: string;
 }

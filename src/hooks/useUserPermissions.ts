@@ -87,6 +87,7 @@ export const PERMISSIONS = {
   BRAINSPACE_VIEW: "brainspace.view",
   // Collection
   COLLECTION_CREATE: "collection.create",
+  COLLECTION_CREATE_PRIVATE: "collection.create.private",
   COLLECTION_EDIT: "collection.edit",
   COLLECTION_DELETE: "collection.delete",
   COLLECTION_VIEW: "collection.view",

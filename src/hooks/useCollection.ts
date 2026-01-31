@@ -32,6 +32,12 @@ interface CreateCollectionPayload {
     workspace_id: number;
 }
 
+interface UpdateCollectionPayload {
+    name?: string;
+    description?: string | null;
+    visibility?: string;
+}
+
 interface CreateCollectionResponse {
     status: boolean;
     message: string;
@@ -54,6 +60,7 @@ async function fetchUserCollections(): Promise<Collections[]> {
         avatarUrl: "/default-avatar.png",
         workspaceId: c.workspace_id,
         workspaceName: c.workspace_name,
+        visibility: c.visibility,
     }));
 }
 
@@ -81,12 +88,21 @@ export function useUserCollections() {
 
 export function useCreateUserCollection() {
     const queryClient = useQueryClient();
+    const tenantId = useAuthStore((state) => state.tenantId);
     
     return useMutation({
         mutationFn: createUserCollection,
         onSuccess: () => {
             // Invalidate and refetch collections after successful creation
-            queryClient.invalidateQueries({ queryKey: ["userCollections"] });
+            // Include tenantId in the query key to ensure proper invalidation
+            queryClient.invalidateQueries({ 
+                queryKey: ["userCollections"],
+                exact: false // Invalidate all queries starting with "userCollections"
+            });
+            // Also explicitly refetch to ensure data is fresh
+            queryClient.refetchQueries({ 
+                queryKey: ["userCollections", tenantId]
+            });
         },
     });
 }
@@ -103,6 +119,24 @@ export function useDeleteUserCollection() {
         mutationFn: deleteUserCollection,
         onSuccess: () => {
             // Invalidate and refetch collections after successful deletion
+            queryClient.invalidateQueries({ queryKey: ["userCollections"] });
+        },
+    });
+}
+
+async function updateUserCollection(collectionId: number, payload: UpdateCollectionPayload): Promise<CreateCollectionResponse> {
+    const { data } = await api.put<CreateCollectionResponse>(routes.collection.update(collectionId), payload);
+    return data;
+}
+
+export function useUpdateUserCollection() {
+    const queryClient = useQueryClient();
+    
+    return useMutation({
+        mutationFn: ({ collectionId, payload }: { collectionId: number; payload: UpdateCollectionPayload }) => 
+            updateUserCollection(collectionId, payload),
+        onSuccess: () => {
+            // Invalidate and refetch collections after successful update
             queryClient.invalidateQueries({ queryKey: ["userCollections"] });
         },
     });

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CollectionList } from "@/src/components/List/Collection/CollectionList";
-import { useParams } from "next/navigation";
 import { FaPlus } from "react-icons/fa";
 import { Layers, FolderOpen } from "lucide-react";
 import {
@@ -11,7 +10,6 @@ import {
     BreadcrumbItem,
     BreadcrumbLink,
     BreadcrumbList,
-    BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import {
     AlertDialog,
@@ -24,6 +22,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useUserCollections, useCreateUserCollection } from "@/src/hooks/useCollection";
+import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useForm, Controller } from "react-hook-form";
@@ -46,14 +45,14 @@ const createCollectionSchema = z.object({
     name: z.string().min(1, "Name is required").max(100, "Name is too long"),
     description: z.string().max(500, "Description is too long").optional(),
     visibility: z.enum(["private", "public", "shared"]).default("private"),
+    workspace_id: z.number().min(1, "Workspace is required"),
 });
 
 type CreateCollectionFormValues = z.infer<typeof createCollectionSchema>;
 
-export default function WorkspacePage() {
-    const params = useParams();
-    const workspaceId = Array.isArray(params.workspaceId) ? params.workspaceId[0] : params.workspaceId;
+export default function AllCollectionsPage() {
     const { data: allCollections, isLoading, isError, error, refetch } = useUserCollections();
+    const { data: workspaces } = useUserWorkspaces();
     const { mutate: createCollection, isPending } = useCreateUserCollection();
     const [open, setOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
@@ -67,17 +66,13 @@ export default function WorkspacePage() {
         hasPermission(PERMISSIONS.COLLECTION_CREATE_PRIVATE) || isOwnerOrAdmin
     );
 
-    // Filter collections for current workspace only
-    const collections = allCollections?.filter(
-        (collection) => collection.workspaceId === Number(workspaceId)
-    );
-
     const form = useForm<CreateCollectionFormValues>({
         resolver: zodResolver(createCollectionSchema),
         defaultValues: {
             name: "",
             description: "",
-            visibility: "public" // Default to public, will be updated based on permissions
+            visibility: "public", // Default to public if user doesn't have private permission
+            workspace_id: workspaces && workspaces.length > 0 ? workspaces[0].id : 0,
         },
     });
 
@@ -86,13 +81,18 @@ export default function WorkspacePage() {
         form.setValue("visibility", "public");
     }
 
+    // Update default workspace_id when workspaces load
+    if (workspaces && workspaces.length > 0 && form.getValues("workspace_id") === 0) {
+        form.setValue("workspace_id", workspaces[0].id);
+    }
+
     const onSubmit = (values: CreateCollectionFormValues) => {
         createCollection(
             {
                 name: values.name,
                 description: values.description || null,
                 visibility: values.visibility,
-                workspace_id: Number(workspaceId),
+                workspace_id: values.workspace_id,
             },
             {
                 onSuccess: (res) => {
@@ -122,11 +122,10 @@ export default function WorkspacePage() {
                 <Breadcrumb>
                     <BreadcrumbList>
                         <BreadcrumbItem>
-                            <BreadcrumbLink href="/dashboard/workspaces">Brainspaces</BreadcrumbLink>
+                            <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
                         </BreadcrumbItem>
-                        <BreadcrumbSeparator />
                         <BreadcrumbItem>
-                            <BreadcrumbLink href={`/dashboard/workspaces/${workspaceId}/collections`}>
+                            <BreadcrumbLink href="/dashboard/collections">
                                 Collections
                             </BreadcrumbLink>
                         </BreadcrumbItem>
@@ -193,6 +192,28 @@ export default function WorkspacePage() {
                                     {form.formState.errors.description && (
                                         <p className="text-sm !text-red-500 mt-1">
                                             {form.formState.errors.description.message}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <Label className="pb-3" htmlFor="workspace_id">
+                                        Workspace
+                                    </Label>
+                                    <select
+                                        id="workspace_id"
+                                        {...form.register("workspace_id", { valueAsNumber: true })}
+                                        className="w-full px-4 py-2 border rounded-md"
+                                    >
+                                        {workspaces?.map((ws) => (
+                                            <option key={ws.id} value={ws.id}>
+                                                {ws.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {form.formState.errors.workspace_id && (
+                                        <p className="text-sm !text-red-500 mt-1">
+                                            {form.formState.errors.workspace_id.message}
                                         </p>
                                     )}
                                 </div>
@@ -282,11 +303,15 @@ export default function WorkspacePage() {
                     </div>
                 )}
 
-                {collections && collections.length > 0 && (
-                    <CollectionList collections={collections} workspace={{ id: Number(workspaceId) }} searchQuery={searchQuery} />
+                {allCollections && allCollections.length > 0 && (
+                    <CollectionList 
+                        collections={allCollections} 
+                        workspace={{ id: 0 }} 
+                        searchQuery={searchQuery} 
+                    />
                 )}
 
-                {collections && collections.length === 0 && !isLoading && (
+                {allCollections && allCollections.length === 0 && !isLoading && (
                     <div className="w-full flex items-center justify-center p-10 mt-10">
                         <div className="flex flex-col items-center text-center max-w-md">
                             {/* Empty State Icon */}
@@ -324,3 +349,4 @@ export default function WorkspacePage() {
         </RequireAuth>
     );
 }
+
