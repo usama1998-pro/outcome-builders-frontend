@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { NotesList } from "@/src/components/List/Notes/NotesList";
 import { useParams } from "next/navigation";
 import { FaPlus, FaFile, FaTimes } from "react-icons/fa";
+import { FileText, Plus, Sparkles, BookOpen } from "lucide-react";
 import { useState, useRef } from "react";
 import {
     Breadcrumb,
@@ -179,14 +180,14 @@ export default function NotesPage() {
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                        <BreadcrumbLink href={`/dashboard/workspaces/${workspaceId}/collections/${collectionId}/notes`}>Notes</BreadcrumbLink>
+                        <BreadcrumbLink href={`/dashboard/workspaces/${workspaceId}/collections/${collectionId}/notes`}>Articles</BreadcrumbLink>
                     </BreadcrumbItem>
                 </BreadcrumbList>
             </Breadcrumb>
             <nav className="sticky top-0 w-[90%] mx-auto self-center px-15 flex justify-between items-center bg-background border-b border-border py-5">
                 <Input
                     type="text"
-                    placeholder="Search notes..."
+                    placeholder="Search articles..."
                     className="w-64"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -196,14 +197,14 @@ export default function NotesPage() {
                 <AlertDialog open={open} onOpenChange={setOpen}>
                     <AlertDialogTrigger asChild>
                         <Button>
-                            <FaPlus className="mr-2" /> New Note
+                            <FaPlus className="mr-2" /> New Article
                         </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent className="max-w-2xl">
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Create a new note</AlertDialogTitle>
+                            <AlertDialogTitle>Create a new article</AlertDialogTitle>
                             <AlertDialogDescription>
-                                Enter a title and content for your new note below.
+                                Enter a title and content for your new article below.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
 
@@ -218,7 +219,7 @@ export default function NotesPage() {
                                 </Label>
                                 <Input
                                     id="title"
-                                    placeholder="e.g. Meeting Notes"
+                                    placeholder="e.g. Meeting Article"
                                     {...form.register("title")}
                                     aria-invalid={!!form.formState.errors.title}
                                 />
@@ -327,12 +328,50 @@ export default function NotesPage() {
             )}
 
             {notes && notes.length === 0 && !isLoading && (
-                <div className="w-full h-full flex items-center justify-center p-5">
-                    <Card className="w-[400px] p-6 text-center">
-                        <CardContent className="pt-6">
-                            <p className="text-muted-foreground">No notes yet. Create your first one!</p>
-                        </CardContent>
-                    </Card>
+                <div className="w-full flex items-center justify-center p-10 mt-10">
+                    <div className="flex flex-col items-center text-center max-w-lg">
+                        <div className="relative mb-8">
+                            {/* Animated background gradient */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 rounded-full blur-3xl animate-pulse"></div>
+                            {/* Main icon container */}
+                            <div className="relative w-32 h-32 bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-red-500/10 dark:from-amber-900/30 dark:via-orange-900/30 dark:to-red-900/30 rounded-2xl flex items-center justify-center border border-amber-500/20 dark:border-amber-500/30 shadow-lg">
+                                <FileText className="w-16 h-16 text-amber-500 dark:text-amber-400" />
+                            </div>
+                            {/* Decorative sparkles */}
+                            <div className="absolute -top-2 -right-2">
+                                <Sparkles className="w-6 h-6 text-amber-400 animate-pulse" />
+                            </div>
+                            <div className="absolute -bottom-2 -left-2">
+                                <Sparkles className="w-5 h-5 text-orange-400 animate-pulse delay-300" />
+                            </div>
+                        </div>
+                        
+                        <h3 className="text-2xl font-bold text-foreground mb-3">
+                            No Articles Yet
+                        </h3>
+                        
+                        <p className="text-muted-foreground mb-8 text-base leading-relaxed">
+                            This collection is empty. Start documenting your knowledge by creating your first article. 
+                            You can add content, attach files, and train articles for your AI assistant.
+                        </p>
+
+                        {canCreateNote && (
+                            <Button 
+                                onClick={() => setOpen(true)}
+                                className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all"
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create Your First Article
+                            </Button>
+                        )}
+
+                        {!canCreateNote && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <BookOpen className="w-4 h-4" />
+                                <span>You don't have permission to create articles in this collection.</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

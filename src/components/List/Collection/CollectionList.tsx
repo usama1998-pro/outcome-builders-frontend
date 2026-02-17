@@ -129,6 +129,14 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
     const handleDeleteClick = (collectionId: number, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        
+        // Find the collection to check for articles
+        const collection = collections.find(c => c.id === collectionId);
+        if (collection && collection.members > 0) {
+            toast.error(`Cannot delete collection. It contains ${collection.members} article(s). Please delete all articles first.`);
+            return;
+        }
+        
         setCollectionToDelete(collectionId);
         setDeleteDialogOpen(true);
     };
@@ -332,7 +340,7 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
                                                     </div>
                                                     <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
                                                         <Eye className="w-4 h-4" />
-                                                        <span>{collection.members} notes</span>
+                                                        <span>{collection.members} articles</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -499,7 +507,7 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             Are you sure you want to delete this collection? This action cannot be undone.
-                            All notes within this collection will also be deleted.
+                            All articles within this collection will also be deleted.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

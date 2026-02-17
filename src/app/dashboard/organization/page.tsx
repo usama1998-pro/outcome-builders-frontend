@@ -11,10 +11,21 @@ import { useOrganizationDetails } from "@/src/hooks/useOrganization";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import RequireAuth from "@/src/components/auth/requireAuth";
 import { FaInstagram, FaLinkedin, FaTwitter, FaGithub, FaFacebook, FaYoutube } from "react-icons/fa";
+import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
 
 export default function OrganizationPage() {
     const currentTenantId = useAuthStore((s) => s.tenantId);
     const { data: organization, isLoading, isError, error } = useOrganizationDetails(currentTenantId || 0);
+    
+    // Permission checks - hide manage button until permissions are loaded and confirmed
+    const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
+    
+    // Only show manage button if user has permission to manage users
+    const canManageUsers = !permissionsLoading && (
+        hasPermission(PERMISSIONS.ADMIN_MANAGE) || 
+        hasPermission(PERMISSIONS.USER_INVITE) || 
+        isOwnerOrAdmin
+    );
 
     if (isLoading) {
         return (
@@ -143,12 +154,14 @@ export default function OrganizationPage() {
                                         <Users className="h-4 w-4 text-emerald-500" />
                                         Team Members ({organization.admins?.length || 0})
                                     </p>
-                                    <Link href="/dashboard/admins">
-                                        <Button variant="outline" size="sm" className="text-xs">
-                                            <Settings className="h-3 w-3 mr-1" />
-                                            Manage
-                                        </Button>
-                                    </Link>
+                                    {canManageUsers && (
+                                        <Link href="/dashboard/admins">
+                                            <Button variant="outline" size="sm" className="text-xs">
+                                                <Settings className="h-3 w-3 mr-1" />
+                                                Manage
+                                            </Button>
+                                        </Link>
+                                    )}
                                 </div>
                                 <div className="space-y-2 max-h-64 overflow-y-auto">
                                     {organization.admins && organization.admins.length > 0 ? (

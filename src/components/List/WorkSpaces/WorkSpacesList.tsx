@@ -2,10 +2,11 @@
 
 import { Badge } from "@/components/ui/badge";
 import { useUserWorkspaces, useDeleteUserWorkspace } from "@/src/hooks/useWorkspace";
+import { useUserCollections } from "@/src/hooks/useCollection";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
 import Link from "next/link";
 import { useState, useMemo } from "react";
-import { Brain, Users, Calendar, MoreVertical, Trash2, ArrowRight, Building2, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { Brain, Users, Calendar, MoreVertical, Trash2, ArrowRight, Building2, Sparkles, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import BlocksLoader from "../../Loaders/BlocksLoader/BlocksLoader";
 import {
     DropdownMenu,
@@ -31,12 +32,16 @@ interface WorkSpacesListProps {
     filter: WorkspaceFilter;
     currentTenantId: number | null;
     searchQuery: string;
+    onCreateClick?: () => void;
+    canCreate?: boolean;
+    onClearSearch?: () => void;
 }
 
 const ITEMS_PER_PAGE = 8;
 
-export default function WorkSpacesList({ filter, currentTenantId, searchQuery }: WorkSpacesListProps) {
+export default function WorkSpacesList({ filter, currentTenantId, searchQuery, onCreateClick, canCreate, onClearSearch }: WorkSpacesListProps) {
     const { data: workspaceData, isLoading, isError, error } = useUserWorkspaces();
+    const { data: collections } = useUserCollections();
     const { mutate: deleteWorkspace, isPending: isDeleting } = useDeleteUserWorkspace();
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [workspaceToDelete, setWorkspaceToDelete] = useState<number | null>(null);
@@ -100,6 +105,14 @@ export default function WorkSpacesList({ filter, currentTenantId, searchQuery }:
     const handleDeleteClick = (workspaceId: number, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        
+        // Check if workspace has collections
+        const workspaceCollections = collections?.filter(c => c.workspaceId === workspaceId) || [];
+        if (workspaceCollections.length > 0) {
+            toast.error(`Cannot delete brainspace. It contains ${workspaceCollections.length} collection(s). Please delete all collections first.`);
+            return;
+        }
+        
         setWorkspaceToDelete(workspaceId);
         setDeleteDialogOpen(true);
     };
@@ -146,17 +159,56 @@ export default function WorkSpacesList({ filter, currentTenantId, searchQuery }:
 
                 {filteredWorkspaces.length === 0 && !isLoading && !isError && (
                     <div className="flex flex-col items-center justify-center py-20">
-                        <div className="relative mb-6">
-                            <div className="w-24 h-24 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center">
+                        <div className="relative mb-8">
+                            {/* Animated background gradient */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/20 via-purple-500/20 to-fuchsia-500/20 rounded-full blur-3xl animate-pulse"></div>
+                            
+                            {/* Main icon container */}
+                            <div className="relative w-24 h-24 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center border border-violet-500/20 dark:border-violet-500/30 shadow-lg animate-pulse">
                                 <Brain className="w-12 h-12 text-violet-500 dark:text-violet-400" />
                             </div>
+                            
+                            {/* Decorative sparkles */}
+                            <div className="absolute -top-2 -right-2">
+                                <Sparkles className="w-5 h-5 text-violet-400 animate-pulse" style={{ animationDelay: '0s' }} />
+                            </div>
+                            <div className="absolute -bottom-2 -left-2">
+                                <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" style={{ animationDelay: '0.5s' }} />
+                            </div>
+                            <div className="absolute top-1/2 -left-3">
+                                <Sparkles className="w-3 h-3 text-fuchsia-400 animate-pulse" style={{ animationDelay: '1s' }} />
+                            </div>
                         </div>
-                        <h3 className="text-xl font-semibold text-foreground mb-2">No Brainspaces Found</h3>
-                        <p className="text-muted-foreground text-center max-w-md">
+                        
+                        <h3 className="text-2xl font-bold text-foreground mb-3">
+                            {searchQuery.trim() ? "No Brainspaces Found" : "No Brainspaces Yet"}
+                        </h3>
+                        
+                        <p className="text-muted-foreground text-center max-w-md mb-8 text-base leading-relaxed">
                             {searchQuery.trim() 
-                                ? `No brainspaces found matching "${searchQuery}".`
-                                : "Create your first brainspace to start organizing your knowledge."}
+                                ? `We couldn't find any brainspaces matching "${searchQuery}". Try adjusting your search terms or create a new brainspace.`
+                                : "Start organizing your knowledge by creating your first brainspace. Group related collections and collaborate with your team."}
                         </p>
+
+                        {!searchQuery.trim() && canCreate && onCreateClick && (
+                            <Button
+                                onClick={onCreateClick}
+                                className="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create Your First Brainspace
+                            </Button>
+                        )}
+
+                        {searchQuery.trim() && onClearSearch && (
+                            <Button
+                                onClick={onClearSearch}
+                                variant="outline"
+                                className="border-violet-500/50 hover:bg-violet-500/10 hover:border-violet-500 transition-all"
+                            >
+                                Clear Search
+                            </Button>
+                        )}
                     </div>
                 )}
 

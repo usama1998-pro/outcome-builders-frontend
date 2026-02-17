@@ -65,9 +65,13 @@ async function createUserWorkspace(name: string): Promise<CreateWorkspaceRespons
 
 // ------------------ // Hook // ------------------ 
 export function useUserWorkspaces() { 
+    const hydrated = useAuthStore((state) => state.hydrated);
+    const userId = useAuthStore((state) => state.userId);
+    
     const { data, isLoading, isError, error, } = useQuery<WorkSpaceList[], Error>({ 
         queryKey: ["userWorkspaces"], 
-        queryFn: fetchUserWorkspaces, 
+        queryFn: fetchUserWorkspaces,
+        enabled: hydrated && !!userId,
     }); 
     
     return { data, isLoading, isError, error };
@@ -134,7 +138,7 @@ interface WorkspaceAssignmentsResponse {
 // Fetch all workspaces in a tenant (for admins to select from)
 async function fetchTenantWorkspaces(tenantId: number): Promise<TenantWorkspace[]> {
   const { data } = await api.get<TenantWorkspacesResponse>(routes.workspace.get.tenant, {
-    headers: { "x-tenant": tenantId.toString() }
+    headers: { "X-Tenant": tenantId.toString() }
   });
   return data.data.message;
 }

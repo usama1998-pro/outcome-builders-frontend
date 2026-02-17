@@ -35,7 +35,7 @@ const routes = {
   user: {
     account: "/user/profile",
     tenants: "/user/tenants",
-    updateProfile: "/user/profile/update",
+    updateProfile: "/user/profile",
     createRole: "/user/role",
     updateRole: "/user/role",
     permissions: "/user/permissions",
@@ -63,6 +63,16 @@ const routes = {
     update: (id: number) => `/note/${id}`,
     delete: (id: number) => `/note/${id}`,
     train: (id: number) => `/note/${id}/train`,
+  },
+  chat: {
+    tabs: "/chat/tabs",
+    search: "/chat/tabs/search",
+    createTab: "/chat/tab",
+    history: (chatTabId: number) => `/chat/tab/${chatTabId}/history`,
+    stream: "/chat/stream",
+    stop: "/chat/stop",
+    delete: (chatTabId: number) => `/chat/tab/${chatTabId}`,
+    clear: (chatTabId: number) => `/chat/tab/${chatTabId}/clear`,
   },
 };
 

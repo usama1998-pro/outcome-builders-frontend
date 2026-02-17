@@ -81,7 +81,7 @@ export default function Home() {
             gradient: "bg-gradient-to-br from-cyan-500 via-teal-500 to-emerald-500",
         },
         {
-            title: "Notes",
+            title: "Articles",
             value: analytics.total_notes,
             icon: <FileText className="w-6 h-6 text-white" />,
             gradient: "bg-gradient-to-br from-amber-500 via-orange-500 to-red-500",
@@ -93,7 +93,7 @@ export default function Home() {
             gradient: "bg-gradient-to-br from-rose-500 via-pink-500 to-fuchsia-500",
         },
         {
-            title: "Trained Notes",
+            title: "Trained Articles",
             value: analytics.total_trained_notes,
             icon: <Brain className="w-6 h-6 text-white" />,
             gradient: "bg-gradient-to-br from-indigo-500 via-blue-500 to-cyan-500",
@@ -119,7 +119,7 @@ export default function Home() {
                                 Outcome Builder
                             </h1>
                             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                                Your central hub for managing knowledge, notes, and team collaboration.
+                                Your central hub for managing knowledge, articles, and team collaboration.
                                 Track your progress and insights at a glance.
                             </p>
                         </div>
@@ -164,7 +164,7 @@ export default function Home() {
                             <h2 className="text-3xl font-bold mb-4">Welcome to Your Dashboard</h2>
                             <p className="text-muted-foreground mb-6 leading-relaxed">
                                 Outcome Builder helps you organize your knowledge, collaborate with your team,
-                                and leverage AI-powered insights from your trained notes. Get started by exploring
+                                and leverage AI-powered insights from your trained articles. Get started by exploring
                                 your workspaces or creating new collections.
                             </p>
                             <div className="flex flex-wrap gap-4">
@@ -196,7 +196,7 @@ export default function Home() {
                                     <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                                         <FolderOpen className="w-8 h-8 text-emerald-500 mb-2" />
                                         <p className="font-semibold">Collect</p>
-                                        <p className="text-sm text-muted-foreground">Group related notes</p>
+                                        <p className="text-sm text-muted-foreground">Group related articles</p>
                                     </div>
                                     <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
                                         <FileText className="w-8 h-8 text-amber-500 mb-2" />

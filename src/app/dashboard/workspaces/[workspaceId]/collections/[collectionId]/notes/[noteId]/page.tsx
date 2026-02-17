@@ -239,12 +239,12 @@ export default function NoteViewPage() {
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                        <BreadcrumbLink href={`/dashboard/workspaces/${workspaceId}/collections/${collectionId}/notes`}>Notes</BreadcrumbLink>
+                        <BreadcrumbLink href={`/dashboard/workspaces/${workspaceId}/collections/${collectionId}/notes`}>Articles</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
                         <BreadcrumbLink href={`/dashboard/workspaces/${workspaceId}/collections/${collectionId}/notes/${noteId}`}>
-                            View Note
+                            View Article
                         </BreadcrumbLink>
                     </BreadcrumbItem>
                 </BreadcrumbList>
@@ -255,7 +255,7 @@ export default function NoteViewPage() {
                     variant="outline"
                     onClick={() => router.push(`/dashboard/workspaces/${workspaceId}/collections/${collectionId}/notes`)}
                 >
-                    <FaArrowLeft className="mr-2" /> Back to Notes
+                    <FaArrowLeft className="mr-2" /> Back to Articles
                 </Button>
 
                 <div className="flex gap-2">

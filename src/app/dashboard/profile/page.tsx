@@ -6,21 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { User, Edit, Save, X } from "lucide-react";
-import { ToggleThemeButton } from "../../../../components/ToggleThemeButton";
 import { useState, useEffect } from "react";
 import { useUserProfile } from "@/src/hooks/useProfile";
 import { useUpdateProfile } from "@/src/hooks/useUpdateProfile";
-import { use2FAStatus, useToggle2FA } from "@/src/hooks/use2FA";
 import { formatDate } from "@/src/utils/dateTimeFormat";
 import { FaGithub, FaInstagram, FaLinkedin, FaTwitch, FaTwitter, FaYoutube } from "react-icons/fa";
 import RequireAuth from "@/src/components/auth/requireAuth";
-import { Shield, ShieldCheck } from "lucide-react";
 
 export default function DashboardProfile() {
     const { data, isLoading } = useUserProfile();
     const { mutate: updateProfile, isPending } = useUpdateProfile();
-    const { data: twoFAData, isLoading: twoFALoading } = use2FAStatus();
-    const { mutate: toggle2FA, isPending: isToggling2FA } = useToggle2FA();
     const [isEditing, setIsEditing] = useState(false);
 
     // Form state
@@ -116,7 +111,6 @@ export default function DashboardProfile() {
                                 </Button>
                             </>
                         )}
-                        <ToggleThemeButton />
                     </div>
                 </div>
 
@@ -328,48 +322,6 @@ export default function DashboardProfile() {
                                     )}
                             </div>
                         )}
-                    </CardContent>
-                </Card>
-
-                <Card className="w-full">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Shield className="h-5 w-5" />
-                            Security Settings
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center justify-between">
-                            <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="font-semibold">Two-Factor Authentication</span>
-                                    {twoFAData?.data?.two_fa_enabled ? (
-                                        <ShieldCheck className="h-4 w-4 text-green-600" />
-                                    ) : (
-                                        <Shield className="h-4 w-4 text-gray-400" />
-                                    )}
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                    {twoFAData?.data?.two_fa_enabled
-                                        ? "Your account is protected with two-factor authentication."
-                                        : "Add an extra layer of security to your account."}
-                                </p>
-                            </div>
-                            <Button
-                                onClick={() => {
-                                    const currentStatus = twoFAData?.data?.two_fa_enabled || false;
-                                    toggle2FA({ enable: !currentStatus });
-                                }}
-                                disabled={twoFALoading || isToggling2FA}
-                                variant={twoFAData?.data?.two_fa_enabled ? "destructive" : "default"}
-                            >
-                                {twoFALoading || isToggling2FA
-                                    ? "Loading..."
-                                    : twoFAData?.data?.two_fa_enabled
-                                    ? "Disable 2FA"
-                                    : "Enable 2FA"}
-                            </Button>
-                        </div>
                     </CardContent>
                 </Card>
             </div>

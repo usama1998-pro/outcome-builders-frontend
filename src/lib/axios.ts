@@ -16,10 +16,11 @@ api.interceptors.request.use((config) => {
   }
 
   // Add tenant header (required for multi-tenant endpoints)
+  // Backend expects X-Tenant header (FastAPI converts x_tenant parameter to X-Tenant)
   const tenantId = useAuthStore.getState().tenantId;
 
   if (tenantId) {
-    config.headers["x-tenant"] = String(tenantId);
+    config.headers["X-Tenant"] = String(tenantId);
   }
 
   return config;

@@ -196,7 +196,14 @@ export default function DashboardWorkspace() {
                     )}
                 </nav>
 
-                <WorkSpacesList filter={filter} currentTenantId={currentTenantId} searchQuery={searchQuery} />
+                <WorkSpacesList 
+                    filter={filter} 
+                    currentTenantId={currentTenantId} 
+                    searchQuery={searchQuery}
+                    onCreateClick={() => setOpen(true)}
+                    canCreate={canCreateBrainspace}
+                    onClearSearch={() => setSearchQuery("")}
+                />
             </div>
         </RequireAuth>
     );

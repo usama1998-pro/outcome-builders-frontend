@@ -79,7 +79,7 @@ export default function DashboardHome() {
             gradient: "bg-gradient-to-br from-cyan-500 via-teal-500 to-emerald-500",
         },
         {
-            title: "Notes",
+            title: "Articles",
             value: analytics.total_notes,
             icon: <FileText className="w-5 h-5 text-white" />,
             gradient: "bg-gradient-to-br from-amber-500 via-orange-500 to-red-500",
@@ -91,7 +91,7 @@ export default function DashboardHome() {
             gradient: "bg-gradient-to-br from-rose-500 via-pink-500 to-fuchsia-500",
         },
         {
-            title: "Trained Notes",
+            title: "Trained Articles",
             value: analytics.total_trained_notes,
             icon: <Brain className="w-5 h-5 text-white" />,
             gradient: "bg-gradient-to-br from-indigo-500 via-blue-500 to-cyan-500",
@@ -231,7 +231,7 @@ export default function DashboardHome() {
                                 <div>
                                     <h3 className="font-semibold mb-1">Group with Collections</h3>
                                     <p className="text-sm text-muted-foreground">
-                                        Use collections to categorize related notes and keep everything structured.
+                                        Use collections to categorize related articles and keep everything structured.
                                     </p>
                                 </div>
                             </div>
@@ -243,9 +243,9 @@ export default function DashboardHome() {
                                     <FileText className="w-6 h-6 text-amber-500" />
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold mb-1">Capture in Notes</h3>
+                                    <h3 className="font-semibold mb-1">Capture in Articles</h3>
                                     <p className="text-sm text-muted-foreground">
-                                        Document insights, ideas, and information in notes with file attachments.
+                                        Document insights, ideas, and information in articles with file attachments.
                                     </p>
                                 </div>
                             </div>
@@ -259,7 +259,7 @@ export default function DashboardHome() {
                                 <div>
                                     <h3 className="font-semibold mb-1">Train Your AI</h3>
                                     <p className="text-sm text-muted-foreground">
-                                        Mark notes as trained to power your AI assistant with your knowledge base.
+                                        Mark articles as trained to power your AI assistant with your knowledge base.
                                     </p>
                                 </div>
                             </div>
