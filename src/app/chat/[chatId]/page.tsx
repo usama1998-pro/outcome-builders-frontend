@@ -503,7 +503,6 @@ export default function Chat() {
             name: displayName,
             text: text // Store full text for API
         });
-        setShowContextPopup(false);
         // Clear selection
         window.getSelection()?.removeAllRanges();
     };

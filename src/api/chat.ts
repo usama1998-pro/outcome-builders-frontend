@@ -174,7 +174,7 @@ export function streamChat(
               switch (event.type) {
                 case "start":
                   streamId = event.stream_id;
-                  if (options.onStart && event.message_id && event.chat_tab_id) {
+                  if (options?.onStart && event.message_id && event.chat_tab_id) {
                     options.onStart(
                       event.message_id,
                       event.chat_tab_id,
@@ -184,31 +184,31 @@ export function streamChat(
                   break;
 
                 case "chunk":
-                  if (event.content) {
+                  if (event.content && options?.onChunk) {
                     options.onChunk(event.content);
                   }
                   break;
 
                 case "complete":
-                  if (options.onComplete) {
+                  if (options?.onComplete) {
                     options.onComplete();
                   }
                   return;
 
                 case "stop":
-                  if (options.onStop) {
+                  if (options?.onStop) {
                     options.onStop();
                   }
                   return;
 
                 case "status":
-                  if (options.onStatus && event.status) {
+                  if (options?.onStatus && event.status) {
                     options.onStatus(event.status, event.step);
                   }
                   break;
 
                 case "error":
-                  if (options.onError) {
+                  if (options?.onError) {
                     options.onError(event.error || "Unknown error");
                   }
                   return;
@@ -220,7 +220,7 @@ export function streamChat(
         }
       }
 
-      if (options.onComplete) {
+      if (options?.onComplete) {
         options.onComplete();
       }
     } catch (error: any) {
@@ -233,11 +233,11 @@ export function streamChat(
             console.error("Error stopping stream on server:", e);
           }
         }
-        if (options.onStop) {
+        if (options?.onStop) {
           options.onStop();
         }
       } else {
-        if (options.onError) {
+        if (options?.onError) {
           options.onError(error.message || "Stream error");
         }
       }
