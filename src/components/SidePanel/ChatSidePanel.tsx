@@ -18,12 +18,13 @@ import {
     SidebarFooter,
     SidebarGroup,
     SidebarGroupContent,
+    SidebarGroupLabel,
     SidebarMenu,
     SidebarMenuAction,
     SidebarMenuButton,
     SidebarMenuItem
 } from "@/components/ui/sidebar";
-import { ChevronUp, ChevronDown, User2, MessageSquare, MoreHorizontal, Building, Users, Settings, Loader2 } from "lucide-react";
+import { ChevronUp, ChevronDown, User2, MessageSquare, MoreHorizontal, Building, Users, Settings, Loader2, HelpCircle } from "lucide-react";
 import { useState } from "react";
 import { ChatTab } from "../../types/chat";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -276,6 +277,12 @@ export default function ChatSidePanel() {
                                             </Link>
                                         </DropdownMenuItem>
                                     )}
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/dashboard/faq">
+                                            <HelpCircle className="mr-2 h-4 w-4" />
+                                            FAQ
+                                        </Link>
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem asChild>
                                         <Link href="/dashboard/settings">
                                             <Settings className="mr-2 h-4 w-4" />

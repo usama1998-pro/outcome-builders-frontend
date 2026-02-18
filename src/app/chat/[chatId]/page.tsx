@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Send, Bot, User, Sparkles, Copy, Check, Square, Loader2, Brain, MessageSquare, ChevronDown, Star, RefreshCw } from "lucide-react";
+import { Send, Bot, User, Sparkles, Copy, Check, Square, Loader2, Brain, MessageSquare, ChevronDown, Star, RefreshCw, X, FileText, Plus } from "lucide-react";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,15 +22,32 @@ interface MessageBubbleProps {
     message: ChatMessage;
     index: number;
     isStreaming?: boolean;
+    onAddContext?: (text: string) => void;
 }
 
-function MessageBubble({ message, index, isStreaming = false }: MessageBubbleProps) {
+// Context separator for parsing stored questions
+const CONTEXT_SEPARATOR = '\n\n---CONTEXT---\n\n';
+
+function MessageBubble({ message, index, isStreaming = false, onAddContext }: MessageBubbleProps) {
     // User message has question, bot message has answer
     const isUser = !!message.question && !message.answer;
     const [copied, setCopied] = useState(false);
+    const [selectedText, setSelectedText] = useState<string>("");
+    const [showContextPopup, setShowContextPopup] = useState(false);
+    const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
+    const messageRef = useRef<HTMLDivElement>(null);
+    const popupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const handleCopy = async () => {
-        const textToCopy = message.answer || message.question || "";
+        // For user messages, copy the original stored question (which includes context separator)
+        // For bot messages, copy the answer
+        let textToCopy = message.answer || message.question || "";
+        
+        // If it's a user message with context, format it nicely for copying
+        if (isUser && contextText) {
+            textToCopy = `Context: ${contextText}\n\nQuestion: ${displayQuestion}`;
+        }
+        
         try {
             await navigator.clipboard.writeText(textToCopy);
             setCopied(true);
@@ -40,8 +57,156 @@ function MessageBubble({ message, index, isStreaming = false }: MessageBubblePro
         }
     };
 
+    // Handle text selection for bot messages
+    useEffect(() => {
+        if (isUser) return;
+
+        const handleMouseUp = (e: MouseEvent) => {
+            // Don't process if clicking on the popup button
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-context-popup]')) {
+                return;
+            }
+
+            // Check if ref is available - if not, skip this event
+            // The effect will re-run when message changes and ref will be available
+            if (!messageRef.current) {
+                return;
+            }
+
+            // Clear any existing timeout
+            if (popupTimeoutRef.current) {
+                clearTimeout(popupTimeoutRef.current);
+            }
+
+            // Small delay to ensure selection is complete
+            setTimeout(() => {
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0) {
+                    // Delay hiding popup to allow clicking the button
+                    popupTimeoutRef.current = setTimeout(() => {
+                        setShowContextPopup(false);
+                    }, 150);
+                    return;
+                }
+
+                const selectedText = selection.toString().trim();
+                if (selectedText.length === 0) {
+                    popupTimeoutRef.current = setTimeout(() => {
+                        setShowContextPopup(false);
+                    }, 150);
+                    return;
+                }
+
+                // Check if selection is within this message - improved for multi-line
+                const range = selection.getRangeAt(0);
+                const messageElement = messageRef.current;
+                
+                if (!messageElement) {
+                    setShowContextPopup(false);
+                    return;
+                }
+
+                // More robust check: verify selection intersects with message element
+                // This works better for ReactMarkdown's nested structure
+                const messageRect = messageElement.getBoundingClientRect();
+                const selectionRect = range.getBoundingClientRect();
+                
+                // Check if selection rectangle overlaps with message rectangle
+                const rectsOverlap = !(
+                    selectionRect.right < messageRect.left ||
+                    selectionRect.left > messageRect.right ||
+                    selectionRect.bottom < messageRect.top ||
+                    selectionRect.top > messageRect.bottom
+                );
+                
+                // Also check if common ancestor is within message (for nested structures)
+                const commonAncestor = range.commonAncestorContainer;
+                const isAncestorInMessage = messageElement.contains(commonAncestor) || 
+                    commonAncestor === messageElement ||
+                    (commonAncestor.nodeType === Node.TEXT_NODE && messageElement.contains(commonAncestor.parentElement || commonAncestor));
+                
+                const isSelectionInMessage = rectsOverlap && isAncestorInMessage;
+
+                if (isSelectionInMessage && selectedText.length > 0) {
+                    setSelectedText(selectedText);
+                    // Position popup near selection - use getBoundingClientRect for multi-line support
+                    const rect = range.getBoundingClientRect();
+                    setPopupPosition({
+                        x: rect.left + rect.width / 2,
+                        y: rect.top - 10
+                    });
+                    setShowContextPopup(true);
+                } else {
+                    setShowContextPopup(false);
+                }
+            }, 10);
+        };
+
+        // Also handle clicks outside to close popup
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            // Don't close if clicking on popup or button
+            if (target.closest('[data-context-popup]')) {
+                return;
+            }
+            // Close popup if clicking outside
+            if (showContextPopup) {
+                setShowContextPopup(false);
+                setSelectedText("");
+            }
+        };
+
+        // Attach listeners - they will check ref availability inside handlers
+        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('click', handleClickOutside);
+        return () => {
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('click', handleClickOutside);
+            if (popupTimeoutRef.current) {
+                clearTimeout(popupTimeoutRef.current);
+            }
+        };
+    }, [isUser, showContextPopup, message.id, message.answer]); // Re-run when message changes
+
     // For bot messages, show answer even if empty (for streaming)
-    const displayContent = isUser ? (message.question || "") : (message.answer !== null && message.answer !== undefined ? message.answer : "");
+    // For user messages, parse context and question separately
+    let displayContent = isUser ? (message.question || "") : (message.answer !== null && message.answer !== undefined ? message.answer : "");
+    let contextText: string | null = null;
+    let displayQuestion = displayContent;
+    
+    // Parse context from stored question if present
+    // Handle both formats:
+    // 1. Messages with CONTEXT_SEPARATOR (from frontend state)
+    // 2. Messages with \n\n separator (from database - concatenated format)
+    if (isUser && displayContent) {
+        // First, try parsing with CONTEXT_SEPARATOR (for messages in frontend state)
+        if (displayContent.includes(CONTEXT_SEPARATOR)) {
+            const parts = displayContent.split(CONTEXT_SEPARATOR);
+            if (parts.length === 2) {
+                contextText = parts[0].trim();
+                displayQuestion = parts[1].trim();
+            }
+        } 
+        // Otherwise, try parsing with \n\n separator (for messages from database)
+        // Only parse if it looks like context (first part is substantial, > 30 chars)
+        // and the question part is reasonable (not too short, > 5 chars)
+        else if (displayContent.includes('\n\n')) {
+            const parts = displayContent.split('\n\n');
+            if (parts.length >= 2) {
+                const potentialContext = parts[0].trim();
+                const potentialQuestion = parts.slice(1).join('\n\n').trim();
+                
+                // Heuristic: If first part is substantial (> 30 chars) and question exists and is reasonable (> 5 chars),
+                // treat first part as context. This handles the case where context was concatenated.
+                if (potentialContext.length > 30 && potentialQuestion.length > 5) {
+                    contextText = potentialContext;
+                    displayQuestion = potentialQuestion;
+                }
+            }
+        }
+    }
+    
     const timestamp = message.updated_at || message.created_at;
 
     return (
@@ -96,9 +261,28 @@ function MessageBubble({ message, index, isStreaming = false }: MessageBubblePro
                     ) : (
                         <div className={`relative z-10 text-sm sm:text-base leading-relaxed ${isUser ? "!text-white" : "text-foreground"}`}>
                             {isUser ? (
-                                <p>{displayContent}</p>
+                                <div className="space-y-2">
+                                    {contextText ? (
+                                        <>
+                                            <blockquote className="border-l-3 border-white/40 pl-3 italic text-white/90 text-sm bg-white/10 rounded-r py-2 mb-2">
+                                                <span className="text-xs font-semibold text-white/70 mb-1 block uppercase tracking-wide">Context</span>
+                                                {contextText}
+                                            </blockquote>
+                                            <p className="mt-1">{displayQuestion}</p>
+                                        </>
+                                    ) : (
+                                        <p>{displayQuestion}</p>
+                                    )}
+                                </div>
                             ) : (
-                                <div className={`markdown-content ${isStreaming ? 'streaming-cursor' : ''}`}>
+                                <div 
+                                    ref={messageRef}
+                                    className={`markdown-content ${isStreaming ? 'streaming-cursor' : ''} select-text`}
+                                    onMouseUp={(e) => {
+                                        // Allow selection to complete before checking
+                                        e.stopPropagation();
+                                    }}
+                                >
                                     <ReactMarkdown
                                         remarkPlugins={[remarkGfm]}
                                         rehypePlugins={[rehypeHighlight]}
@@ -204,6 +388,51 @@ function MessageBubble({ message, index, isStreaming = false }: MessageBubblePro
                     </Button>
                 </div>
             )}
+
+            {/* Context popup for selected text */}
+            {!isUser && showContextPopup && selectedText && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    data-context-popup
+                    className="fixed z-50 bg-card border rounded-lg shadow-lg p-1.5"
+                    style={{
+                        left: `${popupPosition.x}px`,
+                        top: `${popupPosition.y}px`,
+                        transform: 'translate(-50%, -100%)',
+                        marginTop: '-8px'
+                    }}
+                    onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }}
+                >
+                    <Button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (onAddContext && selectedText) {
+                                onAddContext(selectedText);
+                            }
+                            // Clear selection and close popup
+                            window.getSelection()?.removeAllRanges();
+                            setShowContextPopup(false);
+                            setSelectedText("");
+                        }}
+                        size="sm"
+                        variant="default"
+                        className="h-7 px-2.5 text-xs bg-violet-600 hover:bg-violet-700 text-white"
+                    >
+                        <Plus className="h-3 w-3 mr-1.5" />
+                        Add as Context
+                    </Button>
+                </motion.div>
+            )}
         </motion.div>
     );
 }
@@ -256,6 +485,28 @@ export default function Chat() {
     const [currentChatTabId, setCurrentChatTabId] = useState<number | null>(null);
     const [agentMode, setAgentMode] = useState(false);
     const [currentStatus, setCurrentStatus] = useState<string | null>(null);
+    const [selectedContext, setSelectedContext] = useState<{ 
+        type: 'text' | null; 
+        id: number | null; 
+        name: string | null;
+        text?: string | null;
+    }>({ type: null, id: null, name: null, text: null });
+
+    const handleAddTextContext = (text: string) => {
+        // Truncate long text (max 200 characters for display)
+        const maxLength = 200;
+        const displayName = text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+        
+        setSelectedContext({
+            type: 'text',
+            id: null,
+            name: displayName,
+            text: text // Store full text for API
+        });
+        setShowContextPopup(false);
+        // Clear selection
+        window.getSelection()?.removeAllRanges();
+    };
     const lastLoadedChatIdRef = useRef<string | null>(null);
     const isCreatingNewChatRef = useRef<boolean>(false);
     const lastChatHistoryMessageCountRef = useRef<number>(-1);
@@ -269,6 +520,7 @@ export default function Chat() {
         staleTime: 1000 * 30, // Consider data fresh for 30 seconds
         refetchOnWindowFocus: false, // Don't refetch when window regains focus
     });
+
 
     // Track if we're transitioning from "new" to a chat ID (new chat creation)
     useEffect(() => {
@@ -357,13 +609,29 @@ export default function Chat() {
                 }
 
                 // Auto-send the message
-                const question = pendingQuestion.trim();
-                if (question) {
+                const originalQuestion = pendingQuestion.trim();
+                if (originalQuestion) {
+                    // Prepare question for backend (with context concatenated)
+                    // Store context before clearing to ensure it's included in the query
+                    const contextToSend = selectedContext.type === 'text' && selectedContext.text 
+                        ? selectedContext.text 
+                        : null;
+                    
+                    let questionForBackend = originalQuestion;
+                    if (contextToSend) {
+                        questionForBackend = `${contextToSend}\n\n${originalQuestion}`;
+                    }
+
+                    // Store question with context separator for display parsing
+                    const storedQuestion = contextToSend
+                        ? `${contextToSend}${CONTEXT_SEPARATOR}${originalQuestion}`
+                        : originalQuestion;
+
                     // Add user message immediately
                     const userMessage: ChatMessage = {
                         id: Date.now(),
                         chat_tab_id: 0,
-                        question: question,
+                        question: storedQuestion, // Store with separator for parsing
                         answer: null,
                         created_at: new Date().toISOString(),
                         updated_at: new Date().toISOString(),
@@ -383,6 +651,9 @@ export default function Chat() {
                     setStreamingMessageId(botMessage.id);
                     streamingMessageIdRef.current = botMessage.id;
 
+                    // Clear context immediately after message is sent
+                    setSelectedContext({ type: null, id: null, name: null, text: null });
+
                     // Start streaming
                     setIsStreaming(true);
 
@@ -392,9 +663,10 @@ export default function Chat() {
 
                     try {
                         const controller = streamChat(
-                            question,
+                            questionForBackend, // Send concatenated version to backend
                             undefined, // No chat_tab_id - will create new one
                             pendingAgentMode === "true",
+                            undefined, // Don't send context separately since it's in the question
                             {
                                 onStart: (messageId, chatTabId, streamId) => {
                                     setCurrentStatus(null);
@@ -480,6 +752,8 @@ export default function Chat() {
                                     setStreamingMessageId(null);
                                     setCurrentStatus(null);
                                     abortControllerRef.current = null;
+                                    // Clear context even on error (message was attempted to be sent)
+                                    setSelectedContext({ type: null, id: null, name: null, text: null });
                                     toast.error(`Error: ${error}`);
                                 },
                             }
@@ -489,6 +763,8 @@ export default function Chat() {
                     } catch (error: any) {
                         setIsStreaming(false);
                         setStreamingMessageId(null);
+                        // Clear context even on error (message was attempted to be sent)
+                        setSelectedContext({ type: null, id: null, name: null, text: null });
                         toast.error(`Failed to send message: ${error.message}`);
                     }
                 }
@@ -594,14 +870,30 @@ export default function Chat() {
             return;
         }
 
-        const question = inputValue.trim();
+        const originalQuestion = inputValue.trim();
         setInputValue("");
+
+        // Prepare question for backend (with context concatenated)
+        // Store context before clearing to ensure it's included in the query
+        const contextToSend = selectedContext.type === 'text' && selectedContext.text 
+            ? selectedContext.text 
+            : null;
+        
+        let questionForBackend = originalQuestion;
+        if (contextToSend) {
+            questionForBackend = `${contextToSend}\n\n${originalQuestion}`;
+        }
+
+        // Store question with context separator for display parsing
+        const storedQuestion = contextToSend
+            ? `${contextToSend}${CONTEXT_SEPARATOR}${originalQuestion}`
+            : originalQuestion;
 
         // Add user message immediately
         const userMessage: ChatMessage = {
             id: Date.now(), // Temporary ID
             chat_tab_id: currentChatTabId || 0,
-            question: question,
+            question: storedQuestion, // Store with separator for parsing
             answer: null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -621,6 +913,9 @@ export default function Chat() {
         setStreamingMessageId(botMessage.id);
         streamingMessageIdRef.current = botMessage.id;
 
+        // Clear context immediately after message is sent
+        setSelectedContext({ type: null, id: null, name: null, text: null });
+
         // Start streaming
         setIsStreaming(true);
 
@@ -630,9 +925,10 @@ export default function Chat() {
 
         try {
             const controller = streamChat(
-                question,
+                questionForBackend, // Send concatenated version to backend
                 currentChatTabId || undefined,
                 agentMode,
+                undefined, // Don't send context separately since it's in the question
                 {
                     onStart: (messageId, chatTabId, streamId) => {
                         setCurrentStatus(null);
@@ -727,6 +1023,8 @@ export default function Chat() {
         } catch (error: any) {
             setIsStreaming(false);
             setStreamingMessageId(null);
+            // Clear context even on error (message was attempted to be sent)
+            setSelectedContext({ type: null, id: null, name: null, text: null });
             toast.error(`Failed to send message: ${error.message}`);
         }
     };
@@ -842,6 +1140,7 @@ export default function Chat() {
                                 message={msg}
                                 index={index}
                                 isStreaming={isStreaming && streamingMessageId === msg.id}
+                                onAddContext={handleAddTextContext}
                             />
                         ))}
                     </AnimatePresence>
@@ -852,6 +1151,31 @@ export default function Chat() {
             {/* Chat Input */}
             <div className="flex-shrink-0 px-4 sm:px-6 py-4 sm:py-6 border-t bg-background/80 backdrop-blur-sm">
                 <div className="max-w-4xl mx-auto">
+                    {/* Context Display - Above input (only shows when context is added) */}
+                    {selectedContext.type === 'text' && selectedContext.name && (
+                        <div className="mb-3 px-3 py-2 bg-muted/50 border rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <span className="text-sm font-medium block truncate">{selectedContext.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        (Text context)
+                                    </span>
+                                </div>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedContext({ type: null, id: null, name: null, text: null })}
+                                className="h-6 w-6 p-0 flex-shrink-0 ml-2"
+                                disabled={isStreaming}
+                            >
+                                <X className="h-3 w-3" />
+                            </Button>
+                        </div>
+                    )}
+
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();

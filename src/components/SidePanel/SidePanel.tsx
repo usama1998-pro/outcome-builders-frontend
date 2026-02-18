@@ -17,7 +17,7 @@ import {
     SidebarMenuSubButton
 } from "@/components/ui/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, FolderOpen, Layers, FileText, Wrench, Sparkles, Settings, Building } from "lucide-react";
+import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, FolderOpen, Layers, FileText, Wrench, Sparkles, Settings, Building, Briefcase, BarChart3, Stethoscope, Compass, Network, Palette, Package, Megaphone, HelpCircle } from "lucide-react";
 import { useSignOut, useUserTenants } from "@/src/hooks/useAuth";
 import { useAuthStore } from "@/src/store/useAuth";
 import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
@@ -112,6 +112,9 @@ export default function SidePanel() {
     // State for managing expanded organization groups
     const [expandedOrgs, setExpandedOrgs] = useState<Set<number>>(new Set());
     
+    // State for managing expanded navigation sections
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['knowledge-bank']));
+    
     // Auto-expand first organization when workspaces load
     useEffect(() => {
         if (workspaces && workspaces.length > 0 && Object.keys(groupedWorkspaces).length > 0 && expandedOrgs.size === 0) {
@@ -135,13 +138,25 @@ export default function SidePanel() {
         });
     };
 
+    // Toggle navigation section expansion
+    const toggleSection = (sectionId: string) => {
+        setExpandedSections(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(sectionId)) {
+                newSet.delete(sectionId);
+            } else {
+                newSet.add(sectionId);
+            }
+            return newSet;
+        });
+    };
+
 
     return (
         <Sidebar>
             <SidebarContent>
-                {/* Application Links */}
+                {/* Main Navigation */}
                 <SidebarGroup>
-                    <SidebarGroupLabel>Application</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             <SidebarMenuItem>
@@ -161,7 +176,7 @@ export default function SidePanel() {
                                 <SidebarMenuButton asChild>
                                     <Link
                                         href="/chat"
-                                        className={`px-2 py-1 rounded ${pathname === "/chat" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                        className={`px-2 py-1 rounded ${pathname === "/chat" || pathname.startsWith("/chat/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                             }`}
                                     >
                                         <MessageSquare className="mr-2 h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
@@ -173,12 +188,25 @@ export default function SidePanel() {
                             <SidebarMenuItem>
                                 <SidebarMenuButton asChild>
                                     <Link
-                                        href="/dashboard/tools"
-                                        className={`px-2 py-1 rounded ${pathname === "/dashboard/tools" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                        href="/dashboard/clients"
+                                        className={`px-2 py-1 rounded ${pathname === "/dashboard/clients" || pathname.startsWith("/dashboard/clients/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                             }`}
                                     >
-                                        <Wrench className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
-                                        Tools
+                                        <Briefcase className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                        Clients
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+
+                            <SidebarMenuItem>
+                                <SidebarMenuButton asChild>
+                                    <Link
+                                        href="/dashboard/analytics"
+                                        className={`px-2 py-1 rounded ${pathname === "/dashboard/analytics" || pathname.startsWith("/dashboard/analytics/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                            }`}
+                                    >
+                                        <BarChart3 className="mr-2 h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                                        Analytics
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -186,61 +214,197 @@ export default function SidePanel() {
                     </SidebarGroupContent>
                 </SidebarGroup>
 
-                {/* Knowledge Bank */}
+                {/* Knowledge Bank - Collapsible */}
                 <SidebarGroup>
-                    <SidebarGroupLabel>Knowledge Bank</SidebarGroupLabel>
-                    <SidebarGroupContent>
-                        <SidebarMenu>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton asChild>
-                                    <Link
-                                        href="/dashboard/workspaces"
-                                        className={`px-2 py-1 rounded ${pathname === "/dashboard/workspaces" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                            }`}
+                    <SidebarGroupLabel>
+                        <button
+                            onClick={() => toggleSection('knowledge-bank')}
+                            className="flex items-center gap-2 w-full text-left"
+                        >
+                            {expandedSections.has('knowledge-bank') ? (
+                                <ChevronDown className="h-4 w-4" />
+                            ) : (
+                                <ChevronUp className="h-4 w-4 rotate-[-90deg]" />
+                            )}
+                            Knowledge Bank
+                        </button>
+                    </SidebarGroupLabel>
+                    {expandedSections.has('knowledge-bank') && (
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/workspaces"
+                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/workspaces" || pathname.startsWith("/dashboard/workspaces/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                                }`}
+                                        >
+                                            <Brain className="mr-2 h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                            Brainspaces
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton
+                                        asChild
+                                        isActive={pathname === '/dashboard/collections'}
                                     >
-                                        <Brain className="mr-2 h-4 w-4 text-violet-600 dark:text-violet-400" />
-                                        Brainspaces
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                                        <Link href="/dashboard/collections" className="flex items-center justify-between w-full">
+                                            <div className="flex items-center gap-2">
+                                                <Layers className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                                                <span>Collections</span>
+                                            </div>
+                                            {collections && (
+                                                <span className="text-xs text-muted-foreground ml-auto">
+                                                    ({collections.length})
+                                                </span>
+                                            )}
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
 
-                            <SidebarMenuItem>
-                                <SidebarMenuButton
-                                    asChild
-                                    isActive={pathname === '/dashboard/collections'}
-                                >
-                                    <Link href="/dashboard/collections" className="flex items-center justify-between w-full">
-                                        <div className="flex items-center gap-2">
-                                            <Layers className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-                                            <span>Collections</span>
-                                        </div>
-                                        {collections && (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton
+                                        asChild
+                                        isActive={pathname === '/dashboard/notes'}
+                                    >
+                                        <Link href="/dashboard/notes" className="flex items-center justify-between w-full">
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                                <span>Articles</span>
+                                            </div>
                                             <span className="text-xs text-muted-foreground ml-auto">
-                                                ({collections.length})
+                                                ({totalNotesCount})
                                             </span>
-                                        )}
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    )}
+                </SidebarGroup>
 
-                            <SidebarMenuItem>
-                                <SidebarMenuButton
-                                    asChild
-                                    isActive={pathname === '/dashboard/notes'}
-                                >
-                                    <Link href="/dashboard/notes" className="flex items-center justify-between w-full">
-                                        <div className="flex items-center gap-2">
-                                            <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                                            <span>Articles</span>
-                                        </div>
-                                        <span className="text-xs text-muted-foreground ml-auto">
-                                            ({totalNotesCount})
-                                        </span>
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                        </SidebarMenu>
-                    </SidebarGroupContent>
+                {/* Strategy Tools - Collapsible */}
+                <SidebarGroup>
+                    <SidebarGroupLabel>
+                        <button
+                            onClick={() => toggleSection('strategy-tools')}
+                            className="flex items-center gap-2 w-full text-left"
+                        >
+                            {expandedSections.has('strategy-tools') ? (
+                                <ChevronDown className="h-4 w-4" />
+                            ) : (
+                                <ChevronUp className="h-4 w-4 rotate-[-90deg]" />
+                            )}
+                            Strategy Tools
+                        </button>
+                    </SidebarGroupLabel>
+                    {expandedSections.has('strategy-tools') && (
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/diagnosis"
+                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/diagnosis" || pathname.startsWith("/dashboard/diagnosis/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                                }`}
+                                        >
+                                            <Stethoscope className="mr-2 h-4 w-4 text-red-600 dark:text-red-400" />
+                                            Diagnosis
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/direction"
+                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/direction" || pathname.startsWith("/dashboard/direction/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                                }`}
+                                        >
+                                            <Compass className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                            Direction
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/architecture"
+                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/architecture" || pathname.startsWith("/dashboard/architecture/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                                }`}
+                                        >
+                                            <Network className="mr-2 h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                            Architecture
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    )}
+                </SidebarGroup>
+
+                {/* Execution Tools - Collapsible */}
+                <SidebarGroup>
+                    <SidebarGroupLabel>
+                        <button
+                            onClick={() => toggleSection('execution-tools')}
+                            className="flex items-center gap-2 w-full text-left"
+                        >
+                            {expandedSections.has('execution-tools') ? (
+                                <ChevronDown className="h-4 w-4" />
+                            ) : (
+                                <ChevronUp className="h-4 w-4 rotate-[-90deg]" />
+                            )}
+                            Execution Tools
+                        </button>
+                    </SidebarGroupLabel>
+                    {expandedSections.has('execution-tools') && (
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/brand"
+                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/brand" || pathname.startsWith("/dashboard/brand/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                                }`}
+                                        >
+                                            <Palette className="mr-2 h-4 w-4 text-pink-600 dark:text-pink-400" />
+                                            Brand
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/product"
+                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/product" || pathname.startsWith("/dashboard/product/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                                }`}
+                                        >
+                                            <Package className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
+                                            Product
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/marketing"
+                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/marketing" || pathname.startsWith("/dashboard/marketing/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                                }`}
+                                        >
+                                            <Megaphone className="mr-2 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                            Marketing
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    )}
                 </SidebarGroup>
 
                 {/* My Brainspaces - Tree Structure */}
@@ -325,26 +489,6 @@ export default function SidePanel() {
                     </SidebarGroup>
                 )}
 
-                {/* Tools & Agents */}
-                <SidebarGroup>
-                    <SidebarGroupLabel>Tools & Agents</SidebarGroupLabel>
-                    <SidebarGroupContent>
-                        <SidebarMenu>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton asChild>
-                                    <Link
-                                        href="/dashboard/brand-builder"
-                                        className={`px-2 py-1 rounded ${pathname === "/dashboard/brand-builder" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                            }`}
-                                    >
-                                        <Sparkles className="mr-2 h-4 w-4 text-pink-600 dark:text-pink-400" />
-                                        Brand Builder
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
 
             </SidebarContent>
 
@@ -387,6 +531,12 @@ export default function SidePanel() {
                                         </Link>
                                     </DropdownMenuItem>
                                 )}
+                                <DropdownMenuItem asChild>
+                                    <Link href="/dashboard/faq">
+                                        <HelpCircle className="mr-2 h-4 w-4" />
+                                        FAQ
+                                    </Link>
+                                </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
                                     <Link href="/dashboard/settings">
                                         <Settings className="mr-2 h-4 w-4" />

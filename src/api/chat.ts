@@ -72,7 +72,8 @@ export function streamChat(
   question: string,
   chatTabId: number | undefined,
   agentMode: boolean,
-  options: StreamChatOptions
+  context?: { type: 'collection' | 'workspace' | 'article' | 'text'; id?: number; text?: string } | undefined,
+  options?: StreamChatOptions
 ): AbortController {
   const abortController = new AbortController();
   let streamId: string | null = null;
@@ -118,6 +119,11 @@ export function streamChat(
             question,
             chat_tab_id: chatTabId,
             agent_mode: agentMode,
+            context: context ? {
+              type: context.type,
+              id: context.id,
+              text: context.text
+            } : undefined,
           }),
           signal: abortController.signal,
         }

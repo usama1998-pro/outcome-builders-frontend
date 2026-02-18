@@ -13,9 +13,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Building } from "lucide-react";
+import { Building, Building2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useOrganizationDetails } from "@/src/hooks/useOrganization";
+import { usePathname } from "next/navigation";
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
     const { data: tenants, isLoading: tenantsLoading } = useUserTenants();
@@ -23,8 +24,12 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     const setTenantId = useAuthStore((s) => s.setTenantId);
     const queryClient = useQueryClient();
     const { data: organization } = useOrganizationDetails(currentTenantId || 0);
+    const pathname = usePathname();
 
     const currentTenant = tenants?.find((t) => t.id === currentTenantId);
+
+    // Hide watermark on landing page (/chat) and search page (/chat/search) - landing page has its own watermark
+    const shouldShowWatermark = pathname !== "/chat" && pathname !== "/chat/search";
 
     // Set default tenant if none is selected and user has tenants
     React.useEffect(() => {
@@ -48,27 +53,27 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
             <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-muted/30 -z-10" />
             <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-violet-500/8 via-transparent to-transparent pointer-events-none -z-10" />
             <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-indigo-500/5 via-transparent to-transparent pointer-events-none -z-10" />
-            
+
             {/* Theme Toggle */}
             <div className="fixed top-4 right-4 z-50">
                 <ToggleThemeButton />
             </div>
-            
+
             <div className="flex flex-row w-screen h-screen p-0 m-0">
                 {/* Sidebar */}
                 <ChatSidePanel />
 
                 {/* Main content area */}
                 <div className="flex flex-col flex-1 relative">
-                    {/* Organization Switcher - Above chat content only */}
-                    <div className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-sm relative overflow-hidden">
-                        {/* Watermark Logo Background */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] dark:opacity-[0.05]">
+                    {/* Watermark Logo Background - Centered in chat interface */}
+                    {/* Only show watermark when not on landing page or search page */}
+                    {shouldShowWatermark && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                             {organization?.logo ? (
-                                <img 
-                                    src={organization.logo} 
+                                <img
+                                    src={organization.logo}
                                     alt={`${organization.company_name} logo watermark`}
-                                    className="w-64 h-64 object-contain"
+                                    className="w-96 h-96 object-contain opacity-[0.15] dark:opacity-[0.20] grayscale dark:brightness-150"
                                     onError={(e) => {
                                         // Fallback to default logo if company logo fails
                                         const target = e.target as HTMLImageElement;
@@ -76,18 +81,15 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                                     }}
                                 />
                             ) : (
-                                <img 
-                                    src="/assets/Square-Icon-Black.png" 
-                                    alt="Logo watermark"
-                                    className="w-64 h-64 object-contain"
-                                    onError={(e) => {
-                                        // Fallback to SVG if PNG fails
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "/assets/svgs/Square-Icon-Black.svg";
-                                    }}
-                                />
+                                <div className="w-96 h-96 flex items-center justify-center opacity-[0.12] dark:opacity-[0.15]">
+                                    <Building2 className="w-full h-full text-muted-foreground" strokeWidth={0.5} />
+                                </div>
                             )}
                         </div>
+                    )}
+
+                    {/* Organization Switcher - Above chat content only */}
+                    <div className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-sm">
                         <div className="flex items-center justify-between px-4 py-3 relative z-10">
                             {/* Organization Switcher */}
                             <div className="flex items-center gap-3">
@@ -122,7 +124,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                         <SidebarTrigger className="bg-background/80 backdrop-blur-sm border shadow-sm rounded-lg p-2 hover:bg-accent transition-colors" />
                     </div>
 
-                    <main className="m-0 p-0 flex-1 flex flex-col overflow-hidden">
+                    <main className="m-0 p-0 flex-1 flex flex-col overflow-hidden relative z-10">
                         {children}
                     </main>
                 </div>

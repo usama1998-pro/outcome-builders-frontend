@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Building, Brain, FolderPlus, MessageCircle, PlusCircle, Send, Share2, Sparkles, MessageSquare, Star, ChevronDown, Check, RefreshCw } from "lucide-react";
+import { Building, Brain, FolderPlus, MessageCircle, PlusCircle, Send, Share2, Sparkles, MessageSquare, Star, ChevronDown, Check, RefreshCw, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import BlurText from "../../../components/BlurText";
@@ -12,6 +12,8 @@ import { streamChat } from "../../api/chat";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAuthStore } from "@/src/store/useAuth";
+import { useOrganizationDetails } from "@/src/hooks/useOrganization";
 
 interface QuickActionProps {
     href: string;
@@ -51,6 +53,8 @@ export default function Chat() {
     const queryClient = useQueryClient();
     const [inputValue, setInputValue] = useState("");
     const [agentMode, setAgentMode] = useState(false);
+    const currentTenantId = useAuthStore((s) => s.tenantId);
+    const { data: organization } = useOrganizationDetails(currentTenantId || 0);
 
     const handleAnimationComplete = () => {
         console.log('Animation completed!');
@@ -103,31 +107,41 @@ export default function Chat() {
     ];
 
     return (
-        <div className="flex flex-col justify-center items-center min-h-screen w-full px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col justify-center items-center min-h-screen w-full px-4 sm:px-6 lg:px-8 relative">
+            {/* Watermark Logo Background - At the top, above text */}
+            <div className="absolute top-8 left-1/2 -translate-x-1/2 pointer-events-none z-0 mb-16">
+                {organization?.logo ? (
+                    <img 
+                        src={organization.logo} 
+                        alt={`${organization.company_name} logo watermark`}
+                        className="w-48 h-48 object-contain opacity-[0.15] dark:opacity-[0.20] grayscale dark:brightness-150"
+                        onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                        }}
+                    />
+                ) : (
+                    <div className="w-48 h-48 flex items-center justify-center opacity-[0.12] dark:opacity-[0.15]">
+                        <Building2 className="w-full h-full text-muted-foreground" strokeWidth={0.5} />
+                    </div>
+                )}
+            </div>
+
             {/* Decorative Elements */}
             <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-            
-            {/* Header Badge */}
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-violet-500/10 to-indigo-500/10 border border-violet-500/20 mb-6"
-            >
-                <Sparkles className="w-4 h-4 text-violet-500" />
-                <span className="text-sm font-medium text-violet-600 dark:text-violet-400">AI-Powered Assistant</span>
-            </motion.div>
 
-            {/* Main Heading */}
-            <BlurText
-                text="What's on your mind today?"
-                delay={150}
-                animateBy="words"
-                direction="top"
-                onAnimationComplete={handleAnimationComplete}
-                className="text-2xl sm:text-3xl md:text-4xl font-bold text-center bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text mb-2"
-            />
+            {/* Main Heading - Add top margin to create space below watermark */}
+            <div className="mt-32">
+                <BlurText
+                    text="What's on your mind today?"
+                    delay={150}
+                    animateBy="words"
+                    direction="top"
+                    onAnimationComplete={handleAnimationComplete}
+                    className="text-2xl sm:text-3xl md:text-4xl font-bold text-center bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text mb-2"
+                />
+            </div>
             
             <motion.p
                 initial={{ opacity: 0 }}
