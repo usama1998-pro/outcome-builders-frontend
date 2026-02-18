@@ -270,3 +270,11 @@ export async function clearChatTab(chatTabId: number): Promise<void> {
   await api.post(routes.chat.clear(chatTabId));
 }
 
+/**
+ * Update the name of a chat tab
+ */
+export async function updateChatTabName(chatTabId: number, name: string): Promise<ChatTab> {
+  const { data } = await api.patch(routes.chat.updateTab(chatTabId), { name });
+  return data.data.chat_tab;
+}
+

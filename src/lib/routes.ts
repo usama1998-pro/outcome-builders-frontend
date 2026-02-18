@@ -68,6 +68,7 @@ const routes = {
     tabs: "/chat/tabs",
     search: "/chat/tabs/search",
     createTab: "/chat/tab",
+    updateTab: (chatTabId: number) => `/chat/tab/${chatTabId}`,
     history: (chatTabId: number) => `/chat/tab/${chatTabId}/history`,
     stream: "/chat/stream",
     stop: "/chat/stop",

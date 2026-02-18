@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ChatMessage, ChatTab } from "../../../types/chat";
 import { useRef, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { streamChat, getChatHistory, getChatTabs } from "../../../api/chat";
+import { streamChat, getChatHistory, getChatTabs, updateChatTabName } from "../../../api/chat";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../../../store/useAuth";
@@ -506,9 +506,211 @@ export default function Chat() {
         // Clear selection
         window.getSelection()?.removeAllRanges();
     };
+
+    // Helper function to generate a meaningful title from the first question
+    const generateChatTitle = (question: string): string => {
+        if (!question || !question.trim()) {
+            console.log("generateChatTitle: empty question");
+            return "New Chat";
+        }
+        
+        console.log("generateChatTitle: input question:", question.substring(0, 100));
+        
+        // Remove context separator if present
+        let cleanQuestion = question;
+        if (question.includes(CONTEXT_SEPARATOR)) {
+            const parts = question.split(CONTEXT_SEPARATOR);
+            cleanQuestion = parts[1]?.trim() || parts[0]?.trim() || question;
+            console.log("generateChatTitle: after CONTEXT_SEPARATOR:", cleanQuestion.substring(0, 100));
+        }
+        
+        // Remove context if it's in the format "context\n\nquestion"
+        // Only do this if the first part is clearly context (longer than 30 chars)
+        const parts = cleanQuestion.split('\n\n');
+        let actualQuestion = cleanQuestion.trim();
+        if (parts.length > 1 && parts[0].trim().length > 30) {
+            // First part looks like context, use the rest
+            actualQuestion = parts.slice(1).join('\n\n').trim();
+            console.log("generateChatTitle: after context removal:", actualQuestion.substring(0, 100));
+        }
+        
+        // If still empty after processing, use the original
+        if (!actualQuestion || actualQuestion.length === 0) {
+            actualQuestion = cleanQuestion.trim();
+        }
+        
+        // Take first line if multi-line, or first 60 chars for processing
+        const firstLine = actualQuestion.split('\n')[0].trim();
+        let title = firstLine.length > 0 && firstLine.length <= 60
+            ? firstLine
+            : actualQuestion.substring(0, 60).trim();
+        
+        // Map common short greetings/questions to meaningful titles
+        const shortQuestionMap: Record<string, string> = {
+            'hi': 'Introduction',
+            'hello': 'Introduction',
+            'hey': 'Introduction',
+            'hey there': 'Introduction',
+            'hi there': 'Introduction',
+            'hello there': 'Introduction',
+            'what': 'Question',
+            'what?': 'Question',
+            'why': 'Question',
+            'why?': 'Question',
+            'how': 'Question',
+            'how?': 'Question',
+            'who': 'Question',
+            'who?': 'Question',
+            'when': 'Question',
+            'when?': 'Question',
+            'where': 'Question',
+            'where?': 'Question',
+            'help': 'Help',
+            'help?': 'Help',
+            'thanks': 'Thank You',
+            'thank you': 'Thank You',
+            'thanks!': 'Thank You',
+            'thank you!': 'Thank You',
+        };
+        
+        // Check if it's a short question that we have a mapping for
+        const lowerTitle = title.toLowerCase().trim();
+        if (shortQuestionMap[lowerTitle]) {
+            console.log("generateChatTitle: mapped short question to:", shortQuestionMap[lowerTitle]);
+            return shortQuestionMap[lowerTitle];
+        }
+        
+        // Remove common question starters and make it more title-like
+        // Remove question words at the start if they're standalone
+        title = title.replace(/^(what|why|how|who|when|where|can|could|should|would|will|is|are|do|does|did)\s+/i, '');
+        
+        // Remove trailing punctuation and question marks
+        title = title.replace(/[.,;:!?]+$/, '');
+        
+        // Remove common filler words/phrases at the start
+        title = title.replace(/^(can you|could you|please|i want|i need|i would like|tell me|explain|describe)\s+/i, '');
+        
+        // If it starts with "what is" or "what are", remove those
+        title = title.replace(/^what\s+(is|are)\s+/i, '');
+        
+        // Capitalize first letter of each word for better title format
+        // But preserve acronyms and important capitalization
+        const words = title.split(/\s+/);
+        const capitalizedWords = words.map((word, index) => {
+            // Keep acronyms (all caps) as-is
+            if (word === word.toUpperCase() && word.length > 1 && /^[A-Z]+$/.test(word)) {
+                return word;
+            }
+            // Capitalize first letter, lowercase the rest
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        });
+        title = capitalizedWords.join(' ');
+        
+        // Truncate to max 50 characters, but try to break at word boundary
+        if (title.length > 50) {
+            const truncated = title.substring(0, 50);
+            const lastSpace = truncated.lastIndexOf(' ');
+            // If we can break at a word boundary, do so
+            if (lastSpace > 30) {
+                title = truncated.substring(0, lastSpace);
+            } else {
+                title = truncated;
+            }
+        }
+        
+        // Remove trailing punctuation again (in case truncation added some)
+        title = title.replace(/[.,;:!?]+$/, '').trim();
+        
+        console.log("generateChatTitle: final title:", title);
+        
+        // If empty or too short (less than 2 chars), use default
+        if (!title || title.length < 2) {
+            console.log("generateChatTitle: title too short, using default");
+            return "New Chat";
+        }
+        
+        return title;
+    };
+
+    // Async function to rename chat tab (only for new chats, first response)
+    // This function ensures it only runs once per chat tab, even if called multiple times
+    const renameChatTabIfNeeded = async (chatTabId: number, firstQuestion: string, isNewChat: boolean) => {
+        // Early return checks - must pass all to proceed
+        if (!isNewChat) {
+            console.log("Skipping rename - not a new chat:", { chatTabId, isNewChat });
+            return;
+        }
+        
+        if (!chatTabId || chatTabId <= 0) {
+            console.log("Skipping rename - invalid chatTabId:", { chatTabId });
+            return;
+        }
+        
+        // Check if already renamed (completed)
+        if (hasRenamedChatRef.current.has(chatTabId)) {
+            console.log("Skipping rename - already renamed:", { chatTabId });
+            return;
+        }
+        
+        // Check if rename is already in progress
+        if (isRenamingChatRef.current.has(chatTabId)) {
+            console.log("Skipping rename - already in progress:", { chatTabId });
+            return;
+        }
+        
+        if (!firstQuestion || !firstQuestion.trim()) {
+            console.log("Skipping rename - no question provided:", { chatTabId, firstQuestion });
+            return;
+        }
+        
+        // Mark as in-progress immediately to prevent duplicate calls (race condition protection)
+        isRenamingChatRef.current.add(chatTabId);
+        
+        try {
+            const newTitle = generateChatTitle(firstQuestion);
+            console.log("Renaming chat tab:", { chatTabId, newTitle, originalQuestion: firstQuestion.substring(0, 100), questionLength: firstQuestion.length });
+            
+            // Only rename if the title is different from default
+            if (newTitle && newTitle !== "New Chat") {
+                // Run asynchronously without blocking
+                await updateChatTabName(chatTabId, newTitle);
+                console.log("Chat tab renamed successfully:", newTitle);
+                
+                // Mark as renamed (completed) - only after successful rename
+                hasRenamedChatRef.current.add(chatTabId);
+                
+                // Invalidate chat tabs to refresh the list with new name
+                // Use predicate to match all chatTabs queries regardless of tenant ID
+                queryClient.invalidateQueries({ 
+                    predicate: (query) => {
+                        const key = query.queryKey;
+                        return Array.isArray(key) && key.length >= 1 && key[0] === "chatTabs";
+                    }
+                });
+            } else {
+                console.log("Skipping rename - title is default or empty:", newTitle, "from question:", firstQuestion.substring(0, 50));
+                // Mark as renamed even if we skip (to prevent retrying with same question)
+                hasRenamedChatRef.current.add(chatTabId);
+            }
+        } catch (error) {
+            // Log error for debugging
+            console.error("Failed to rename chat tab:", error);
+            // Remove from in-progress set so we can retry if needed (but keep in renamed set to prevent infinite retries)
+            isRenamingChatRef.current.delete(chatTabId);
+            // Don't add to hasRenamedChatRef on error, so it won't retry automatically
+        } finally {
+            // Always remove from in-progress set
+            isRenamingChatRef.current.delete(chatTabId);
+        }
+    };
     const lastLoadedChatIdRef = useRef<string | null>(null);
     const isCreatingNewChatRef = useRef<boolean>(false);
     const lastChatHistoryMessageCountRef = useRef<number>(-1);
+    const hasRenamedChatRef = useRef<Set<number>>(new Set()); // Track which chats have been renamed
+    const isRenamingChatRef = useRef<Set<number>>(new Set()); // Track which chats are currently being renamed (in progress)
+    const currentStreamingChatTabIdRef = useRef<number | null>(null); // Track chat tab ID for current stream
+    const currentStreamingQuestionRef = useRef<string | null>(null); // Track question for current stream
+    const wasNewChatRef = useRef<boolean>(false); // Track if this stream started as a new chat
 
     // Load chat tabs to check if we should show landing page
     const currentTenantId = useAuthStore((s) => s.tenantId);
@@ -670,9 +872,19 @@ export default function Chat() {
                                 onStart: (messageId, chatTabId, streamId) => {
                                     setCurrentStatus(null);
                                     // Update with real IDs
+                                    const previousChatTabId = currentChatTabId;
                                     setCurrentChatTabId(chatTabId);
                                     setStreamingMessageId(messageId);
                                     streamingMessageIdRef.current = messageId;
+                                    currentStreamingChatTabIdRef.current = chatTabId;
+                                    currentStreamingQuestionRef.current = originalQuestion;
+
+                                    // Track if this is a new chat (no existing chatTabId before)
+                                    const isNewChat = chatId === "new" || !previousChatTabId;
+                                    wasNewChatRef.current = isNewChat;
+                                    if (isNewChat) {
+                                        isCreatingNewChatRef.current = true;
+                                    }
 
                                     // Update bot message with real ID
                                     setMessages((prev) => {
@@ -696,6 +908,13 @@ export default function Chat() {
                                         lastLoadedChatIdRef.current = "new";
                                         // Use window.history to update URL without reload
                                         window.history.replaceState(null, "", `/chat/${chatTabId}`);
+                                    }
+
+                                    // Rename chat tab immediately when first question is sent (don't wait for response)
+                                    // This happens asynchronously and doesn't block the stream
+                                    if (isNewChat && chatTabId && originalQuestion) {
+                                        console.log("onStart - renaming chat tab immediately:", { chatTabId, question: originalQuestion.substring(0, 50) });
+                                        renameChatTabIfNeeded(chatTabId, originalQuestion, isNewChat);
                                     }
                                 },
                                 onChunk: (content) => {
@@ -727,7 +946,16 @@ export default function Chat() {
                                     setCurrentStatus(null);
                                     abortControllerRef.current = null;
                                     // Invalidate chat tabs after completion to update the list (e.g., new chat created)
-                                    queryClient.invalidateQueries({ queryKey: ["chatTabs"] });
+                                    queryClient.invalidateQueries({ 
+                                        predicate: (query) => {
+                                            const key = query.queryKey;
+                                            return Array.isArray(key) && key.length >= 1 && key[0] === "chatTabs";
+                                        }
+                                    });
+                                    // Clear refs
+                                    currentStreamingChatTabIdRef.current = null;
+                                    currentStreamingQuestionRef.current = null;
+                                    wasNewChatRef.current = false;
                                 },
                                 onStop: async () => {
                                     setIsStreaming(false);
@@ -836,12 +1064,13 @@ export default function Chat() {
                     setCurrentChatTabId(chatHistory.chat_tab.id);
                 }
             } else if (isCreatingNewChatRef.current && chatId !== "new") {
-                // If we just created a new chat, reset the flag after a moment
-                // This allows the next navigation to load history normally
+                // If we just created a new chat, reset the flag after a longer delay
+                // This allows the rename to complete before resetting
+                // The rename happens in onComplete, so we need to wait longer
                 setTimeout(() => {
                     isCreatingNewChatRef.current = false;
                     lastLoadedChatIdRef.current = chatId;
-                }, 100);
+                }, 2000); // Increased delay to allow rename to complete
             }
         }
     }, [chatHistory, chatId, isStreaming]);
@@ -932,9 +1161,19 @@ export default function Chat() {
                     onStart: (messageId, chatTabId, streamId) => {
                         setCurrentStatus(null);
                         // Update with real IDs
+                        const previousChatTabId = currentChatTabId;
                         setCurrentChatTabId(chatTabId);
                         setStreamingMessageId(messageId);
                         streamingMessageIdRef.current = messageId;
+                        currentStreamingChatTabIdRef.current = chatTabId;
+                        currentStreamingQuestionRef.current = originalQuestion;
+
+                        // Track if this is a new chat (no existing chatTabId before or we're on /chat/new)
+                        const isNewChat = chatId === "new" || !previousChatTabId;
+                        wasNewChatRef.current = isNewChat;
+                        if (isNewChat) {
+                            isCreatingNewChatRef.current = true;
+                        }
 
                         // Update bot message with real ID
                         setMessages((prev) => {
@@ -958,6 +1197,13 @@ export default function Chat() {
                             lastLoadedChatIdRef.current = "new";
                             // Use window.history to update URL without reload
                             window.history.replaceState(null, "", `/chat/${chatTabId}`);
+                        }
+
+                        // Rename chat tab immediately when first question is sent (don't wait for response)
+                        // This happens asynchronously and doesn't block the stream
+                        if (isNewChat && chatTabId && originalQuestion) {
+                            console.log("onStart - renaming chat tab immediately:", { chatTabId, question: originalQuestion.substring(0, 50) });
+                            renameChatTabIfNeeded(chatTabId, originalQuestion, isNewChat);
                         }
                     },
                     onChunk: (content) => {
@@ -989,7 +1235,16 @@ export default function Chat() {
                         setCurrentStatus(null);
                         abortControllerRef.current = null;
                         // Invalidate chat tabs after completion to update the list (e.g., new chat created)
-                        queryClient.invalidateQueries({ queryKey: ["chatTabs"] });
+                        queryClient.invalidateQueries({ 
+                            predicate: (query) => {
+                                const key = query.queryKey;
+                                return Array.isArray(key) && key.length >= 1 && key[0] === "chatTabs";
+                            }
+                        });
+                        // Clear refs
+                        currentStreamingChatTabIdRef.current = null;
+                        currentStreamingQuestionRef.current = null;
+                        wasNewChatRef.current = false;
                     },
                     onStop: async () => {
                         setIsStreaming(false);
