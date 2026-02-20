@@ -18,8 +18,11 @@ api.interceptors.request.use((config) => {
   // Add tenant header (required for multi-tenant endpoints)
   // Backend expects X-Tenant header (FastAPI converts x_tenant parameter to X-Tenant)
   const tenantId = useAuthStore.getState().tenantId;
+  const hydrated = useAuthStore.getState().hydrated;
 
-  if (tenantId) {
+  // Only add tenant header if tenantId exists and store is hydrated
+  // Queries should be disabled until hydrated, but this is a safety check
+  if (tenantId && hydrated) {
     config.headers["X-Tenant"] = String(tenantId);
   }
 

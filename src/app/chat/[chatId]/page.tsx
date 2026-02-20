@@ -482,7 +482,7 @@ export default function Chat() {
     const [isStreaming, setIsStreaming] = useState(false);
     const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
     const streamingMessageIdRef = useRef<number | null>(null);
-    const [currentChatTabId, setCurrentChatTabId] = useState<number | null>(null);
+    const [currentChatTabId, setCurrentChatTabId] = useState<string | null>(null); // UUID as string
     const [agentMode, setAgentMode] = useState(false);
     const [currentStatus, setCurrentStatus] = useState<string | null>(null);
     const [selectedContext, setSelectedContext] = useState<{ 
@@ -634,14 +634,14 @@ export default function Chat() {
 
     // Async function to rename chat tab (only for new chats, first response)
     // This function ensures it only runs once per chat tab, even if called multiple times
-    const renameChatTabIfNeeded = async (chatTabId: number, firstQuestion: string, isNewChat: boolean) => {
+    const renameChatTabIfNeeded = async (chatTabId: string, firstQuestion: string, isNewChat: boolean) => { // UUID as string
         // Early return checks - must pass all to proceed
         if (!isNewChat) {
             console.log("Skipping rename - not a new chat:", { chatTabId, isNewChat });
             return;
         }
         
-        if (!chatTabId || chatTabId <= 0) {
+        if (!chatTabId || chatTabId.trim() === "") {
             console.log("Skipping rename - invalid chatTabId:", { chatTabId });
             return;
         }
@@ -706,9 +706,9 @@ export default function Chat() {
     const lastLoadedChatIdRef = useRef<string | null>(null);
     const isCreatingNewChatRef = useRef<boolean>(false);
     const lastChatHistoryMessageCountRef = useRef<number>(-1);
-    const hasRenamedChatRef = useRef<Set<number>>(new Set()); // Track which chats have been renamed
-    const isRenamingChatRef = useRef<Set<number>>(new Set()); // Track which chats are currently being renamed (in progress)
-    const currentStreamingChatTabIdRef = useRef<number | null>(null); // Track chat tab ID for current stream
+    const hasRenamedChatRef = useRef<Set<string>>(new Set()); // Track which chats have been renamed (UUID strings)
+    const isRenamingChatRef = useRef<Set<string>>(new Set()); // Track which chats are currently being renamed (UUID strings)
+    const currentStreamingChatTabIdRef = useRef<string | null>(null); // Track chat tab ID for current stream (UUID string)
     const currentStreamingQuestionRef = useRef<string | null>(null); // Track question for current stream
     const wasNewChatRef = useRef<boolean>(false); // Track if this stream started as a new chat
 
@@ -752,7 +752,7 @@ export default function Chat() {
         queryFn: async () => {
             if (chatId && chatId !== "new" && currentTenantId) {
                 try {
-                    const history = await getChatHistory(parseInt(chatId));
+                    const history = await getChatHistory(chatId); // chatId is already a UUID string
                     // Handle case where chat tab doesn't exist (returns empty list)
                     if (history.chat_tab) {
                         setCurrentChatTabId(history.chat_tab.id);
@@ -831,7 +831,7 @@ export default function Chat() {
                     // Add user message immediately
                     const userMessage: ChatMessage = {
                         id: Date.now(),
-                        chat_tab_id: 0,
+                        chat_tab_id: "", // Will be updated with real UUID
                         question: storedQuestion, // Store with separator for parsing
                         answer: null,
                         created_at: new Date().toISOString(),
@@ -841,7 +841,7 @@ export default function Chat() {
                     // Create bot message placeholder immediately for smooth UX
                     const botMessage: ChatMessage = {
                         id: Date.now() + 1,
-                        chat_tab_id: 0,
+                        chat_tab_id: "", // Will be updated with real UUID
                         question: "",
                         answer: "",
                         created_at: new Date().toISOString(),
@@ -871,7 +871,7 @@ export default function Chat() {
                             {
                                 onStart: (messageId, chatTabId, streamId) => {
                                     setCurrentStatus(null);
-                                    // Update with real IDs
+                                    // Update with real IDs (chatTabId is UUID string)
                                     const previousChatTabId = currentChatTabId;
                                     setCurrentChatTabId(chatTabId);
                                     setStreamingMessageId(messageId);
@@ -894,7 +894,7 @@ export default function Chat() {
                                             return [...updated.slice(0, -1), {
                                                 ...lastMsg,
                                                 id: messageId,
-                                                chat_tab_id: chatTabId,
+                                                chat_tab_id: chatTabId, // UUID string
                                             }];
                                         }
                                         return updated;
@@ -1120,7 +1120,7 @@ export default function Chat() {
         // Add user message immediately
         const userMessage: ChatMessage = {
             id: Date.now(), // Temporary ID
-            chat_tab_id: currentChatTabId || 0,
+            chat_tab_id: currentChatTabId || "", // UUID string
             question: storedQuestion, // Store with separator for parsing
             answer: null,
             created_at: new Date().toISOString(),
@@ -1130,7 +1130,7 @@ export default function Chat() {
         // Create bot message placeholder immediately for smooth UX
         const botMessage: ChatMessage = {
             id: Date.now() + 1,
-            chat_tab_id: currentChatTabId || 0,
+            chat_tab_id: currentChatTabId || "", // UUID string
             question: "",
             answer: "",
             created_at: new Date().toISOString(),
@@ -1160,7 +1160,7 @@ export default function Chat() {
                 {
                     onStart: (messageId, chatTabId, streamId) => {
                         setCurrentStatus(null);
-                        // Update with real IDs
+                        // Update with real IDs (chatTabId is UUID string)
                         const previousChatTabId = currentChatTabId;
                         setCurrentChatTabId(chatTabId);
                         setStreamingMessageId(messageId);
@@ -1183,7 +1183,7 @@ export default function Chat() {
                                 return [...updated.slice(0, -1), {
                                     ...lastMsg,
                                     id: messageId,
-                                    chat_tab_id: chatTabId,
+                                    chat_tab_id: chatTabId, // UUID string
                                 }];
                             }
                             return updated;

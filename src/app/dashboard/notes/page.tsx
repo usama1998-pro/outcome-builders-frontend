@@ -1,19 +1,15 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
-import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-} from "@/components/ui/breadcrumb";
 import { useUserCollections } from "@/src/hooks/useCollection";
+import { useNotePermissions } from "@/src/hooks/useNotePermissions";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import api from "@/src/lib/axios";
 import routes from "@/src/lib/routes";
 import Notes from "@/src/types/notes";
 import { useAuthStore } from "@/src/store/useAuth";
+import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import {
     Card,
@@ -25,12 +21,11 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import RequireAuth from "@/src/components/auth/requireAuth";
-import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
 import { BsThreeDotsVertical } from "react-icons/bs";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
-import { FaTrash, FaPaperclip, FaEdit, FaEye, FaBrain, FaFile, FaTimes } from "react-icons/fa";
+import { FaTrash, FaEdit, FaEye, FaBrain } from "react-icons/fa";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -49,8 +44,8 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { useDeleteNote, useToggleTrainNote, useCreateNote } from "@/src/hooks/useNotes";
-import { FileText, Plus, Search, FolderOpen, Sparkles, BookOpen } from "lucide-react";
+import { useDeleteNote, useToggleTrainNote, useCreateNote, useMoveNote } from "@/src/hooks/useNotes";
+import { FileText, Plus, Search, FolderOpen, Sparkles, BookOpen, RefreshCw, Move } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,15 +68,6 @@ interface NoteWithCollection extends Notes {
 }
 
 
-const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1 MB
-const ALLOWED_FILE_TYPES = [".pdf", ".txt", ".doc", ".docx"];
-const ALLOWED_MIME_TYPES = [
-    "application/pdf",
-    "text/plain",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-];
-
 const createNoteSchema = z.object({
     title: z.string().min(1, "Title is required").max(200, "Title is too long"),
     content: z.string().min(1, "Content is required"),
@@ -93,8 +79,14 @@ type CreateNoteFormValues = z.infer<typeof createNoteSchema>;
 function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]; searchQuery?: string }) {
     const { mutate: deleteNote, isPending: isDeleting } = useDeleteNote();
     const { mutate: toggleTrain } = useToggleTrainNote();
+    const { mutate: moveNote, isPending: isMoving } = useMoveNote();
+    // Fetch all collections (no workspace filter) to show all available collections including private ones
+    const { data: collections = [] } = useUserCollections(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [moveDialogOpen, setMoveDialogOpen] = useState(false);
     const [noteToDelete, setNoteToDelete] = useState<number | null>(null);
+    const [noteToMove, setNoteToMove] = useState<NoteWithCollection | null>(null);
+    const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
 
     const handleDeleteClick = (noteId: number, e: React.MouseEvent) => {
         e.preventDefault();
@@ -121,6 +113,50 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
         });
     };
 
+    const handleMoveClick = (note: NoteWithCollection, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setNoteToMove(note);
+        setSelectedCollectionId("");
+        setMoveDialogOpen(true);
+    };
+
+    const confirmMove = () => {
+        if (noteToMove && selectedCollectionId) {
+            moveNote(
+                {
+                    noteId: noteToMove.id,
+                    payload: { collection_id: Number(selectedCollectionId) },
+                },
+                {
+                    onSuccess: (res) => {
+                        if (res?.status) {
+                            toast.success(res.message || "Note moved successfully!");
+                            setMoveDialogOpen(false);
+                            setNoteToMove(null);
+                            setSelectedCollectionId("");
+                            // Refresh the page to show updated notes
+                            window.location.reload();
+                        } else {
+                            toast.error(res?.message || "Could not move note.");
+                        }
+                    },
+                    onError: (err: unknown) => {
+                        const error = err as { response?: { data?: { detail?: string } } };
+                        toast.error(error?.response?.data?.detail || "Failed to move note.");
+                    },
+                }
+            );
+        }
+    };
+
+    // Filter out the current collection from available collections for the note being moved
+    // Backend already filters collections to only show those visible to the user (including owner's private collections)
+    // So we just need to exclude the current collection
+    const availableCollections = noteToMove
+        ? collections.filter((col) => col.id !== noteToMove.collectionId)
+        : [];
+
     const confirmDelete = () => {
         if (noteToDelete) {
             deleteNote({ note_id: noteToDelete }, {
@@ -144,9 +180,9 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
     // Filter notes based on search query (matching NotesList behavior)
     const filteredNotes = useMemo(() => {
         if (!searchQuery.trim()) return notes;
-        
+
         const query = searchQuery.toLowerCase().trim();
-        return notes.filter(note => 
+        return notes.filter(note =>
             note.title.toLowerCase().includes(query) ||
             note.createdBy?.toLowerCase().includes(query)
         );
@@ -170,8 +206,8 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
 
                 {filteredNotes.map((note) => (
                     <div key={note.id} className="relative">
-                        <Link 
-                            href={`/dashboard/workspaces/${note.workspaceId}/collections/${note.collectionId}/notes/${note.id}`} 
+                        <Link
+                            href={`/dashboard/workspaces/${note.workspaceId}/collections/${note.collectionId}/notes/${note.id}`}
                             className="no-underline"
                         >
                             <Card className="w-[300px] h-[200px] flex flex-col justify-between">
@@ -180,14 +216,9 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                                         <CardTitle className="truncate max-w-[180px]" title={note.title}>
                                             {note.title}
                                         </CardTitle>
-                                        {note.hasFile && (
-                                            <span title={note.fileName || "Attachment"} className="text-blue-500">
-                                                <FaPaperclip size={14} />
-                                            </span>
-                                        )}
                                         {note.is_trained && (
-                                            <span 
-                                                title="Trained" 
+                                            <span
+                                                title="Trained"
                                                 className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500"
                                             >
                                                 <FaBrain size={12} className="text-white" />
@@ -237,6 +268,13 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                                                     {note.is_trained ? "Untrain Note" : "Train Note"}
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
+                                                    onClick={(e) => handleMoveClick(note, e)}
+                                                    className="cursor-pointer"
+                                                >
+                                                    <Move className="mr-2" />
+                                                    Move to Collection
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
                                                     onClick={(e) => handleDeleteClick(note.id, e)}
                                                     className="text-red-600 focus:text-red-600 cursor-pointer"
                                                 >
@@ -275,6 +313,72 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                             className="bg-red-600 hover:bg-red-700"
                         >
                             {isDeleting ? "Deleting..." : "Delete"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={moveDialogOpen}
+                onOpenChange={(isOpen) => {
+                    setMoveDialogOpen(isOpen);
+                    if (!isOpen) {
+                        setNoteToMove(null);
+                        setSelectedCollectionId("");
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <Move className="w-5 h-5 text-teal-500" />
+                            Move Note to Collection
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Select a collection to move this note to. This action will move the note from the current collection to the selected one.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-4">
+                        <Label htmlFor="move-collection-select" className="text-sm font-medium mb-2 block">
+                            Select Collection
+                        </Label>
+                        {availableCollections.length > 0 ? (
+                            <Select
+                                value={selectedCollectionId}
+                                onValueChange={setSelectedCollectionId}
+                            >
+                                <SelectTrigger id="move-collection-select" className="w-full" disabled={isMoving}>
+                                    <SelectValue placeholder="-- Select a collection --" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {availableCollections.map((col) => (
+                                        <SelectItem key={col.id} value={String(col.id)}>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium">{col.title}</span>
+                                                {col.workspaceName && (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {col.workspaceName}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        ) : (
+                            <p className="text-sm text-muted-foreground mt-2">
+                                No other collections available to move to.
+                            </p>
+                        )}
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isMoving}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmMove}
+                            disabled={!selectedCollectionId || isMoving}
+                            className="bg-teal-500 hover:bg-teal-600"
+                        >
+                            {isMoving ? "Moving..." : "Move Note"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -324,16 +428,21 @@ async function fetchCollectionNotes(collectionId: number): Promise<Notes[]> {
 }
 
 export default function AllNotesPage() {
-    const { data: collections, isLoading: collectionsLoading } = useUserCollections();
+    const { currentBrainSpaceId } = useBrainSpaceStore();
+    const { data: collections, isLoading: collectionsLoading } = useUserCollections(currentBrainSpaceId);
     const [searchQuery, setSearchQuery] = useState("");
     const tenantId = useAuthStore((state) => state.tenantId);
     const hydrated = useAuthStore((state) => state.hydrated);
+    const userId = useAuthStore((state) => state.userId);
     const [open, setOpen] = useState(false);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [fileError, setFileError] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const queryClient = useQueryClient();
     const { mutate: createNote, isPending } = useCreateNote();
+
+    // Collections are already filtered by backend based on workspace_id
+    const filteredCollections = collections || [];
+
+    // Use shared permission hook (no collectionId for side menu - checks global permissions)
+    const { canCreateNote, permissionsLoading, hasAnyNotePermission, isOwnerOrAdmin, permissions, refetchPermissions } = useNotePermissions();
 
     const form = useForm<CreateNoteFormValues>({
         resolver: zodResolver(createNoteSchema),
@@ -344,76 +453,18 @@ export default function AllNotesPage() {
         },
     });
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        setFileError(null);
-        
-        if (file) {
-            // Check file extension
-            const fileExt = "." + file.name.split(".").pop()?.toLowerCase();
-            if (!ALLOWED_FILE_TYPES.includes(fileExt)) {
-                setFileError("Only PDF, TXT, DOC, and DOCX files are allowed.");
-                setSelectedFile(null);
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = "";
-                }
-                return;
-            }
-            
-            // Check MIME type
-            if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-                setFileError("Only PDF, TXT, DOC, and DOCX files are allowed.");
-                setSelectedFile(null);
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = "";
-                }
-                return;
-            }
-            
-            // Check file size
-            if (file.size > MAX_FILE_SIZE) {
-                setFileError(`File size exceeds 1 MB limit. Your file is ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
-                setSelectedFile(null);
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = "";
-                }
-                return;
-            }
-            setSelectedFile(file);
-        }
-    };
-
-    const removeFile = () => {
-        setSelectedFile(null);
-        setFileError(null);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-        }
-    };
-
-    const formatFileSize = (bytes: number) => {
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-        return (bytes / (1024 * 1024)).toFixed(2) + " MB";
-    };
-
     const onSubmit = (values: CreateNoteFormValues) => {
         createNote(
             {
                 title: values.title,
                 content: values.content,
                 collection_id: Number(values.collection_id),
-                file: selectedFile,
             },
             {
                 onSuccess: (res) => {
                     if (res?.status) {
                         toast.success(res.message || "Article created successfully!");
                         form.reset();
-                        setSelectedFile(null);
-                        if (fileInputRef.current) {
-                            fileInputRef.current.value = "";
-                        }
                         setOpen(false);
                         // Invalidate all collection notes queries to refresh the list
                         queryClient.invalidateQueries({ queryKey: ["collectionNotes"] });
@@ -429,12 +480,12 @@ export default function AllNotesPage() {
         );
     };
 
-    // Fetch notes for all collections using useQueries
+    // Fetch notes for filtered collections using useQueries
     const noteQueries = useQueries({
-        queries: (collections || []).map((collection) => ({
+        queries: (filteredCollections || []).map((collection) => ({
             queryKey: ["collectionNotes", collection.id, tenantId],
             queryFn: () => fetchCollectionNotes(collection.id),
-            enabled: !!collection.id && !!tenantId && hydrated && !!collections && collections.length > 0,
+            enabled: !!collection.id && !!tenantId && hydrated && !!filteredCollections && filteredCollections.length > 0,
         })),
     });
 
@@ -443,13 +494,13 @@ export default function AllNotesPage() {
 
     // Combine all notes with collection and workspace info
     const allNotes: NoteWithCollection[] = useMemo(() => {
-        if (!collections) return [];
-        
+        if (!filteredCollections) return [];
+
         const notes: NoteWithCollection[] = [];
         noteQueries.forEach((query, index) => {
-            if (query.data && collections[index]) {
+            if (query.data && filteredCollections[index]) {
                 query.data.forEach((note) => {
-                    const collection = collections[index];
+                    const collection = filteredCollections[index];
                     notes.push({
                         ...note,
                         collectionId: collection.id,
@@ -461,14 +512,14 @@ export default function AllNotesPage() {
             }
         });
         return notes;
-    }, [collections, noteQueries]);
+    }, [filteredCollections, noteQueries]);
 
     // Filter notes based on search query
     const filteredNotes = useMemo(() => {
         if (!searchQuery.trim()) return allNotes;
-        
+
         const query = searchQuery.toLowerCase().trim();
-        return allNotes.filter(note => 
+        return allNotes.filter(note =>
             note.title.toLowerCase().includes(query) ||
             note.collectionName.toLowerCase().includes(query) ||
             note.workspaceName.toLowerCase().includes(query) ||
@@ -479,18 +530,6 @@ export default function AllNotesPage() {
     return (
         <RequireAuth>
             <div className="flex flex-col items-center justify-center p-6">
-                <Breadcrumb>
-                    <BreadcrumbList>
-                        <BreadcrumbItem>
-                            <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-                        </BreadcrumbItem>
-                        <BreadcrumbItem>
-                            <BreadcrumbLink href="/dashboard/notes">
-                                Articles
-                            </BreadcrumbLink>
-                        </BreadcrumbItem>
-                    </BreadcrumbList>
-                </Breadcrumb>
 
                 <nav className="sticky top-0 w-[90%] mx-auto self-center px-15 flex justify-between items-center bg-background border-b border-border py-5">
                     <Input
@@ -500,8 +539,8 @@ export default function AllNotesPage() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
-                    
-                    {collections && collections.length > 0 && (
+
+                    {filteredCollections && filteredCollections.length > 0 && !permissionsLoading && canCreateNote && (
                         <AlertDialog open={open} onOpenChange={setOpen}>
                             <AlertDialogTrigger asChild>
                                 <Button className="gap-2">
@@ -534,7 +573,7 @@ export default function AllNotesPage() {
                                                 <SelectValue placeholder="Select a collection" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {collections.map((collection) => (
+                                                {filteredCollections.map((collection) => (
                                                     <SelectItem key={collection.id} value={String(collection.id)}>
                                                         <div className="flex flex-col">
                                                             <span className="font-medium">{collection.title}</span>
@@ -590,50 +629,9 @@ export default function AllNotesPage() {
                                         )}
                                     </div>
 
-                                    <div>
-                                        <Label className="pb-3" htmlFor="file">
-                                            Attachment (optional, max 1 MB - PDF, TXT, DOC, DOCX only)
-                                        </Label>
-                                        <div className="flex items-center gap-2">
-                                            <Input
-                                                id="file"
-                                                type="file"
-                                                ref={fileInputRef}
-                                                onChange={handleFileChange}
-                                                className="flex-1"
-                                                accept=".pdf,.txt,.doc,.docx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                            />
-                                        </div>
-                                        {fileError && (
-                                            <p className="text-sm !text-red-500 mt-1">
-                                                {fileError}
-                                            </p>
-                                        )}
-                                        {selectedFile && !fileError && (
-                                            <div className="mt-2 flex items-center gap-2 p-2 bg-muted rounded-md">
-                                                <FaFile className="text-blue-500" />
-                                                <span className="text-sm truncate flex-1">{selectedFile.name}</span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {formatFileSize(selectedFile.size)}
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={removeFile}
-                                                    className="text-red-500 hover:text-red-700"
-                                                >
-                                                    <FaTimes />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-
                                     <AlertDialogFooter>
                                         <AlertDialogCancel disabled={isPending} onClick={() => {
                                             form.reset();
-                                            setSelectedFile(null);
-                                            if (fileInputRef.current) {
-                                                fileInputRef.current.value = "";
-                                            }
                                         }}>
                                             Cancel
                                         </AlertDialogCancel>
@@ -692,18 +690,18 @@ export default function AllNotesPage() {
                                     <Sparkles className="w-5 h-5 text-orange-400 animate-pulse delay-300" />
                                 </div>
                             </div>
-                            
+
                             <h3 className="text-2xl font-bold text-foreground mb-3">
                                 No Articles Yet
                             </h3>
-                            
+
                             <p className="text-muted-foreground mb-8 text-base leading-relaxed">
-                                This collection is empty. Start documenting your knowledge by creating your first article. 
-                                You can add content, attach files, and train articles for your AI assistant.
+                                This collection is empty. Start documenting your knowledge by creating your first article.
+                                You can add content and train articles for your AI assistant.
                             </p>
 
-                            {collections && collections.length > 0 && (
-                                <Button 
+                            {filteredCollections && filteredCollections.length > 0 && canCreateNote && (
+                                <Button
                                     onClick={() => setOpen(true)}
                                     className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all"
                                 >
@@ -712,10 +710,38 @@ export default function AllNotesPage() {
                                 </Button>
                             )}
 
-                            {(!collections || collections.length === 0) && (
+                            {filteredCollections && filteredCollections.length > 0 && !canCreateNote && !permissionsLoading && (
+                                <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+                                    <div className="flex items-center gap-2">
+                                        <BookOpen className="w-4 h-4" />
+                                        <span>You don't have permission to create articles. Please contact an administrator or become a member of a collection with editor/owner role.</span>
+                                    </div>
+                                    {permissions && permissions.length === 0 && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-amber-600">No permissions found. If you just added permissions, try refreshing:</span>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => refetchPermissions()}
+                                                className="h-7"
+                                            >
+                                                <RefreshCw className="w-3 h-3 mr-1" />
+                                                Refresh Permissions
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {(!filteredCollections || filteredCollections.length === 0) && (
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <BookOpen className="w-4 h-4" />
-                                    <span>You need to create a collection first before creating articles.</span>
+                                    <span>
+                                        {currentBrainSpaceId
+                                            ? "No collections found in the selected brain space. Create a collection first before creating articles."
+                                            : "You need to create a collection first before creating articles. Select a brain space to filter collections."
+                                        }
+                                    </span>
                                 </div>
                             )}
                         </div>

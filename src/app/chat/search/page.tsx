@@ -53,7 +53,7 @@ export default function SearchChatPage() {
         staleTime: 1000 * 30,
     });
 
-    const handleChatClick = (chatId: number) => {
+    const handleChatClick = (chatId: string) => { // UUID as string
         router.push(`/chat/${chatId}`);
     };
 

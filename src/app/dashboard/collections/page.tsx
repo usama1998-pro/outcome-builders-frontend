@@ -1,16 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { CollectionList } from "@/src/components/List/Collection/CollectionList";
 import { FaPlus } from "react-icons/fa";
 import { Layers, FolderOpen, Sparkles, Building } from "lucide-react";
-import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-} from "@/components/ui/breadcrumb";
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -21,7 +15,12 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useUserCollections, useCreateUserCollection } from "@/src/hooks/useCollection";
+import { 
+    useUserCollections, 
+    useCreateUserCollection,
+    useTenantUsers,
+    useAddCollectionMember
+} from "@/src/hooks/useCollection";
 import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -40,6 +39,9 @@ import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import RequireAuth from "@/src/components/auth/requireAuth";
 import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
+import { useAuthStore } from "@/src/store/useAuth";
+import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
+import { X, UserPlus } from "lucide-react";
 
 const createCollectionSchema = z.object({
     name: z.string().min(1, "Name is required").max(100, "Name is too long"),
@@ -51,11 +53,27 @@ const createCollectionSchema = z.object({
 type CreateCollectionFormValues = z.infer<typeof createCollectionSchema>;
 
 export default function AllCollectionsPage() {
-    const { data: allCollections, isLoading, isError, error, refetch } = useUserCollections();
+    const { currentBrainSpaceId } = useBrainSpaceStore();
+    const { data: allCollections, isLoading, isError, error, refetch } = useUserCollections(currentBrainSpaceId);
     const { data: workspaces } = useUserWorkspaces();
     const { mutate: createCollection, isPending } = useCreateUserCollection();
+    const { mutate: addMember, isPending: isAddingMember } = useAddCollectionMember();
+    const userId = useAuthStore((state) => state.userId);
     const [open, setOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [selectedMembers, setSelectedMembers] = useState<number[]>([]);
+    const [selectedUserId, setSelectedUserId] = useState<number | "">("");
+    
+    // Collections are already filtered by backend based on workspace_id
+    const filteredCollections = allCollections || [];
+    
+    // Fetch tenant users for member selection
+    const { data: tenantUsers = [] } = useTenantUsers();
+    
+    // Filter out the current user (owner) from the list
+    const availableUsers = tenantUsers.filter(
+        (user) => user.id !== userId && !selectedMembers.includes(user.id)
+    );
 
     // Permission checks - hide elements until permissions are loaded and confirmed
     const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
@@ -81,12 +99,26 @@ export default function AllCollectionsPage() {
         form.setValue("visibility", "public");
     }
 
-    // Update default workspace_id when workspaces load
-    if (workspaces && workspaces.length > 0 && form.getValues("workspace_id") === 0) {
-        form.setValue("workspace_id", workspaces[0].id);
-    }
+    // Update default workspace_id when workspaces load or brain space changes
+    useEffect(() => {
+        if (currentBrainSpaceId && form.getValues("workspace_id") !== currentBrainSpaceId) {
+            form.setValue("workspace_id", currentBrainSpaceId);
+        } else if (!currentBrainSpaceId && workspaces && workspaces.length > 0 && form.getValues("workspace_id") === 0) {
+            form.setValue("workspace_id", workspaces[0].id);
+        }
+    }, [currentBrainSpaceId, workspaces, form]);
 
-    const onSubmit = (values: CreateCollectionFormValues) => {
+    const handleAddMember = () => {
+        if (!selectedUserId) return;
+        setSelectedMembers([...selectedMembers, Number(selectedUserId)]);
+        setSelectedUserId("");
+    };
+    
+    const handleRemoveMember = (userId: number) => {
+        setSelectedMembers(selectedMembers.filter((id) => id !== userId));
+    };
+    
+    const onSubmit = async (values: CreateCollectionFormValues) => {
         createCollection(
             {
                 name: values.name,
@@ -95,10 +127,58 @@ export default function AllCollectionsPage() {
                 workspace_id: values.workspace_id,
             },
             {
-                onSuccess: (res) => {
+                onSuccess: async (res) => {
                     if (res?.status) {
-                        toast.success(res.message || "Collection created successfully!");
+                        // If visibility is "shared" and there are members, add them
+                        if (values.visibility === "shared" && selectedMembers.length > 0) {
+                            // Get the collection ID from the response
+                            // Response structure: { status, message, data: { message: { collection: { id, ... } } } }
+                            const collectionId = (res?.data as any)?.message?.collection?.id || 
+                                                (res?.data as any)?.collection?.id;
+                            
+                            if (collectionId) {
+                                // Add all selected members sequentially to avoid race conditions
+                                let successCount = 0;
+                                for (const memberId of selectedMembers) {
+                                    try {
+                                        await new Promise<void>((resolve, reject) => {
+                                            addMember(
+                                                {
+                                                    collectionId,
+                                                    payload: { user_id: memberId, role: "viewer" },
+                                                },
+                                                {
+                                                    onSuccess: () => {
+                                                        successCount++;
+                                                        resolve();
+                                                    },
+                                                    onError: (err) => reject(err),
+                                                }
+                                            );
+                                        });
+                                    } catch (err: any) {
+                                        console.error(`Failed to add member ${memberId}:`, err);
+                                    }
+                                }
+                                
+                                if (successCount === selectedMembers.length) {
+                                    toast.success("Collection created and all members added successfully!");
+                                } else if (successCount > 0) {
+                                    toast.warning(`Collection created but only ${successCount} of ${selectedMembers.length} members were added.`);
+                                } else {
+                                    toast.warning("Collection created but members could not be added. You can add them manually.");
+                                }
+                            } else {
+                                toast.success(res.message || "Collection created successfully!");
+                                toast.info("Please add members manually from the collection settings.");
+                            }
+                        } else {
+                            toast.success(res.message || "Collection created successfully!");
+                        }
+                        
                         form.reset();
+                        setSelectedMembers([]);
+                        setSelectedUserId("");
                         setOpen(false);
                         // Small delay to ensure backend has processed, then refetch
                         setTimeout(() => {
@@ -119,18 +199,6 @@ export default function AllCollectionsPage() {
     return (
         <RequireAuth>
             <div className="flex flex-col items-center justify-center p-6">
-                <Breadcrumb>
-                    <BreadcrumbList>
-                        <BreadcrumbItem>
-                            <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-                        </BreadcrumbItem>
-                        <BreadcrumbItem>
-                            <BreadcrumbLink href="/dashboard/collections">
-                                Collections
-                            </BreadcrumbLink>
-                        </BreadcrumbItem>
-                    </BreadcrumbList>
-                </Breadcrumb>
 
                 <nav className="sticky top-0 w-[90%] mx-auto self-center px-15 flex justify-between items-center bg-background border-b border-border py-5">
                     <Input
@@ -142,7 +210,18 @@ export default function AllCollectionsPage() {
                     />
 
                     {canCreateCollection && (
-                        <AlertDialog open={open} onOpenChange={setOpen}>
+                        <AlertDialog 
+                            open={open} 
+                            onOpenChange={(isOpen) => {
+                                setOpen(isOpen);
+                                if (!isOpen) {
+                                    // Reset form and selections when dialog closes
+                                    form.reset();
+                                    setSelectedMembers([]);
+                                    setSelectedUserId("");
+                                }
+                            }}
+                        >
                             <AlertDialogTrigger asChild>
                                 <Button className="outline">
                                     <FaPlus className="mr-2" /> New Collection
@@ -266,6 +345,91 @@ export default function AllCollectionsPage() {
                                         )}
                                     </div>
 
+                                    {/* Member Management Section - Only show when visibility is "shared" */}
+                                    {form.watch("visibility") === "shared" && (
+                                        <div className="space-y-3 pt-4 border-t border-border">
+                                            <Label className="text-base font-semibold">Shared Members</Label>
+                                            <p className="text-sm text-muted-foreground">
+                                                Add members who can view this collection. Only these members and the owner will be able to see it.
+                                            </p>
+                                            
+                                            {/* Add Member Section */}
+                                            <div className="flex gap-2">
+                                                <Select
+                                                    value={selectedUserId.toString()}
+                                                    onValueChange={(value) => setSelectedUserId(value === "" ? "" : Number(value))}
+                                                >
+                                                    <SelectTrigger className="flex-1">
+                                                        <SelectValue placeholder="Select a user to add" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {availableUsers.length === 0 ? (
+                                                            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                                                No users available to add
+                                                            </div>
+                                                        ) : (
+                                                            availableUsers.map((user) => (
+                                                                <SelectItem key={user.id} value={user.id.toString()}>
+                                                                    {user.full_name || user.email}
+                                                                </SelectItem>
+                                                            ))
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Button
+                                                    type="button"
+                                                    onClick={handleAddMember}
+                                                    disabled={!selectedUserId || isAddingMember}
+                                                    size="sm"
+                                                    className="shrink-0"
+                                                >
+                                                    <UserPlus className="w-4 h-4 mr-1" />
+                                                    Add
+                                                </Button>
+                                            </div>
+                                            
+                                            {/* Members List */}
+                                            {selectedMembers.length > 0 && (
+                                                <div className="space-y-2 max-h-40 overflow-y-auto">
+                                                    {selectedMembers.map((memberId) => {
+                                                        const member = tenantUsers.find((u) => u.id === memberId);
+                                                        if (!member) return null;
+                                                        return (
+                                                            <div
+                                                                key={memberId}
+                                                                className="flex items-center justify-between p-2 bg-muted/50 rounded-lg"
+                                                            >
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm font-medium truncate">
+                                                                        {member.full_name || member.email}
+                                                                    </p>
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        Viewer
+                                                                    </p>
+                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => handleRemoveMember(memberId)}
+                                                                    className="shrink-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                                                                >
+                                                                    <X className="w-4 h-4" />
+                                                                </Button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                            
+                                            {selectedMembers.length === 0 && (
+                                                <p className="text-sm text-muted-foreground text-center py-4">
+                                                    No members added yet. Add members to share this collection with them.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <AlertDialogFooter>
                                         <AlertDialogCancel disabled={isPending}>
                                             Cancel
@@ -303,15 +467,15 @@ export default function AllCollectionsPage() {
                     </div>
                 )}
 
-                {allCollections && allCollections.length > 0 && (
+                {filteredCollections && filteredCollections.length > 0 && (
                     <CollectionList
-                        collections={allCollections}
-                        workspace={{ id: 0 }}
+                        collections={filteredCollections}
+                        workspace={{ id: currentBrainSpaceId || 0 }}
                         searchQuery={searchQuery}
                     />
                 )}
 
-                {allCollections && allCollections.length === 0 && !isLoading && (
+                {filteredCollections && filteredCollections.length === 0 && !isLoading && (
                     <div className="w-full flex items-center justify-center p-10 mt-10">
                         <div className="flex flex-col items-center text-center max-w-md">
                             {/* Empty State Icon with Animations */}
@@ -343,10 +507,13 @@ export default function AllCollectionsPage() {
 
                             {/* Text Content */}
                             <h3 className="text-xl font-semibold text-foreground mb-2">
-                                No Collections Yet
+                                {currentBrainSpaceId ? "No Collections in Selected Brain Space" : "No Collections Yet"}
                             </h3>
                             <p className="text-muted-foreground mb-6">
-                                Collections help you organize your articles and resources. Create your first collection to get started!
+                                {currentBrainSpaceId 
+                                    ? "This brain space doesn't have any collections yet. Create your first collection to get started!"
+                                    : "Collections help you organize your articles and resources. Select a brain space from the sidebar or create your first collection to get started!"
+                                }
                             </p>
 
                             {/* CTA Button - only show if user can create */}
@@ -364,6 +531,20 @@ export default function AllCollectionsPage() {
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <Building className="w-4 h-4" />
                                     <span>You need to create a brain space first before creating collections.</span>
+                                </div>
+                            )}
+                            
+                            {currentBrainSpaceId && filteredCollections.length === 0 && allCollections && allCollections.length > 0 && (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-4">
+                                    <Building className="w-4 h-4" />
+                                    <span>No collections found in the selected brain space. Create a new collection or select a different brain space.</span>
+                                </div>
+                            )}
+                            
+                            {!currentBrainSpaceId && allCollections && allCollections.length > 0 && (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-4">
+                                    <Building className="w-4 h-4" />
+                                    <span>Select a brain space from the sidebar to filter collections.</span>
                                 </div>
                             )}
                         </div>

@@ -27,10 +27,14 @@ const routes = {
   collection: {
     get: {
       user: "/collection/user",
+      users: "/collection/users",
     },
     create: "/collection",
     update: (id: number) => `/collection/${id}`,
     delete: (id: number) => `/collection/${id}`,
+    members: (id: number) => `/collection/${id}/members`,
+    addMember: (id: number) => `/collection/${id}/members`,
+    removeMember: (id: number, userId: number) => `/collection/${id}/members/${userId}`,
   },
   user: {
     account: "/user/profile",
@@ -63,17 +67,20 @@ const routes = {
     update: (id: number) => `/note/${id}`,
     delete: (id: number) => `/note/${id}`,
     train: (id: number) => `/note/${id}/train`,
+    share: (id: number) => `/note/${id}/share`,
+    unshare: (id: number) => `/note/${id}/share`,
+    move: (id: number) => `/note/${id}/move`,
   },
   chat: {
     tabs: "/chat/tabs",
     search: "/chat/tabs/search",
     createTab: "/chat/tab",
-    updateTab: (chatTabId: number) => `/chat/tab/${chatTabId}`,
-    history: (chatTabId: number) => `/chat/tab/${chatTabId}/history`,
+    updateTab: (chatTabId: string) => `/chat/tab/${chatTabId}`, // UUID as string
+    history: (chatTabId: string) => `/chat/tab/${chatTabId}/history`, // UUID as string
     stream: "/chat/stream",
     stop: "/chat/stop",
-    delete: (chatTabId: number) => `/chat/tab/${chatTabId}`,
-    clear: (chatTabId: number) => `/chat/tab/${chatTabId}/clear`,
+    delete: (chatTabId: string) => `/chat/tab/${chatTabId}`, // UUID as string
+    clear: (chatTabId: string) => `/chat/tab/${chatTabId}/clear`, // UUID as string
   },
 };
 

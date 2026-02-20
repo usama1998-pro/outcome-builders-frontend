@@ -9,13 +9,13 @@ interface CreateChatTabRequest {
 
 interface CreateChatMessageRequest {
   question: string;
-  chat_tab_id?: number;
+  chat_tab_id?: string; // UUID as string
   agent_mode?: boolean;
 }
 
 interface StreamChatOptions {
   onChunk: (content: string) => void;
-  onStart?: (messageId: number, chatTabId: number, streamId: string) => void;
+  onStart?: (messageId: number, chatTabId: string, streamId: string) => void; // chatTabId is UUID string
   onComplete?: () => void;
   onError?: (error: string) => void;
   onStop?: () => void;
@@ -52,7 +52,7 @@ export async function searchChatTabs(query: string): Promise<ChatTab[]> {
  * Get chat history for a chat tab (last N messages)
  */
 export async function getChatHistory(
-  chatTabId: number,
+  chatTabId: string, // UUID as string
   limit: number = 10
 ): Promise<ChatHistory> {
   const { data } = await api.get(routes.chat.history(chatTabId), {
@@ -70,7 +70,7 @@ export async function getChatHistory(
  */
 export function streamChat(
   question: string,
-  chatTabId: number | undefined,
+  chatTabId: string | undefined, // UUID as string
   agentMode: boolean,
   context?: { type: 'collection' | 'workspace' | 'article' | 'text'; id?: number; text?: string } | undefined,
   options?: StreamChatOptions
@@ -259,21 +259,21 @@ export async function stopChatStream(streamId: string): Promise<void> {
 /**
  * Delete a chat tab and all its messages
  */
-export async function deleteChatTab(chatTabId: number): Promise<void> {
+export async function deleteChatTab(chatTabId: string): Promise<void> { // UUID as string
   await api.delete(routes.chat.delete(chatTabId));
 }
 
 /**
  * Clear all messages from a chat tab (but keep the tab)
  */
-export async function clearChatTab(chatTabId: number): Promise<void> {
+export async function clearChatTab(chatTabId: string): Promise<void> { // UUID as string
   await api.post(routes.chat.clear(chatTabId));
 }
 
 /**
  * Update the name of a chat tab
  */
-export async function updateChatTabName(chatTabId: number, name: string): Promise<ChatTab> {
+export async function updateChatTabName(chatTabId: string, name: string): Promise<ChatTab> { // UUID as string
   const { data } = await api.patch(routes.chat.updateTab(chatTabId), { name });
   return data.data.chat_tab;
 }

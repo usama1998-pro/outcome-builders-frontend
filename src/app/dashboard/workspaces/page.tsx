@@ -21,12 +21,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { FaPlus } from "react-icons/fa";
-import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-} from "@/components/ui/breadcrumb";
 import { useCreateUserWorkspace, useUserWorkspaces } from "@/src/hooks/useWorkspace";
 import { useUserTenants } from "@/src/hooks/useAuth";
 import { useAuthStore } from "@/src/store/useAuth";
@@ -90,16 +84,6 @@ export default function DashboardWorkspace() {
     return (
         <RequireAuth>
             <div className="flex flex-col items-center justify-center p-6">
-                <Breadcrumb>
-                    <BreadcrumbList>
-                        <BreadcrumbItem>
-                            <BreadcrumbLink href="/dashboard/workspaces">
-                                Brainspaces
-                            </BreadcrumbLink>
-                        </BreadcrumbItem>
-                    </BreadcrumbList>
-                </Breadcrumb>
-
                 <nav className="sticky top-0 w-[90%] mx-auto self-center flex justify-between items-center bg-background border-b border-border py-5">
                     <div className="flex items-center gap-4">
                         <Input

@@ -20,6 +20,11 @@ interface PermissionsApiResponse {
 
 async function fetchUserPermissions(tenantId: number): Promise<UserPermissions> {
   const { data } = await api.get<PermissionsApiResponse>(routes.user.myPermissions(tenantId));
+  // Debug: Log the API response to see what we're getting
+  console.log("=== Permissions API Response ===");
+  console.log("Full Response:", data);
+  console.log("Response Data:", data.data);
+  console.log("Permissions Array:", data.data?.permissions);
   return data.data;
 }
 
@@ -30,12 +35,15 @@ export function useUserPermissions() {
 
   const queryEnabled = !!tenantId && !!userId && hydrated;
 
-  const { data, isLoading: queryLoading, isError, error } = useQuery<UserPermissions, Error>({
+  const { data, isLoading: queryLoading, isError, error, refetch } = useQuery<UserPermissions, Error>({
     // Include userId in query key to prevent caching across different users
     queryKey: ["userPermissions", tenantId, userId],
     queryFn: () => fetchUserPermissions(tenantId!),
     enabled: queryEnabled,
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    staleTime: 0, // No cache - always fetch fresh permissions to reflect role changes immediately
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchOnMount: true, // Always refetch on mount
+    gcTime: 0, // Don't keep in cache after unmount
   });
 
   // Consider loading if: store not hydrated, tenantId/userId not set, or query is fetching
@@ -49,7 +57,7 @@ export function useUserPermissions() {
   };
 
   const hasAnyPermission = (permissions: string[]): boolean => {
-    if (!data) return false;
+    if (!data || !data.permissions || !Array.isArray(data.permissions)) return false;
     return permissions.some((p) => data.permissions.includes(p));
   };
 
@@ -75,6 +83,7 @@ export function useUserPermissions() {
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
+    refetch, // Expose refetch function to manually refresh permissions
   };
 }
 

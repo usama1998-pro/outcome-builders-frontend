@@ -14,6 +14,9 @@ interface CollectionApiItem {
     workspace_id: number;
     workspace_name: string;
     created_at: string | null;
+    article_count?: number;
+    notes_count?: number;
+    members_count?: number;
 }
 
 interface CollectionApiResponse {
@@ -47,8 +50,13 @@ interface CreateCollectionResponse {
 
 
 // ------------------ // Collections Fetch/Create // ------------------
-async function fetchUserCollections(): Promise<Collections[]> {
-    const { data } = await api.get<CollectionApiResponse>(routes.collection.get.user);
+async function fetchUserCollections(workspaceId?: number | null): Promise<Collections[]> {
+    const params: Record<string, any> = {};
+    // Only add workspace_id if it's a valid number (not null or undefined)
+    if (workspaceId !== null && workspaceId !== undefined && workspaceId > 0) {
+        params.workspace_id = workspaceId;
+    }
+    const { data } = await api.get<CollectionApiResponse>(routes.collection.get.user, { params });
     // backend returns data.collections array
     return data.data.collections.map((c) => ({
         id: c.id,
@@ -56,7 +64,8 @@ async function fetchUserCollections(): Promise<Collections[]> {
         createdAt: c.created_at ?? "",
         createdBy: String(c.owner_id),
         description: c.description ?? "",
-        members: 0,
+        // Use article_count or notes_count from backend if available, otherwise default to 0
+        members: c.article_count ?? c.notes_count ?? 0,
         avatarUrl: "/default-avatar.png",
         workspaceId: c.workspace_id,
         workspaceName: c.workspace_name,
@@ -71,18 +80,22 @@ async function createUserCollection(payload: CreateCollectionPayload): Promise<C
 
 // ------------------ // Hooks // ------------------ 
 
-export function useUserCollections() {
+export function useUserCollections(workspaceId?: number | null) {
     const tenantId = useAuthStore((state) => state.tenantId);
     const hydrated = useAuthStore((state) => state.hydrated);
     
     const { data, isLoading, isError, error, refetch } = useQuery<Collections[], Error>({
-        queryKey: ["userCollections", tenantId],
-        queryFn: fetchUserCollections,
+        queryKey: ["userCollections", tenantId, workspaceId ?? null],
+        queryFn: () => fetchUserCollections(workspaceId),
         // Only run query if tenantId is available and store is hydrated
-        enabled: !!tenantId && hydrated,
+        enabled: !!tenantId && !!hydrated,
+        // Don't retry on errors to avoid spamming the API
+        retry: false,
+        // Return empty array as default instead of undefined to avoid issues
+        placeholderData: [],
     });
 
-    return { data, isLoading, isError, error, refetch };
+    return { data: data ?? [], isLoading, isError, error, refetch };
 }
 
 
@@ -138,6 +151,91 @@ export function useUpdateUserCollection() {
         onSuccess: () => {
             // Invalidate and refetch collections after successful update
             queryClient.invalidateQueries({ queryKey: ["userCollections"] });
+        },
+    });
+}
+
+// ------------------ // Collection Members // ------------------
+
+interface CollectionMember {
+    id: number;
+    user_id: number;
+    email: string;
+    full_name: string | null;
+    role: string;
+}
+
+interface TenantUser {
+    id: number;
+    email: string;
+    full_name: string | null;
+    role: string | null;
+}
+
+interface AddMemberPayload {
+    user_id: number;
+    role?: string;
+}
+
+async function getCollectionMembers(collectionId: number): Promise<CollectionMember[]> {
+    const { data } = await api.get<{ status: boolean; message: string; data: { members: CollectionMember[] } }>(
+        routes.collection.members(collectionId)
+    );
+    return data.data.members;
+}
+
+async function getTenantUsers(): Promise<TenantUser[]> {
+    const { data } = await api.get<{ status: boolean; message: string; data: { users: TenantUser[] } }>(
+        routes.collection.get.users
+    );
+    return data.data.users;
+}
+
+async function addCollectionMember(collectionId: number, payload: AddMemberPayload): Promise<{ status: boolean; message: string }> {
+    const { data } = await api.post(routes.collection.addMember(collectionId), payload);
+    return data;
+}
+
+async function removeCollectionMember(collectionId: number, userId: number): Promise<{ status: boolean; message: string }> {
+    const { data } = await api.delete(routes.collection.removeMember(collectionId, userId));
+    return data;
+}
+
+export function useCollectionMembers(collectionId: number) {
+    return useQuery<CollectionMember[], Error>({
+        queryKey: ["collectionMembers", collectionId],
+        queryFn: () => getCollectionMembers(collectionId),
+        enabled: !!collectionId,
+    });
+}
+
+export function useTenantUsers() {
+    return useQuery<TenantUser[], Error>({
+        queryKey: ["tenantUsers"],
+        queryFn: getTenantUsers,
+    });
+}
+
+export function useAddCollectionMember() {
+    const queryClient = useQueryClient();
+    
+    return useMutation({
+        mutationFn: ({ collectionId, payload }: { collectionId: number; payload: AddMemberPayload }) =>
+            addCollectionMember(collectionId, payload),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["collectionMembers", variables.collectionId] });
+        },
+    });
+}
+
+export function useRemoveCollectionMember() {
+    const queryClient = useQueryClient();
+    
+    return useMutation({
+        mutationFn: ({ collectionId, userId }: { collectionId: number; userId: number }) =>
+            removeCollectionMember(collectionId, userId),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["collectionMembers", variables.collectionId] });
         },
     });
 }

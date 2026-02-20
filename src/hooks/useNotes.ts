@@ -17,6 +17,9 @@ interface NoteApiItem {
   has_file: boolean;
   is_trained: boolean;
   is_pinned: boolean;
+  visibility?: "private" | "public" | "shared";
+  user_id?: number;
+  is_owner?: boolean;
 }
 
 interface NotesApiResponse {
@@ -32,6 +35,7 @@ interface CreateNotePayload {
   title: string;
   content: string;
   collection_id: number;
+  visibility?: "private" | "public" | "shared";
   file?: File | null;
 }
 
@@ -50,6 +54,7 @@ interface UpdateNotePayload {
   note_id: number;
   title: string;
   content: string;
+  visibility?: "private" | "public" | "shared";
   file?: File | null;
 }
 
@@ -62,11 +67,20 @@ interface SingleNoteApiItem {
   created_at: string | null;
   is_pinned: boolean;
   is_trained: boolean;
+  visibility?: "private" | "public" | "shared";
   file_name: string | null;
   file_size: number | null;
   file_type: string | null;
   has_file: boolean;
   is_owner: boolean;
+  shared_members?: Array<{
+    id: number;
+    user_id: number;
+    note_id: number;
+    role: string;
+    user_email?: string;
+    user_name?: string;
+  }>;
 }
 
 interface SingleNoteResponse {
@@ -88,13 +102,16 @@ async function fetchCollectionNotes(collectionId: number): Promise<Notes[]> {
     id: n.id,
     title: n.title,
     createdAt: n.created_at ?? "",
-    createdBy: String(n.created_by),
+    createdBy: String(n.created_by || n.user_id || ""),
     fileName: n.file_name,
     fileSize: n.file_size,
     fileType: n.file_type,
     hasFile: n.has_file,
     is_trained: n.is_trained,
     is_pinned: n.is_pinned,
+    visibility: n.visibility,
+    user_id: n.user_id,
+    is_owner: n.is_owner,
   }));
 }
 
@@ -106,6 +123,7 @@ async function createNote(
   formData.append("title", payload.title);
   formData.append("content", payload.content);
   formData.append("collection_id", String(payload.collection_id));
+  formData.append("visibility", payload.visibility || "private");
 
   if (payload.file) {
     formData.append("file", payload.file);
@@ -136,6 +154,10 @@ async function updateNote(
   const formData = new FormData();
   formData.append("title", payload.title);
   formData.append("content", payload.content);
+
+  if (payload.visibility) {
+    formData.append("visibility", payload.visibility);
+  }
 
   if (payload.file) {
     formData.append("file", payload.file);
@@ -187,6 +209,18 @@ export function useCreateNote() {
       // Invalidate and refetch notes for the specific collection after successful creation
       queryClient.invalidateQueries({
         queryKey: ["collectionNotes", variables.collection_id],
+      });
+      // Also invalidate and refetch all collectionNotes queries to update article count in side menu
+      queryClient.invalidateQueries({
+        queryKey: ["collectionNotes"],
+      });
+      // Force refetch all collectionNotes queries to ensure side menu updates immediately
+      queryClient.refetchQueries({
+        queryKey: ["collectionNotes"],
+      });
+      // Also invalidate collections to update article count
+      queryClient.invalidateQueries({
+        queryKey: ["userCollections"],
       });
     },
   });
@@ -256,6 +290,10 @@ export function useDeleteNote() {
     onSuccess: () => {
       // Invalidate all collection notes queries after successful deletion
       queryClient.invalidateQueries({ queryKey: ["collectionNotes"] });
+      // Force refetch all collectionNotes queries to ensure side menu updates immediately
+      queryClient.refetchQueries({ queryKey: ["collectionNotes"] });
+      // Also invalidate collections to update article count
+      queryClient.invalidateQueries({ queryKey: ["userCollections"] });
     },
   });
 }
@@ -285,6 +323,121 @@ export function useToggleTrainNote() {
       queryClient.invalidateQueries({ queryKey: ["note", noteId] });
       queryClient.invalidateQueries({ queryKey: ["collectionNotes"] });
       queryClient.invalidateQueries({ queryKey: ["analytics"] });
+    },
+  });
+}
+
+interface ShareNotePayload {
+  user_ids?: number[];
+  collection_ids?: number[];
+}
+
+interface ShareNoteResponse {
+  status: boolean;
+  message: string;
+  data: {
+    message: string;
+    shared_members: Array<{
+      id: number;
+      user_id: number;
+      note_id: number;
+      role: string;
+      user_email?: string;
+      user_name?: string;
+    }>;
+  };
+}
+
+async function shareNote(
+  noteId: number,
+  payload: ShareNotePayload
+): Promise<ShareNoteResponse> {
+  const { data } = await api.post<ShareNoteResponse>(
+    routes.notes.share(noteId),
+    payload
+  );
+  return data;
+}
+
+async function unshareNote(
+  noteId: number,
+  userId?: number
+): Promise<{ status: boolean; message: string }> {
+  const params = userId ? { user_id: userId } : {};
+  const { data } = await api.delete(routes.notes.unshare(noteId), {
+    params,
+  });
+  return data;
+}
+
+export function useShareNote() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ noteId, payload }: { noteId: number; payload: ShareNotePayload }) =>
+      shareNote(noteId, payload),
+    onSuccess: (_, variables) => {
+      // Invalidate the specific note and collection notes
+      queryClient.invalidateQueries({ queryKey: ["note", variables.noteId] });
+      queryClient.invalidateQueries({ queryKey: ["collectionNotes"] });
+    },
+  });
+}
+
+export function useUnshareNote() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ noteId, userId }: { noteId: number; userId?: number }) =>
+      unshareNote(noteId, userId),
+    onSuccess: (_, variables) => {
+      // Invalidate the specific note and collection notes
+      queryClient.invalidateQueries({ queryKey: ["note", variables.noteId] });
+      queryClient.invalidateQueries({ queryKey: ["collectionNotes"] });
+    },
+  });
+}
+
+// ------------------ // Move Note // ------------------
+
+interface MoveNotePayload {
+  collection_id: number;
+}
+
+interface MoveNoteResponse {
+  status: boolean;
+  message: string;
+  data: {
+    message: string;
+    note: {
+      id: number;
+      title: string;
+      collection_id: number;
+    };
+  };
+}
+
+async function moveNote(
+  noteId: number,
+  payload: MoveNotePayload
+): Promise<MoveNoteResponse> {
+  const { data } = await api.post<MoveNoteResponse>(
+    routes.notes.move(noteId),
+    payload
+  );
+  return data;
+}
+
+export function useMoveNote() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ noteId, payload }: { noteId: number; payload: MoveNotePayload }) =>
+      moveNote(noteId, payload),
+    onSuccess: (_, variables) => {
+      // Invalidate the specific note and all collection notes
+      queryClient.invalidateQueries({ queryKey: ["note", variables.noteId] });
+      queryClient.invalidateQueries({ queryKey: ["collectionNotes"] });
     },
   });
 }

@@ -1,5 +1,5 @@
 export interface ChatTab {
-    id: number;
+    id: string; // UUID as string
     name: string;
     tenant_id: number;
     user_id: number;
@@ -9,7 +9,7 @@ export interface ChatTab {
 
 export interface ChatMessage {
     id: number;
-    chat_tab_id: number;
+    chat_tab_id: string; // UUID as string
     question: string;
     answer: string | null;
     created_at: string;
@@ -25,7 +25,7 @@ export interface StreamEvent {
     type: 'start' | 'chunk' | 'complete' | 'stop' | 'error' | 'status';
     content?: string;
     message_id?: number;
-    chat_tab_id?: number;
+    chat_tab_id?: string; // UUID as string
     stream_id?: string;
     error?: string;
     status?: string;  // Status message like "Searching knowledge base..."

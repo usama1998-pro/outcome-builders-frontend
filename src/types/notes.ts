@@ -9,4 +9,16 @@ export default interface Notes {
     hasFile?: boolean;
     is_trained?: boolean;
     is_pinned?: boolean;
+    visibility?: "private" | "public" | "shared";
+    user_id?: number;
+    is_owner?: boolean;
+}
+
+export interface NoteMember {
+    id: number;
+    user_id: number;
+    note_id: number;
+    role: string;
+    user_email?: string;
+    user_name?: string;
 }

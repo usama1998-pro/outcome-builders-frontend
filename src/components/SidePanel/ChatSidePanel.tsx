@@ -54,8 +54,8 @@ export default function ChatSidePanel() {
     const [chatsOpen, setChatsOpen] = useState(true);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [clearDialogOpen, setClearDialogOpen] = useState(false);
-    const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
-    const [loadingChatId, setLoadingChatId] = useState<number | null>(null);
+    const [selectedChatId, setSelectedChatId] = useState<string | null>(null); // UUID as string
+    const [loadingChatId, setLoadingChatId] = useState<string | null>(null); // UUID as string
     const signOut = useSignOut();
     const currentTenantId = useAuthStore((s) => s.tenantId);
     const { data: tenants } = useUserTenants();
@@ -331,7 +331,7 @@ export default function ChatSidePanel() {
                                                 return Array.isArray(key) &&
                                                     key.length >= 2 &&
                                                     key[0] === "chatHistory" &&
-                                                    String(key[1]) === String(chatIdToClear);
+                                                    String(key[1]) === String(chatIdToClear); // UUID string comparison
                                             }
                                         });
                                         // Don't redirect - stay on the cleared chat so user can continue chatting
@@ -374,8 +374,8 @@ export default function ChatSidePanel() {
                                         toast.success("Chat deleted successfully");
                                         // Immediately refetch chat tabs to update the list
                                         await refetchChatTabs();
-                                        // Invalidate chat history for this specific chat
-                                        queryClient.invalidateQueries({ queryKey: ["chatHistory", chatIdToDelete.toString()] });
+                                        // Invalidate chat history for this specific chat (UUID string)
+                                        queryClient.invalidateQueries({ queryKey: ["chatHistory", chatIdToDelete] });
                                         // If we're on this chat page, redirect to landing page
                                         if (pathname === `/chat/${chatIdToDelete}`) {
                                             router.push("/chat");

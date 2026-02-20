@@ -5,9 +5,16 @@ import Collections from "@/src/types/collections";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
 import Link from "next/link";
 import { useState, useMemo } from "react";
-import { Layers, FileText, MoreVertical, Trash2, ChevronRight, Clock, Eye, Lock, Globe, Users, ChevronLeft, Edit } from "lucide-react";
+import { Layers, FileText, MoreVertical, Trash2, ChevronRight, Clock, Lock, Globe, Users, ChevronLeft, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useDeleteUserCollection, useUpdateUserCollection } from "@/src/hooks/useCollection";
+import { 
+    useDeleteUserCollection, 
+    useUpdateUserCollection,
+    useCollectionMembers,
+    useTenantUsers,
+    useAddCollectionMember,
+    useRemoveCollectionMember
+} from "@/src/hooks/useCollection";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -38,6 +45,23 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useAuthStore } from "@/src/store/useAuth";
+import { X, UserPlus } from "lucide-react";
+import { useQueries } from "@tanstack/react-query";
+import api from "@/src/lib/axios";
+import routes from "@/src/lib/routes";
+
+// Component to display member count for shared collections
+function CollectionMemberCount({ collectionId }: { collectionId: number }) {
+    const { data: members = [] } = useCollectionMembers(collectionId);
+    const memberCount = members.length;
+    
+    return (
+        <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+            <Users className="w-4 h-4" />
+            <span>{memberCount} {memberCount === 1 ? 'member' : 'members'}</span>
+        </div>
+    );
+}
 
 
 type CollectionListProps = {
@@ -60,18 +84,48 @@ type UpdateCollectionFormValues = z.infer<typeof updateCollectionSchema>;
 export function CollectionList({ collections, workspace, onDelete, searchQuery = "" }: CollectionListProps) {
     const { mutate: deleteCollection, isPending: isDeleting } = useDeleteUserCollection();
     const { mutate: updateCollection, isPending: isUpdating } = useUpdateUserCollection();
+    const { mutate: addMember, isPending: isAddingMember } = useAddCollectionMember();
+    const { mutate: removeMember, isPending: isRemovingMember } = useRemoveCollectionMember();
     const userId = useAuthStore((state) => state.userId);
+    const tenantId = useAuthStore((state) => state.tenantId);
+    const hydrated = useAuthStore((state) => state.hydrated);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [collectionToDelete, setCollectionToDelete] = useState<number | null>(null);
     const [collectionToEdit, setCollectionToEdit] = useState<Collections | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
-
-    // Check if user owns a collection
-    const isOwner = (collection: Collections) => {
-        return userId !== null && String(userId) === collection.createdBy;
+    const [selectedUserId, setSelectedUserId] = useState<number | "">("");
+    
+    // Fetch notes count from all collections to get accurate article counts
+    const noteQueries = useQueries({
+        queries: collections.map((collection) => ({
+            queryKey: ["collectionNotes", collection.id, tenantId],
+            queryFn: async () => {
+                const { data } = await api.get(routes.notes.get, {
+                    params: { collection_id: collection.id },
+                });
+                return data.data.notes || [];
+            },
+            enabled: !!collection.id && !!tenantId && hydrated && collections.length > 0,
+            refetchOnMount: true,
+            staleTime: 0, // Always consider data stale to ensure fresh counts
+        })),
+    });
+    
+    // Helper function to get article count for a collection
+    const getArticleCount = (collection: Collections) => {
+        const collectionIndex = collections.findIndex(c => c.id === collection.id);
+        if (collectionIndex >= 0 && collectionIndex < noteQueries.length) {
+            const query = noteQueries[collectionIndex];
+            if (query?.data) {
+                return query.data.length;
+            }
+        }
+        // Fallback to collection.members if query data not available
+        return collection.members || 0;
     };
-
+    
+    // Initialize form first
     const form = useForm<UpdateCollectionFormValues>({
         resolver: zodResolver(updateCollectionSchema),
         defaultValues: {
@@ -80,6 +134,19 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
             visibility: "private",
         },
     });
+    
+    // Fetch members and users when editing a collection
+    const visibility = form.watch("visibility");
+    const shouldFetchMembers = editDialogOpen && collectionToEdit && visibility === "shared";
+    const { data: members = [], refetch: refetchMembers } = useCollectionMembers(
+        collectionToEdit?.id || 0
+    );
+    const { data: tenantUsers = [] } = useTenantUsers();
+
+    // Check if user owns a collection
+    const isOwner = (collection: Collections) => {
+        return userId !== null && String(userId) === collection.createdBy;
+    };
 
     // Filter collections based on search query
     const filteredCollections = useMemo(() => {
@@ -132,9 +199,12 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
         
         // Find the collection to check for articles
         const collection = collections.find(c => c.id === collectionId);
-        if (collection && collection.members > 0) {
-            toast.error(`Cannot delete collection. It contains ${collection.members} article(s). Please delete all articles first.`);
-            return;
+        if (collection) {
+            const articleCount = getArticleCount(collection);
+            if (articleCount > 0) {
+                toast.error(`Cannot delete collection. It contains ${articleCount} article(s). Please delete all articles first.`);
+                return;
+            }
         }
         
         setCollectionToDelete(collectionId);
@@ -145,6 +215,7 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
         e.preventDefault();
         e.stopPropagation();
         setCollectionToEdit(collection);
+        setSelectedUserId("");
         form.reset({
             name: collection.title,
             description: collection.description || "",
@@ -152,6 +223,52 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
         });
         setEditDialogOpen(true);
     };
+    
+    const handleAddMember = () => {
+        if (!collectionToEdit || !selectedUserId) return;
+        
+        addMember(
+            {
+                collectionId: collectionToEdit.id,
+                payload: { user_id: Number(selectedUserId), role: "viewer" },
+            },
+            {
+                onSuccess: () => {
+                    toast.success("Member added successfully!");
+                    setSelectedUserId("");
+                    refetchMembers();
+                },
+                onError: (err: any) => {
+                    toast.error(err?.response?.data?.detail || "Failed to add member");
+                },
+            }
+        );
+    };
+    
+    const handleRemoveMember = (userId: number) => {
+        if (!collectionToEdit) return;
+        
+        removeMember(
+            {
+                collectionId: collectionToEdit.id,
+                userId,
+            },
+            {
+                onSuccess: () => {
+                    toast.success("Member removed successfully!");
+                    refetchMembers();
+                },
+                onError: (err: any) => {
+                    toast.error(err?.response?.data?.detail || "Failed to remove member");
+                },
+            }
+        );
+    };
+    
+    // Filter out users who are already members and the owner
+    const availableUsers = tenantUsers.filter(
+        (user) => user.id !== userId && !members.some((member) => member.user_id === user.id)
+    );
 
     const onSubmitEdit = (values: UpdateCollectionFormValues) => {
         if (!collectionToEdit) return;
@@ -339,9 +456,12 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
                                                         <span>{formatDateTime(collection.createdAt)}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
-                                                        <Eye className="w-4 h-4" />
-                                                        <span>{collection.members} articles</span>
+                                                        <FileText className="w-4 h-4" />
+                                                        <span>{getArticleCount(collection)} articles</span>
                                                     </div>
+                                                    {collection.visibility === "shared" && (
+                                                        <CollectionMemberCount collectionId={collection.id} />
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -474,6 +594,88 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
                                 </p>
                             )}
                         </div>
+
+                        {/* Member Management Section - Only show when visibility is "shared" */}
+                        {form.watch("visibility") === "shared" && collectionToEdit && (
+                            <div className="space-y-3 pt-4 border-t border-border">
+                                <Label className="text-base font-semibold">Shared Members</Label>
+                                <p className="text-sm text-muted-foreground">
+                                    Add members who can view this collection. Only these members and the owner will be able to see it.
+                                </p>
+                                
+                                {/* Add Member Section */}
+                                <div className="flex gap-2">
+                                    <Select
+                                        value={selectedUserId.toString()}
+                                        onValueChange={(value) => setSelectedUserId(value === "" ? "" : Number(value))}
+                                    >
+                                        <SelectTrigger className="flex-1">
+                                            <SelectValue placeholder="Select a user to add" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableUsers.length === 0 ? (
+                                                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                                    No users available to add
+                                                </div>
+                                            ) : (
+                                                availableUsers.map((user) => (
+                                                    <SelectItem key={user.id} value={user.id.toString()}>
+                                                        {user.full_name || user.email}
+                                                    </SelectItem>
+                                                ))
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button
+                                        type="button"
+                                        onClick={handleAddMember}
+                                        disabled={!selectedUserId || isAddingMember}
+                                        size="sm"
+                                        className="shrink-0"
+                                    >
+                                        <UserPlus className="w-4 h-4 mr-1" />
+                                        Add
+                                    </Button>
+                                </div>
+                                
+                                {/* Members List */}
+                                {members.length > 0 && (
+                                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                                        {members.map((member) => (
+                                            <div
+                                                key={member.id}
+                                                className="flex items-center justify-between p-2 bg-muted/50 rounded-lg"
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium truncate">
+                                                        {member.full_name || member.email}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground capitalize">
+                                                        {member.role}
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleRemoveMember(member.user_id)}
+                                                    disabled={isRemovingMember}
+                                                    className="shrink-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                
+                                {members.length === 0 && (
+                                    <p className="text-sm text-muted-foreground text-center py-4">
+                                        No members added yet. Add members to share this collection with them.
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         <AlertDialogFooter>
                             <AlertDialogCancel
