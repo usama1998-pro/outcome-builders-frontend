@@ -103,7 +103,7 @@ export default function SidePanel() {
         const workspaceMatch = pathname.match(/\/dashboard\/workspaces\/(\d+)/);
         if (workspaceMatch) {
             const workspaceId = Number(workspaceMatch[1]);
-            if (workspaceId !== currentBrainSpaceId) {
+            if (workspaceId && workspaceId !== currentBrainSpaceId) {
                 setCurrentBrainSpaceId(workspaceId);
             }
         }
@@ -970,8 +970,9 @@ export default function SidePanel() {
                                                                         )}
                                                                     </SidebarMenuSubButton>
                                                                     {hasCollections && isWorkspaceExpanded && (
-                                                                        <div className="ml-6 mt-1 space-y-1">
-                                                                            {workspaceCollections.map((collection) => {
+                                                                        <div className="ml-6 mt-1 space-y-1 relative z-0">
+                                                                            {workspaceCollections.map((collection, index) => {
+                                                                                const isLast = index === workspaceCollections.length - 1;
                                                                                 const isCollectionActive = pathname.startsWith(
                                                                                     `/dashboard/workspaces/${workspace.id}/collections/${collection.id}`
                                                                                 );
@@ -994,11 +995,11 @@ export default function SidePanel() {
                                                                                 const collectionNotes = getCollectionNotes(collection.id);
                                                                                 
                                                                                 return (
-                                                                                    <div key={collection.id} className="flex items-center group">
+                                                                                    <div key={collection.id} className={`flex items-center group relative z-0 ${isLast ? 'rounded-b-md overflow-hidden' : ''}`}>
                                                                                         <SidebarMenuSubButton
                                                                                             asChild
                                                                                             isActive={isCollectionActive}
-                                                                                            className="pl-4 flex-1"
+                                                                                            className={`pl-4 flex-1 relative z-0 ${isLast ? 'rounded-b-md' : ''}`}
                                                                                         >
                                                                                             <Link
                                                                                                 href={`/dashboard/workspaces/${workspace.id}/collections/${collection.id}/notes`}

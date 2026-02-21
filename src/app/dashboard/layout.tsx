@@ -14,11 +14,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <SidePanel />
 
                 {/* Main content area */}
-                <div className="flex flex-col flex-1">
+                <div className="flex flex-col flex-1 relative z-10">
                     {/* Trigger pinned at the top */}
-                    <SidebarTrigger className="sticky top-0 self-start" />
+                    <SidebarTrigger className="sticky top-0 self-start z-[60]" />
 
-                    <main className="m-0 p-0">
+                    <main className="m-0 p-0 relative z-10">
                         {children}
                     </main>
                 </div>

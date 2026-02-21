@@ -112,7 +112,7 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                 {
                     onSuccess: (res) => {
                         if (res?.status) {
-                            toast.success(res.message || "Note moved successfully!");
+                            toast.success(res.message || "Article moved successfully!");
                             setMoveDialogOpen(false);
                             setNoteToMove(null);
                             setSelectedCollectionId("");
@@ -141,7 +141,7 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
             deleteNote({ note_id: noteToDelete }, {
                 onSuccess: (res) => {
                     if (res?.status) {
-                        toast.success(res.message || "Note deleted successfully!");
+                        toast.success(res.message || "Article deleted successfully!");
                         setDeleteDialogOpen(false);
                         setNoteToDelete(null);
                     } else {
@@ -225,25 +225,25 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                                                         className="cursor-pointer"
                                                     >
                                                         <FaEye className="mr-2" />
-                                                        View Note
+                                                        View Article
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                         onClick={(e) => {
                                                             e.preventDefault();
                                                             e.stopPropagation();
-                                                            window.location.href = `/dashboard/workspaces/${workspace.id}/collections/${collection.id}/notes/${note.id}?edit=true`;
+                                                            window.location.href = `/dashboard/articles/new?noteId=${note.id}&collection_id=${collection.id}`;
                                                         }}
                                                         className="cursor-pointer"
                                                     >
                                                         <FaEdit className="mr-2" />
-                                                        Edit Note
+                                                        Edit Article
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                         onClick={(e) => handleTrainClick(note.id, note.is_trained || false, e)}
                                                         className={`cursor-pointer ${note.is_trained ? "text-cyan-600 focus:text-cyan-600" : ""}`}
                                                     >
                                                         <FaBrain className="mr-2" />
-                                                        {note.is_trained ? "Untrain Note" : "Train Note"}
+                                                        {note.is_trained ? "Untrain Article" : "Train Article"}
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                         onClick={(e) => handleMoveClick(note.id, e)}
@@ -257,7 +257,7 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                                                         className="text-red-600 focus:text-red-600 cursor-pointer"
                                                     >
                                                         <FaTrash className="mr-2" />
-                                                        Delete Note
+                                                        Delete Article
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -279,9 +279,9 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Note</AlertDialogTitle>
+                        <AlertDialogTitle>Delete Article</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to delete this note? This action cannot be undone.
+                            Are you sure you want to delete this article? This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -302,10 +302,10 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                     <AlertDialogHeader>
                         <AlertDialogTitle className="flex items-center gap-2">
                             <Move className="w-5 h-5 text-teal-500" />
-                            Move Note to Collection
+                            Move Article to Collection
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Select a collection to move this note to. This action will move the note from the current collection to the selected one.
+                            Select a collection to move this article to. This action will move the article from the current collection to the selected one.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="py-4">
@@ -339,7 +339,7 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                             disabled={!selectedCollectionId || isMoving}
                             className="bg-teal-500 hover:bg-teal-600"
                         >
-                            {isMoving ? "Moving..." : "Move Note"}
+                            {isMoving ? "Moving..." : "Move Article"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

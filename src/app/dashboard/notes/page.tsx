@@ -59,6 +59,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useRouter } from "next/navigation";
 
 interface NoteWithCollection extends Notes {
     collectionId: number;
@@ -131,7 +132,7 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                 {
                     onSuccess: (res) => {
                         if (res?.status) {
-                            toast.success(res.message || "Note moved successfully!");
+                            toast.success(res.message || "Article moved successfully!");
                             setMoveDialogOpen(false);
                             setNoteToMove(null);
                             setSelectedCollectionId("");
@@ -247,25 +248,25 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                                                     className="cursor-pointer"
                                                 >
                                                     <FaEye className="mr-2" />
-                                                    View Note
+                                                    View Article
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         e.stopPropagation();
-                                                        window.location.href = `/dashboard/workspaces/${note.workspaceId}/collections/${note.collectionId}/notes/${note.id}?edit=true`;
+                                                        window.location.href = `/dashboard/articles/new?noteId=${note.id}&collection_id=${note.collectionId}`;
                                                     }}
                                                     className="cursor-pointer"
                                                 >
                                                     <FaEdit className="mr-2" />
-                                                    Edit Note
+                                                    Edit Article
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     onClick={(e) => handleTrainClick(note.id, note.is_trained || false, e)}
                                                     className={`cursor-pointer ${note.is_trained ? "text-cyan-600 focus:text-cyan-600" : ""}`}
                                                 >
                                                     <FaBrain className="mr-2" />
-                                                    {note.is_trained ? "Untrain Note" : "Train Note"}
+                                                    {note.is_trained ? "Untrain Article" : "Train Article"}
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     onClick={(e) => handleMoveClick(note, e)}
@@ -279,7 +280,7 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                                                     className="text-red-600 focus:text-red-600 cursor-pointer"
                                                 >
                                                     <FaTrash className="mr-2" />
-                                                    Delete Note
+                                                    Delete Article
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
@@ -300,9 +301,9 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Note</AlertDialogTitle>
+                        <AlertDialogTitle>Delete Article</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to delete this note? This action cannot be undone.
+                            Are you sure you want to delete this article? This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -332,10 +333,10 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                     <AlertDialogHeader>
                         <AlertDialogTitle className="flex items-center gap-2">
                             <Move className="w-5 h-5 text-teal-500" />
-                            Move Note to Collection
+                            Move Article to Collection
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Select a collection to move this note to. This action will move the note from the current collection to the selected one.
+                            Select a collection to move this article to. This action will move the article from the current collection to the selected one.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="py-4">
@@ -378,7 +379,7 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                             disabled={!selectedCollectionId || isMoving}
                             className="bg-teal-500 hover:bg-teal-600"
                         >
-                            {isMoving ? "Moving..." : "Move Note"}
+                            {isMoving ? "Moving..." : "Move Article"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -428,6 +429,7 @@ async function fetchCollectionNotes(collectionId: number): Promise<Notes[]> {
 }
 
 export default function AllNotesPage() {
+    const router = useRouter();
     const { currentBrainSpaceId } = useBrainSpaceStore();
     const { data: collections, isLoading: collectionsLoading } = useUserCollections(currentBrainSpaceId);
     const [searchQuery, setSearchQuery] = useState("");
@@ -454,30 +456,9 @@ export default function AllNotesPage() {
     });
 
     const onSubmit = (values: CreateNoteFormValues) => {
-        createNote(
-            {
-                title: values.title,
-                content: values.content,
-                collection_id: Number(values.collection_id),
-            },
-            {
-                onSuccess: (res) => {
-                    if (res?.status) {
-                        toast.success(res.message || "Article created successfully!");
-                        form.reset();
-                        setOpen(false);
-                        // Invalidate all collection notes queries to refresh the list
-                        queryClient.invalidateQueries({ queryKey: ["collectionNotes"] });
-                    } else {
-                        toast.error(res?.message || "Could not create article.");
-                    }
-                },
-                onError: (err: unknown) => {
-                    const error = err as { message?: string };
-                    toast.error(error?.message || "Request failed, please try again.");
-                },
-            }
-        );
+        // Redirect to the new article editor instead of creating directly
+        setOpen(false);
+        router.push(`/dashboard/articles/new?collection_id=${values.collection_id}`);
     };
 
     // Fetch notes for filtered collections using useQueries
@@ -529,9 +510,9 @@ export default function AllNotesPage() {
 
     return (
         <RequireAuth>
-            <div className="flex flex-col items-center justify-center p-6">
+            <div className="flex flex-col items-center justify-center p-4">
 
-                <nav className="sticky top-0 w-[90%] mx-auto self-center px-15 flex justify-between items-center bg-background border-b border-border py-5">
+                <nav className="sticky top-0 z-[60] w-[90%] mx-auto self-center px-15 flex justify-between items-center bg-background border-b border-border py-3">
                     <Input
                         type="text"
                         placeholder="Search articles..."
@@ -541,111 +522,21 @@ export default function AllNotesPage() {
                     />
 
                     {filteredCollections && filteredCollections.length > 0 && !permissionsLoading && canCreateNote && (
-                        <AlertDialog open={open} onOpenChange={setOpen}>
-                            <AlertDialogTrigger asChild>
-                                <Button className="gap-2">
-                                    <Plus className="h-4 w-4" />
-                                    Create Article
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="max-w-2xl">
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Create a new article</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Enter a title and content for your new article below. Select a collection to add it to.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-
-                                <form
-                                    id="create-note-form"
-                                    onSubmit={form.handleSubmit(onSubmit)}
-                                    className="space-y-4"
-                                >
-                                    <div>
-                                        <Label className="pb-3" htmlFor="collection_id">
-                                            Collection *
-                                        </Label>
-                                        <Select
-                                            value={form.watch("collection_id")}
-                                            onValueChange={(value) => form.setValue("collection_id", value)}
-                                        >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Select a collection" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {filteredCollections.map((collection) => (
-                                                    <SelectItem key={collection.id} value={String(collection.id)}>
-                                                        <div className="flex flex-col">
-                                                            <span className="font-medium">{collection.title}</span>
-                                                            {collection.workspaceName && (
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    {collection.workspaceName}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {form.formState.errors.collection_id && (
-                                            <p className="text-sm !text-red-500 mt-1">
-                                                {form.formState.errors.collection_id.message}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <Label className="pb-3" htmlFor="title">
-                                            Title *
-                                        </Label>
-                                        <Input
-                                            id="title"
-                                            placeholder="e.g. Meeting Notes"
-                                            {...form.register("title")}
-                                            aria-invalid={!!form.formState.errors.title}
-                                        />
-                                        {form.formState.errors.title && (
-                                            <p className="text-sm !text-red-500 mt-1">
-                                                {form.formState.errors.title.message}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <Label className="pb-3" htmlFor="content">
-                                            Content *
-                                        </Label>
-                                        <Textarea
-                                            id="content"
-                                            placeholder="Write your article content here..."
-                                            rows={8}
-                                            {...form.register("content")}
-                                            aria-invalid={!!form.formState.errors.content}
-                                        />
-                                        {form.formState.errors.content && (
-                                            <p className="text-sm !text-red-500 mt-1">
-                                                {form.formState.errors.content.message}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel disabled={isPending} onClick={() => {
-                                            form.reset();
-                                        }}>
-                                            Cancel
-                                        </AlertDialogCancel>
-                                        <Button
-                                            type="submit"
-                                            disabled={isPending}
-                                            className="ml-2"
-                                        >
-                                            {isPending ? "Creating..." : "Create"}
-                                        </Button>
-                                    </AlertDialogFooter>
-                                </form>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                        <Button 
+                            className="gap-2"
+                            onClick={() => {
+                                // If only one collection, redirect with it pre-selected
+                                if (filteredCollections.length === 1) {
+                                    router.push(`/dashboard/articles/new?collection_id=${filteredCollections[0].id}`);
+                                } else {
+                                    // Otherwise, just go to editor and let user select
+                                    router.push(`/dashboard/articles/new`);
+                                }
+                            }}
+                        >
+                            <Plus className="h-4 w-4" />
+                            Create Article
+                        </Button>
                     )}
                 </nav>
 
@@ -702,7 +593,15 @@ export default function AllNotesPage() {
 
                             {filteredCollections && filteredCollections.length > 0 && canCreateNote && (
                                 <Button
-                                    onClick={() => setOpen(true)}
+                                    onClick={() => {
+                                        // If only one collection, redirect with it pre-selected
+                                        if (filteredCollections.length === 1) {
+                                            router.push(`/dashboard/articles/new?collection_id=${filteredCollections[0].id}`);
+                                        } else {
+                                            // Otherwise, just go to editor and let user select
+                                            router.push(`/dashboard/articles/new`);
+                                        }
+                                    }}
                                     className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all"
                                 >
                                     <Plus className="w-4 h-4 mr-2" />

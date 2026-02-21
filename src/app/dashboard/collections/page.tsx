@@ -15,8 +15,8 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { 
-    useUserCollections, 
+import {
+    useUserCollections,
     useCreateUserCollection,
     useTenantUsers,
     useAddCollectionMember
@@ -63,13 +63,13 @@ export default function AllCollectionsPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedMembers, setSelectedMembers] = useState<number[]>([]);
     const [selectedUserId, setSelectedUserId] = useState<number | "">("");
-    
+
     // Collections are already filtered by backend based on workspace_id
     const filteredCollections = allCollections || [];
-    
+
     // Fetch tenant users for member selection
     const { data: tenantUsers = [] } = useTenantUsers();
-    
+
     // Filter out the current user (owner) from the list
     const availableUsers = tenantUsers.filter(
         (user) => user.id !== userId && !selectedMembers.includes(user.id)
@@ -113,11 +113,11 @@ export default function AllCollectionsPage() {
         setSelectedMembers([...selectedMembers, Number(selectedUserId)]);
         setSelectedUserId("");
     };
-    
+
     const handleRemoveMember = (userId: number) => {
         setSelectedMembers(selectedMembers.filter((id) => id !== userId));
     };
-    
+
     const onSubmit = async (values: CreateCollectionFormValues) => {
         createCollection(
             {
@@ -133,9 +133,9 @@ export default function AllCollectionsPage() {
                         if (values.visibility === "shared" && selectedMembers.length > 0) {
                             // Get the collection ID from the response
                             // Response structure: { status, message, data: { message: { collection: { id, ... } } } }
-                            const collectionId = (res?.data as any)?.message?.collection?.id || 
-                                                (res?.data as any)?.collection?.id;
-                            
+                            const collectionId = (res?.data as any)?.message?.collection?.id ||
+                                (res?.data as any)?.collection?.id;
+
                             if (collectionId) {
                                 // Add all selected members sequentially to avoid race conditions
                                 let successCount = 0;
@@ -160,7 +160,7 @@ export default function AllCollectionsPage() {
                                         console.error(`Failed to add member ${memberId}:`, err);
                                     }
                                 }
-                                
+
                                 if (successCount === selectedMembers.length) {
                                     toast.success("Collection created and all members added successfully!");
                                 } else if (successCount > 0) {
@@ -175,7 +175,7 @@ export default function AllCollectionsPage() {
                         } else {
                             toast.success(res.message || "Collection created successfully!");
                         }
-                        
+
                         form.reset();
                         setSelectedMembers([]);
                         setSelectedUserId("");
@@ -200,7 +200,7 @@ export default function AllCollectionsPage() {
         <RequireAuth>
             <div className="flex flex-col items-center justify-center p-6">
 
-                <nav className="sticky top-0 w-[90%] mx-auto self-center px-15 flex justify-between items-center bg-background border-b border-border py-5">
+                <nav className="sticky top-0 z-[100] w-[90%] mx-auto self-center px-15 flex justify-between items-center bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border rounded-b-lg py-5 shadow-sm" style={{ isolation: 'isolate' }}>
                     <Input
                         type="text"
                         placeholder="Search collections..."
@@ -210,8 +210,8 @@ export default function AllCollectionsPage() {
                     />
 
                     {canCreateCollection && (
-                        <AlertDialog 
-                            open={open} 
+                        <AlertDialog
+                            open={open}
                             onOpenChange={(isOpen) => {
                                 setOpen(isOpen);
                                 if (!isOpen) {
@@ -352,7 +352,7 @@ export default function AllCollectionsPage() {
                                             <p className="text-sm text-muted-foreground">
                                                 Add members who can view this collection. Only these members and the owner will be able to see it.
                                             </p>
-                                            
+
                                             {/* Add Member Section */}
                                             <div className="flex gap-2">
                                                 <Select
@@ -387,7 +387,7 @@ export default function AllCollectionsPage() {
                                                     Add
                                                 </Button>
                                             </div>
-                                            
+
                                             {/* Members List */}
                                             {selectedMembers.length > 0 && (
                                                 <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -421,7 +421,7 @@ export default function AllCollectionsPage() {
                                                     })}
                                                 </div>
                                             )}
-                                            
+
                                             {selectedMembers.length === 0 && (
                                                 <p className="text-sm text-muted-foreground text-center py-4">
                                                     No members added yet. Add members to share this collection with them.
@@ -468,11 +468,13 @@ export default function AllCollectionsPage() {
                 )}
 
                 {filteredCollections && filteredCollections.length > 0 && (
-                    <CollectionList
-                        collections={filteredCollections}
-                        workspace={{ id: currentBrainSpaceId || 0 }}
-                        searchQuery={searchQuery}
-                    />
+                    <div className="w-full mt-4" style={{ position: 'relative', zIndex: 0 }}>
+                        <CollectionList
+                            collections={filteredCollections}
+                            workspace={{ id: currentBrainSpaceId || 0 }}
+                            searchQuery={searchQuery}
+                        />
+                    </div>
                 )}
 
                 {filteredCollections && filteredCollections.length === 0 && !isLoading && (
@@ -510,7 +512,7 @@ export default function AllCollectionsPage() {
                                 {currentBrainSpaceId ? "No Collections in Selected Brain Space" : "No Collections Yet"}
                             </h3>
                             <p className="text-muted-foreground mb-6">
-                                {currentBrainSpaceId 
+                                {currentBrainSpaceId
                                     ? "This brain space doesn't have any collections yet. Create your first collection to get started!"
                                     : "Collections help you organize your articles and resources. Select a brain space from the sidebar or create your first collection to get started!"
                                 }
@@ -533,14 +535,14 @@ export default function AllCollectionsPage() {
                                     <span>You need to create a brain space first before creating collections.</span>
                                 </div>
                             )}
-                            
+
                             {currentBrainSpaceId && filteredCollections.length === 0 && allCollections && allCollections.length > 0 && (
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-4">
                                     <Building className="w-4 h-4" />
                                     <span>No collections found in the selected brain space. Create a new collection or select a different brain space.</span>
                                 </div>
                             )}
-                            
+
                             {!currentBrainSpaceId && allCollections && allCollections.length > 0 && (
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-4">
                                     <Building className="w-4 h-4" />

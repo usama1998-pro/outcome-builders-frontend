@@ -5,6 +5,7 @@ import Collections from "@/src/types/collections";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
 import Link from "next/link";
 import { useState, useMemo } from "react";
+import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
 import { Layers, FileText, MoreVertical, Trash2, ChevronRight, Clock, Lock, Globe, Users, ChevronLeft, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -89,6 +90,7 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
     const userId = useAuthStore((state) => state.userId);
     const tenantId = useAuthStore((state) => state.tenantId);
     const hydrated = useAuthStore((state) => state.hydrated);
+    const { setCurrentBrainSpaceId } = useBrainSpaceStore();
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [collectionToDelete, setCollectionToDelete] = useState<number | null>(null);
@@ -344,7 +346,7 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
 
     return (
         <>
-            <div className="w-full p-6">
+            <div className="w-full p-6" style={{ position: 'relative', zIndex: 0 }}>
                 {/* Empty search results */}
                 {filteredCollections.length === 0 && searchQuery.trim() && (
                     <div className="flex flex-col items-center justify-center py-16">
@@ -369,10 +371,17 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
                             return (
                                 <Link
                                     key={collection.id}
-                                    href={`/dashboard/workspaces/${workspace.id}/collections/${collection.id}/notes`}
+                                    href={`/dashboard/workspaces/${collection.workspaceId}/collections/${collection.id}/notes`}
                                     className="group block"
+                                    style={{ position: 'relative', zIndex: 0 }}
+                                    onClick={() => {
+                                        // Set the workspace when clicking on a collection
+                                        if (collection.workspaceId) {
+                                            setCurrentBrainSpaceId(collection.workspaceId);
+                                        }
+                                    }}
                                 >
-                                    <div className={`relative bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg ${accent.glow} ${accent.border}`}>
+                                    <div className={`relative bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg ${accent.glow} ${accent.border}`} style={{ position: 'relative', zIndex: 0 }}>
                                         <div className="flex items-stretch">
                                             {/* Left Color Bar & Icon */}
                                             <div className={`w-20 shrink-0 bg-gradient-to-b ${accent.icon} flex items-center justify-center`}>

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { FaEdit, FaArrowLeft, FaBrain } from "react-icons/fa";
+import { FaEdit, FaArrowLeft, FaBrain, FaTimes } from "react-icons/fa";
 import { useState, useEffect } from "react";
 import {
     AlertDialog,
@@ -13,13 +13,14 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useUpdateNote, useToggleTrainNote, useShareNote, useUnshareNote, useNote } from "@/src/hooks/useNotes";
+import { useUpdateNote, useToggleTrainNote, useShareNote, useUnshareNote, useNote, useMoveNote } from "@/src/hooks/useNotes";
 import { useTenantUsers, useUserCollections } from "@/src/hooks/useCollection";
 import { useAuthStore } from "@/src/store/useAuth";
 import { useNotePermissions } from "@/src/hooks/useNotePermissions";
+import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
 import api from "@/src/lib/axios";
 import routes from "@/src/lib/routes";
-import { X, UserPlus, Search } from "lucide-react";
+import { X, UserPlus, Search, Settings, MoreVertical, Users } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,6 +37,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
 import { Badge } from "@/components/ui/badge";
 import RequireAuth from "@/src/components/auth/requireAuth";
+import TiptapViewer from "@/src/components/editor/TiptapViewer";
+import ArticleSettingsDialog from "@/src/components/article/ArticleSettingsDialog";
+import ArticleMembersDialog from "@/src/components/article/ArticleMembersDialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function NoteViewPage() {
     const params = useParams();
@@ -57,6 +67,8 @@ export default function NoteViewPage() {
 
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [shareDialogOpen, setShareDialogOpen] = useState(false);
+    const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+    const [membersDialogOpen, setMembersDialogOpen] = useState(false);
     const [editTitle, setEditTitle] = useState("");
     const [editContent, setEditContent] = useState("");
     const [editVisibility, setEditVisibility] = useState<"private" | "public" | "shared">("private");
@@ -70,9 +82,19 @@ export default function NoteViewPage() {
     const [mounted, setMounted] = useState(false);
     const { mutate: shareNote, isPending: isSharing } = useShareNote();
     const { mutate: unshareNote, isPending: isUnsharing } = useUnshareNote();
+    const { mutate: moveNote, isPending: isMoving } = useMoveNote();
     const userId = useAuthStore((state) => state.userId);
     const { data: tenantUsers = [] } = useTenantUsers();
-    const { data: collections = [] } = useUserCollections();
+    const { currentBrainSpaceId } = useBrainSpaceStore();
+    // Use brain space ID if available, otherwise fall back to workspaceId
+    const { data: collectionsData = [] } = useUserCollections(currentBrainSpaceId || (workspaceId ? Number(workspaceId) : undefined));
+    
+    // Map collections to the format expected by ArticleSettingsDialog
+    const collections = collectionsData.map((c) => ({
+        id: c.id,
+        name: c.title, // Collections type uses 'title' but dialog expects 'name'
+        visibility: c.visibility,
+    }));
 
     // Use shared permission hook
     const {
@@ -147,7 +169,10 @@ export default function NoteViewPage() {
 
             try {
                 const response = await api.get(routes.notes.getById(noteId));
-                setNote(response.data.data.note);
+                const noteData = response.data.data.note;
+                console.log("[NoteViewPage] Fetched note data:", noteData);
+                console.log("[NoteViewPage] Shared members:", noteData.shared_members);
+                setNote(noteData);
             } catch (err: any) {
                 console.error("[NoteViewPage] Error fetching note:", err);
                 setIsError(true);
@@ -169,7 +194,7 @@ export default function NoteViewPage() {
             const noteVisibility = note.visibility || "private";
             if (noteVisibility === "shared" && isCollectionPrivate) {
                 setEditVisibility("private");
-                toast.warning("Note visibility was set to 'Only Me' because the collection is private. Please make the collection 'Shared' first to enable collaboration.");
+                            toast.warning("Article visibility was set to 'Only Me' because the collection is private. Please make the collection 'Shared' first to enable collaboration.");
             } else {
                 setEditVisibility(noteVisibility);
             }
@@ -234,12 +259,12 @@ export default function NoteViewPage() {
                                         }
                                     );
                                 });
-                                toast.success("Note updated and shared with members successfully!");
+                                toast.success("Article updated and shared with members successfully!");
                             } catch (err: any) {
-                                toast.warning("Note updated but some members could not be added. You can share it manually.");
+                                toast.warning("Article updated but some members could not be added. You can share it manually.");
                             }
                         } else {
-                            toast.success(res.message || "Note updated successfully!");
+                            toast.success(res.message || "Article updated successfully!");
                         }
 
                         setEditDialogOpen(false);
@@ -249,7 +274,7 @@ export default function NoteViewPage() {
                         // Refetch note to get updated data
                         window.location.reload();
                     } else {
-                        toast.error(res?.message || "Could not update note.");
+                        toast.error(res?.message || "Could not update article.");
                     }
                 },
                 onError: (err: unknown) => {
@@ -283,8 +308,8 @@ export default function NoteViewPage() {
 
     return (
         <RequireAuth>
-            <div className="flex flex-col items-center p-6">
-                <nav className="sticky top-0 w-[90%] mx-auto self-center flex justify-between items-center bg-background border-b border-border py-5">
+            <div className="flex flex-col items-center p-4">
+                <nav className="sticky top-0 z-[60] w-[90%] mx-auto self-center flex justify-between items-center bg-background border-b border-border py-3">
                     <Button
                         variant="outline"
                         onClick={() => router.push(`/dashboard/workspaces/${workspaceId}/collections/${collectionId}/notes`)}
@@ -293,6 +318,20 @@ export default function NoteViewPage() {
                     </Button>
 
                     <div className="flex gap-2">
+                        {/* Members Icon - Show if visibility is shared and has members */}
+                        {note?.visibility === "shared" && note?.shared_members && note.shared_members.length > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setMembersDialogOpen(true)}
+                                className="relative"
+                            >
+                                <Users className="w-4 h-4 mr-2" />
+                                Members
+                                <span className="ml-2 px-1.5 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
+                                    {note.shared_members.length}
+                                </span>
+                            </Button>
+                        )}
                         {(note?.is_owner || canPerformNoteActions) && (
                             <Button
                                 variant={note?.is_trained ? "default" : "outline"}
@@ -305,49 +344,28 @@ export default function NoteViewPage() {
                             </Button>
                         )}
                         {(note?.is_owner || canPerformNoteActions) && (
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    if (isCollectionPrivate) {
-                                        toast.error("Cannot share note. The collection is private. Please make the collection 'Shared' first to enable sharing.");
-                                        return;
-                                    }
-                                    // Pre-populate selected members from shared_members if available
-                                    if (note.shared_members && note.shared_members.length > 0) {
-                                        setShareUserIds(note.shared_members.map((m: any) => m.user_id));
-                                    } else {
-                                        setShareUserIds([]);
-                                    }
-                                    setShareDialogOpen(true);
-                                }}
-                            >
-                                Share
-                            </Button>
-                        )}
-                        {(note?.is_owner || canPerformNoteActions) && (
-                            <Button onClick={() => {
-                                if (note) {
-                                    setEditTitle(note.title);
-                                    setEditContent(note.content);
-                                    // If collection is private and note visibility is "shared", reset to "private"
-                                    const noteVisibility = note.visibility || "private";
-                                    if (noteVisibility === "shared" && isCollectionPrivate) {
-                                        setEditVisibility("private");
-                                        toast.warning("Note visibility was set to 'Only Me' because the collection is private. Please make the collection 'Shared' first to enable collaboration.");
-                                    } else {
-                                        setEditVisibility(noteVisibility);
-                                    }
-                                    // Pre-populate selected members from shared_members if available
-                                    if (note.shared_members && note.shared_members.length > 0) {
-                                        setEditSelectedMembers(note.shared_members.map((m: any) => m.user_id));
-                                    } else {
-                                        setEditSelectedMembers([]);
-                                    }
-                                }
-                                setEditDialogOpen(true);
-                            }}>
-                                <FaEdit className="mr-2" /> Edit Note
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline">
+                                        <MoreVertical className="w-4 h-4 mr-2" />
+                                        Options
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem onClick={() => setSettingsDialogOpen(true)}>
+                                        <Settings className="w-4 h-4 mr-2" />
+                                        Settings
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() => {
+                                            router.push(`/dashboard/articles/new?noteId=${noteId}&collection_id=${collectionId}`);
+                                        }}
+                                    >
+                                        <FaEdit className="w-4 h-4 mr-2" />
+                                        Edit Article
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         )}
                     </div>
                 </nav>
@@ -397,41 +415,10 @@ export default function NoteViewPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap">
-                                {note.content}
-                            </div>
-
-                            {(note.is_owner || canPerformNoteActions) && note.shared_members && note.shared_members.length > 0 && (
-                                <div className="mt-6 pt-6 border-t">
-                                    <h4 className="text-sm font-medium mb-3">Shared With</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {note.shared_members.map((member) => (
-                                            <Badge key={member.id} variant="secondary" className="flex items-center gap-2">
-                                                {member.user_name || member.user_email}
-                                                <button
-                                                    onClick={() => {
-                                                        unshareNote(
-                                                            { noteId: note.id, userId: member.user_id },
-                                                            {
-                                                                onSuccess: () => {
-                                                                    toast.success("User removed from sharing");
-                                                                    window.location.reload();
-                                                                },
-                                                                onError: () => {
-                                                                    toast.error("Failed to remove user");
-                                                                },
-                                                            }
-                                                        );
-                                                    }}
-                                                    className="ml-1 hover:text-red-500"
-                                                >
-                                                    <FaTimes size={10} />
-                                                </button>
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                            <TiptapViewer 
+                                content={note.content || "<p></p>"} 
+                                className="min-h-[200px]"
+                            />
                         </CardContent>
                     </Card>
                 )}
@@ -450,9 +437,9 @@ export default function NoteViewPage() {
                 >
                     <AlertDialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
                         <AlertDialogHeader className="flex-shrink-0">
-                            <AlertDialogTitle>Edit Note</AlertDialogTitle>
+                            <AlertDialogTitle>Edit Article</AlertDialogTitle>
                             <AlertDialogDescription>
-                                Update the title and content of your note.
+                                Update the title and content of your article.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
 
@@ -464,7 +451,7 @@ export default function NoteViewPage() {
                                         id="edit-title"
                                         value={editTitle}
                                         onChange={(e) => setEditTitle(e.target.value)}
-                                        placeholder="Note title"
+                                        placeholder="Article title"
                                     />
                                 </div>
 
@@ -474,7 +461,7 @@ export default function NoteViewPage() {
                                         id="edit-content"
                                         value={editContent}
                                         onChange={(e) => setEditContent(e.target.value)}
-                                        placeholder="Note content..."
+                                        placeholder="Article content..."
                                         rows={10}
                                     />
                                 </div>
@@ -485,7 +472,7 @@ export default function NoteViewPage() {
                                         value={editVisibility}
                                         onValueChange={(value: "private" | "public" | "shared") => {
                                             if (value === "shared" && isCollectionPrivate) {
-                                                toast.error("Cannot use 'Collaborate' option. The collection is private. Please make the collection 'Shared' first to enable collaboration on notes.");
+                                                toast.error("Cannot use 'Collaborate' option. The collection is private. Please make the collection 'Shared' first to enable collaboration on articles.");
                                                 return;
                                             }
                                             setEditVisibility(value);
@@ -507,9 +494,9 @@ export default function NoteViewPage() {
                                         </SelectContent>
                                     </Select>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        {editVisibility === "private" && "Only you can see and access this note"}
-                                        {editVisibility === "shared" && "Share this note with specific people. They will only see this note, not other notes in the collection."}
-                                        {editVisibility === "public" && "Anyone in your organization can view and edit this note"}
+                                        {editVisibility === "private" && "Only you can see and access this article"}
+                                        {editVisibility === "shared" && "Share this article with specific people. They will only see this article, not other articles in the collection."}
+                                        {editVisibility === "public" && "Anyone in your organization can view and edit this article"}
                                     </p>
                                     {isCollectionPrivate && (
                                         <p className="text-xs text-amber-600 dark:text-amber-500 mt-1 flex items-center gap-1">
@@ -524,7 +511,7 @@ export default function NoteViewPage() {
                                     <div className="space-y-3 pt-4 border-t border-border">
                                         <Label className="text-base font-semibold">Collaborate Members</Label>
                                         <p className="text-sm text-muted-foreground">
-                                            Add members who can view and collaborate on this note. They will only see this note, not other notes in the collection.
+                                            Add members who can view and collaborate on this article. They will only see this article, not other articles in the collection.
                                         </p>
 
                                         {/* Add Member Section */}
@@ -607,7 +594,7 @@ export default function NoteViewPage() {
 
                                         {editSelectedMembers.length === 0 && (
                                             <p className="text-sm text-muted-foreground text-center py-4">
-                                                No members added yet. Search and add members to collaborate on this note.
+                                                No members added yet. Search and add members to collaborate on this article.
                                             </p>
                                         )}
                                     </div>
@@ -639,14 +626,14 @@ export default function NoteViewPage() {
                 >
                     <AlertDialogContent className="max-w-2xl">
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Share Note - Collaborate</AlertDialogTitle>
+                            <AlertDialogTitle>Share Article - Collaborate</AlertDialogTitle>
                             <AlertDialogDescription>
                                 {isCollectionPrivate ? (
                                     <span className="text-amber-600 dark:text-amber-500">
-                                        ⚠️ Cannot share note. The collection is private. Please make the collection 'Shared' first to enable sharing.
+                                        ⚠️ Cannot share article. The collection is private. Please make the collection 'Shared' first to enable sharing.
                                     </span>
                                 ) : (
-                                    "Add members who can view and collaborate on this note. They will only see this note, not other notes in the collection."
+                                    "Add members who can view and collaborate on this article. They will only see this article, not other articles in the collection."
                                 )}
                             </AlertDialogDescription>
                         </AlertDialogHeader>
@@ -736,14 +723,14 @@ export default function NoteViewPage() {
 
                                 {shareUserIds.length === 0 && (
                                     <p className="text-sm text-muted-foreground text-center py-4">
-                                        No members added yet. Search and add members to collaborate on this note.
+                                        No members added yet. Search and add members to collaborate on this article.
                                     </p>
                                 )}
                             </div>
                         ) : (
                             <div className="py-4">
                                 <p className="text-sm text-amber-600 dark:text-amber-500 text-center">
-                                    Please make the collection 'Shared' first to enable collaboration on notes.
+                                    Please make the collection 'Shared' first to enable collaboration on articles.
                                 </p>
                             </div>
                         )}
@@ -764,7 +751,7 @@ export default function NoteViewPage() {
                                             {
                                                 onSuccess: (res) => {
                                                     if (res?.status) {
-                                                        toast.success(res.data.message || "Note shared successfully!");
+                                                        toast.success(res.data.message || "Article shared successfully!");
                                                         setShareDialogOpen(false);
                                                         setShareUserIds([]);
                                                         setShareCollectionIds([]);
@@ -772,7 +759,7 @@ export default function NoteViewPage() {
                                                         setMemberSearchQuery("");
                                                         window.location.reload();
                                                     } else {
-                                                        toast.error(res?.message || "Could not share note.");
+                                                        toast.error(res?.message || "Could not share article.");
                                                     }
                                                 },
                                                 onError: (err: unknown) => {
@@ -790,6 +777,176 @@ export default function NoteViewPage() {
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
+
+                {/* Article Settings Dialog */}
+                {note && (
+                    <ArticleSettingsDialog
+                        open={settingsDialogOpen}
+                        onOpenChange={setSettingsDialogOpen}
+                        noteId={noteId}
+                        currentCollectionId={Number(collectionId)}
+                        currentVisibility={note.visibility || "private"}
+                        currentMembers={note.shared_members?.map((m: any) => m.user_id) || []}
+                        collections={collections}
+                        tenantUsers={tenantUsers}
+                        userId={userId}
+                        isCollectionPrivate={isCollectionPrivate}
+                        onUpdate={async (updates) => {
+                            // Handle visibility update
+                            if (updates.visibility) {
+                                await new Promise<void>((resolve, reject) => {
+                                    updateNote(
+                                        {
+                                            note_id: noteId!,
+                                            title: note.title,
+                                            content: note.content,
+                                            visibility: updates.visibility,
+                                        },
+                                        {
+                                            onSuccess: () => resolve(),
+                                            onError: (err) => reject(err),
+                                        }
+                                    );
+                                });
+                            }
+
+                            // Handle members update (sharing)
+                            if (updates.members !== undefined) {
+                                if (updates.members.length > 0) {
+                                    // Get current member IDs
+                                    const currentMemberIds = note.shared_members?.map((m: any) => m.user_id) || [];
+                                    
+                                    // Find members to add (in updates but not in current)
+                                    const membersToAdd = updates.members.filter((id) => !currentMemberIds.includes(id));
+                                    
+                                    // Find members to remove (in current but not in updates)
+                                    const membersToRemove = currentMemberIds.filter((id) => !updates.members.includes(id));
+                                    
+                                    console.log("[ArticleSettingsDialog] Members update:", {
+                                        currentMemberIds,
+                                        updatesMembers: updates.members,
+                                        membersToAdd,
+                                        membersToRemove,
+                                    });
+                                    
+                                    // Add new members
+                                    if (membersToAdd.length > 0) {
+                                        await new Promise<void>((resolve, reject) => {
+                                            shareNote(
+                                                {
+                                                    noteId: noteId!,
+                                                    payload: {
+                                                        user_ids: membersToAdd,
+                                                    },
+                                                },
+                                                {
+                                                    onSuccess: () => {
+                                                        console.log("[ArticleSettingsDialog] Successfully added members:", membersToAdd);
+                                                        resolve();
+                                                    },
+                                                    onError: (err) => {
+                                                        console.error("[ArticleSettingsDialog] Error adding members:", err);
+                                                        reject(err);
+                                                    },
+                                                }
+                                            );
+                                        });
+                                    }
+                                    
+                                    // Remove members
+                                    if (membersToRemove.length > 0) {
+                                        for (const userId of membersToRemove) {
+                                            await new Promise<void>((resolve, reject) => {
+                                                unshareNote(
+                                                    { noteId: noteId!, userId },
+                                                    {
+                                                        onSuccess: () => {
+                                                            console.log("[ArticleSettingsDialog] Successfully removed member:", userId);
+                                                            resolve();
+                                                        },
+                                                        onError: (err) => {
+                                                            console.error("[ArticleSettingsDialog] Error removing member:", err);
+                                                            reject(err);
+                                                        },
+                                                    }
+                                                );
+                                            });
+                                        }
+                                    }
+                                } else if (updates.members.length === 0 && note.shared_members && note.shared_members.length > 0) {
+                                    // Remove all shared members
+                                    console.log("[ArticleSettingsDialog] Removing all members");
+                                    for (const member of note.shared_members) {
+                                        await new Promise<void>((resolve, reject) => {
+                                            unshareNote(
+                                                { noteId: noteId!, userId: member.user_id },
+                                                {
+                                                    onSuccess: () => resolve(),
+                                                    onError: (err) => reject(err),
+                                                }
+                                            );
+                                        });
+                                    }
+                                }
+                            }
+
+                            // Reload page to reflect changes
+                            window.location.reload();
+                        }}
+                        onMoveNote={async (noteId, targetCollectionId) => {
+                            await new Promise<void>((resolve, reject) => {
+                                moveNote(
+                                    {
+                                        noteId: noteId,
+                                        payload: {
+                                            collection_id: targetCollectionId,
+                                        },
+                                    },
+                                    {
+                                        onSuccess: () => {
+                                            toast.success("Article moved successfully!");
+                                            // Navigate to new collection
+                                            router.push(
+                                                `/dashboard/workspaces/${workspaceId}/collections/${targetCollectionId}/notes/${noteId}`
+                                            );
+                                            resolve();
+                                        },
+                                        onError: (err) => {
+                                            toast.error("Failed to move article");
+                                            reject(err);
+                                        },
+                                    }
+                                );
+                            });
+                        }}
+                    />
+                )}
+
+                {/* Article Members Dialog */}
+                {note && (
+                    <ArticleMembersDialog
+                        open={membersDialogOpen}
+                        onOpenChange={setMembersDialogOpen}
+                        members={note.shared_members || []}
+                        tenantUsers={tenantUsers}
+                        onRemoveMember={(userId) => {
+                            unshareNote(
+                                { noteId: note.id, userId },
+                                {
+                                    onSuccess: () => {
+                                        toast.success("User removed from sharing");
+                                        // Refetch note to update the members list
+                                        window.location.reload();
+                                    },
+                                    onError: () => {
+                                        toast.error("Failed to remove user");
+                                    },
+                                }
+                            );
+                        }}
+                        isRemoving={isUnsharing}
+                    />
+                )}
             </div>
         </RequireAuth>
     );
