@@ -26,7 +26,7 @@ interface Member {
 interface User {
     id: number;
     email: string;
-    full_name?: string;
+    full_name?: string | null;
 }
 
 interface ArticleMembersDialogProps {

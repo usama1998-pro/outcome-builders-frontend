@@ -28,7 +28,7 @@ import { Separator } from "@/components/ui/separator";
 interface User {
     id: number;
     email: string;
-    full_name?: string;
+    full_name?: string | null;
 }
 
 interface Collection {
@@ -46,7 +46,7 @@ interface ArticleSettingsDialogProps {
     currentMembers: number[];
     collections: Collection[];
     tenantUsers: User[];
-    userId: number;
+    userId: number | null;
     isCollectionPrivate: boolean;
     onUpdate: (data: {
         collectionId?: number;
@@ -100,7 +100,7 @@ export default function ArticleSettingsDialog({
     // Filter available users
     const availableUsers = tenantUsers.filter(
         (user) =>
-            user.id !== userId &&
+            (userId === null || user.id !== userId) &&
             !selectedMembers.includes(user.id) &&
             (memberSearchQuery === "" ||
                 (user.full_name?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||

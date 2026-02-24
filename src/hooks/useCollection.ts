@@ -170,8 +170,8 @@ interface CollectionMember {
 interface TenantUser {
     id: number;
     email: string;
-    full_name: string | null;
-    role: string | null;
+    full_name?: string | null;
+    role?: string | null;
 }
 
 interface AddMemberPayload {

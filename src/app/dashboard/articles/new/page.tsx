@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -22,7 +22,7 @@ import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
 import { toast } from "sonner";
 import RequireAuth from "@/src/components/auth/requireAuth";
 
-export default function NewArticlePage() {
+function NewArticlePageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { currentBrainSpaceId } = useBrainSpaceStore();
@@ -682,6 +682,33 @@ export default function NewArticlePage() {
                 </div>
             </div>
         </RequireAuth>
+    );
+}
+
+export default function NewArticlePage() {
+    return (
+        <Suspense
+            fallback={
+                <RequireAuth>
+                    <div className="flex flex-col items-center justify-center min-h-screen">
+                        <div className="relative w-16 h-16">
+                            <PenTool
+                                className="w-12 h-12 text-primary absolute inset-0 m-auto animate-bounce"
+                                style={{ animationDuration: "1.5s" }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                            </div>
+                        </div>
+                        <div className="mt-6 text-muted-foreground animate-pulse text-sm">
+                            Loading editor...
+                        </div>
+                    </div>
+                </RequireAuth>
+            }
+        >
+            <NewArticlePageContent />
+        </Suspense>
     );
 }
 

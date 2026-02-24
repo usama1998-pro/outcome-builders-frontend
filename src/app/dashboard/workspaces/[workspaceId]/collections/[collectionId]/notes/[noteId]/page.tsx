@@ -828,19 +828,20 @@ export default function NoteViewPage() {
 
                             // Handle members update (sharing)
                             if (updates.members !== undefined) {
-                                if (updates.members.length > 0) {
+                                const updatedMembers = updates.members;
+                                if (updatedMembers.length > 0) {
                                     // Get current member IDs
                                     const currentMemberIds = note.shared_members?.map((m: any) => m.user_id) || [];
                                     
                                     // Find members to add (in updates but not in current)
-                                    const membersToAdd = updates.members.filter((id) => !currentMemberIds.includes(id));
+                                    const membersToAdd = updatedMembers.filter((id: number) => !currentMemberIds.includes(id));
                                     
                                     // Find members to remove (in current but not in updates)
-                                    const membersToRemove = currentMemberIds.filter((id) => !updates.members.includes(id));
+                                    const membersToRemove = currentMemberIds.filter((id: number) => !updatedMembers.includes(id));
                                     
                                     console.log("[ArticleSettingsDialog] Members update:", {
                                         currentMemberIds,
-                                        updatesMembers: updates.members,
+                                        updatesMembers: updatedMembers,
                                         membersToAdd,
                                         membersToRemove,
                                     });
@@ -889,7 +890,7 @@ export default function NoteViewPage() {
                                             });
                                         }
                                     }
-                                } else if (updates.members.length === 0 && note.shared_members && note.shared_members.length > 0) {
+                                } else if (updatedMembers.length === 0 && note.shared_members && note.shared_members.length > 0) {
                                     // Remove all shared members
                                     console.log("[ArticleSettingsDialog] Removing all members");
                                     for (const member of note.shared_members) {

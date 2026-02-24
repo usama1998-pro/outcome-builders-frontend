@@ -76,28 +76,28 @@ export default function SidePanel() {
     const { currentBrainSpaceId, setCurrentBrainSpaceId } = useBrainSpaceStore();
     const queryClient = useQueryClient();
     const { mutate: createWorkspace, isPending: isCreatingWorkspace } = useCreateUserWorkspace();
-    
+
     // State for create brain space dialog
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
-    
+
     // State for move article dialog
     const [moveDialogOpen, setMoveDialogOpen] = useState(false);
     const [sourceCollectionId, setSourceCollectionId] = useState<number | null>(null);
     const [selectedNoteIds, setSelectedNoteIds] = useState<number[]>([]);
     const [targetCollectionId, setTargetCollectionId] = useState<string>("");
     const { mutate: moveNote, isPending: isMovingNote } = useMoveNote();
-    
+
     // Permission checks - hide elements until permissions are loaded and confirmed
     const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
     const canCreateBrainspace = !permissionsLoading && (
         hasPermission(PERMISSIONS.BRAINSPACE_CREATE) || isOwnerOrAdmin
     );
-    
+
     const createForm = useForm<CreateBrainSpaceFormValues>({
         resolver: zodResolver(createBrainSpaceSchema),
         defaultValues: { name: "" },
     });
-    
+
     // Extract current brain space from pathname (supports both legacy numeric id and UUID)
     useEffect(() => {
         const segmentMatch = pathname.match(/\/dashboard\/workspaces\/([^/]+)/);
@@ -117,7 +117,7 @@ export default function SidePanel() {
             setCurrentBrainSpaceId(workspace.id);
         }
     }, [pathname, currentBrainSpaceId, setCurrentBrainSpaceId, workspaces]);
-    
+
     // Validate that the current brain space still exists (use stable dep to avoid loop)
     const workspaceIds = useMemo(() => new Set((workspaces ?? []).map((ws) => ws.id)), [workspaces]);
     useEffect(() => {
@@ -125,10 +125,10 @@ export default function SidePanel() {
             setCurrentBrainSpaceId(null);
         }
     }, [currentBrainSpaceId, workspaceIds]);
-    
+
     // Get current brain space
     const currentBrainSpace = workspaces?.find(ws => ws.id === currentBrainSpaceId);
-    
+
     // Filter collections by selected brain space for counts (but keep all for tree structure)
     // If no brainspace is selected, show 0 counts (not all collections)
     const collections = useMemo(() => {
@@ -136,7 +136,7 @@ export default function SidePanel() {
         if (!currentBrainSpaceId) return []; // Show 0 if no brain space selected
         return allCollections.filter(c => c.workspaceId === currentBrainSpaceId);
     }, [allCollections, currentBrainSpaceId]);
-    
+
     // Handle brain space selection
     const handleBrainSpaceChange = (value: string) => {
         if (value === "create-new") {
@@ -148,7 +148,7 @@ export default function SidePanel() {
         const ws = workspaces?.find((w) => w.id === workspaceId);
         router.push(`/dashboard/workspaces/${ws?.uuid ?? workspaceId}/collections`);
     };
-    
+
     // Handle create brain space
     const onCreateBrainSpace = (values: CreateBrainSpaceFormValues) => {
         const workspaceName = values.name;
@@ -197,7 +197,7 @@ export default function SidePanel() {
             staleTime: 0, // Always consider data stale to ensure fresh counts
         })),
     });
-    
+
     // Filter note queries by selected brain space for counts
     const noteQueries = useMemo(() => {
         if (!currentBrainSpaceId || !allCollections) return [];
@@ -212,7 +212,7 @@ export default function SidePanel() {
     const totalNotesCount = noteQueries.reduce((total, query) => {
         return total + (query.data?.length || 0);
     }, 0);
-    
+
     // Get notes for a specific collection (use allCollections and allNoteQueries)
     const getCollectionNotes = (collectionId: number) => {
         const collectionIndex = allCollections?.findIndex(c => c.id === collectionId) ?? -1;
@@ -222,7 +222,7 @@ export default function SidePanel() {
         }
         return [];
     };
-    
+
     // Handle move article click
     const handleMoveArticleClick = (collectionId: number, e: React.MouseEvent) => {
         e.preventDefault();
@@ -232,19 +232,19 @@ export default function SidePanel() {
         setTargetCollectionId("");
         setMoveDialogOpen(true);
     };
-    
+
     // Handle move articles
     const handleMoveArticles = () => {
         if (!sourceCollectionId || !targetCollectionId || selectedNoteIds.length === 0) {
             toast.error("Please select articles and a target collection");
             return;
         }
-        
+
         // Move all selected notes one by one
         let successCount = 0;
         let errorCount = 0;
         const totalNotes = selectedNoteIds.length;
-        
+
         const movePromises = selectedNoteIds.map((noteId) => {
             return new Promise<void>((resolve) => {
                 moveNote(
@@ -269,7 +269,7 @@ export default function SidePanel() {
                 );
             });
         });
-        
+
         Promise.all(movePromises).then(() => {
             if (successCount === totalNotes) {
                 toast.success(`Successfully moved ${successCount} article(s)!`);
@@ -304,11 +304,11 @@ export default function SidePanel() {
         }
         return text;
     };
-    
+
     // Only show once permissions are loaded AND user has access
     const canViewTeam = !permissionsLoading && (
-        hasPermission(PERMISSIONS.ADMIN_MANAGE) || 
-        hasPermission(PERMISSIONS.USER_INVITE) || 
+        hasPermission(PERMISSIONS.ADMIN_MANAGE) ||
+        hasPermission(PERMISSIONS.USER_INVITE) ||
         isOwnerOrAdmin
     );
 
@@ -320,11 +320,11 @@ export default function SidePanel() {
         if (!workspaces || workspaces.length === 0) {
             return {};
         }
-        
+
         return workspaces.reduce((acc, workspace) => {
             const orgId = workspace.tenantId;
             const orgName = workspace.tenant?.company_name || "Unknown Organization";
-            
+
             if (!acc[orgId]) {
                 acc[orgId] = {
                     id: orgId,
@@ -339,14 +339,14 @@ export default function SidePanel() {
 
     // State for managing expanded organization groups
     const [expandedOrgs, setExpandedOrgs] = useState<Set<number>>(new Set());
-    
+
     // State for managing expanded workspaces (to show collections)
     const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<number>>(new Set());
-    
+
     // State for managing expanded navigation sections
     // Default: Knowledge Bank, Strategy Tools, and Execution Tools are all expanded
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['knowledge-bank', 'strategy-tools', 'execution-tools']));
-    
+
     // Auto-expand first organization when workspaces load
     useEffect(() => {
         if (workspaces && workspaces.length > 0 && Object.keys(groupedWorkspaces).length > 0 && expandedOrgs.size === 0) {
@@ -384,7 +384,7 @@ export default function SidePanel() {
     };
 
     // Toggle workspace expansion (to show collections)
-    const toggleWorkspace = (workspaceId: number, e: React.MouseEvent<HTMLButtonElement>) => {
+    const toggleWorkspace = (workspaceId: number, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
         setExpandedWorkspaces(prev => {
@@ -460,7 +460,7 @@ export default function SidePanel() {
                                     )}
                                 </SelectContent>
                             </Select>
-                            
+
                             {/* Create Brain Space Dialog */}
                             {canCreateBrainspace && (
                                 <AlertDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -507,7 +507,7 @@ export default function SidePanel() {
                                     </AlertDialogContent>
                                 </AlertDialog>
                             )}
-                            
+
                             {/* Move Articles Dialog */}
                             <AlertDialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen}>
                                 <AlertDialogContent className="max-w-2xl">
@@ -517,7 +517,7 @@ export default function SidePanel() {
                                             Select articles to move and choose the target collection.
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
-                                    
+
                                     {sourceCollectionId && (
                                         <div className="space-y-4">
                                             {/* Source Collection Info */}
@@ -527,7 +527,7 @@ export default function SidePanel() {
                                                     {collections?.find(c => c.id === sourceCollectionId)?.title || "Unknown"}
                                                 </p>
                                             </div>
-                                            
+
                                             {/* Articles List */}
                                             <div>
                                                 <Label>Select Articles to Move</Label>
@@ -537,7 +537,7 @@ export default function SidePanel() {
                                                             No articles in this collection
                                                         </p>
                                                     ) : (
-                                                        getCollectionNotes(sourceCollectionId).map((note) => (
+                                                        getCollectionNotes(sourceCollectionId).map((note: { id: number; title: string }) => (
                                                             <div key={note.id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded">
                                                                 <input
                                                                     type="checkbox"
@@ -572,7 +572,11 @@ export default function SidePanel() {
                                                                 if (selectedNoteIds.length === getCollectionNotes(sourceCollectionId).length) {
                                                                     setSelectedNoteIds([]);
                                                                 } else {
-                                                                    setSelectedNoteIds(getCollectionNotes(sourceCollectionId).map(n => n.id));
+                                                                    setSelectedNoteIds(
+                                                                        getCollectionNotes(sourceCollectionId).map(
+                                                                            (n: { id: number }) => n.id
+                                                                        )
+                                                                    );
                                                                 }
                                                             }}
                                                             className="text-primary hover:underline"
@@ -582,7 +586,7 @@ export default function SidePanel() {
                                                     </div>
                                                 )}
                                             </div>
-                                            
+
                                             {/* Target Collection Select */}
                                             <div>
                                                 <Label htmlFor="target-collection">To Collection *</Label>
@@ -613,7 +617,7 @@ export default function SidePanel() {
                                             </div>
                                         </div>
                                     )}
-                                    
+
                                     <AlertDialogFooter>
                                         <AlertDialogCancel disabled={isMovingNote}>
                                             Cancel
@@ -630,7 +634,7 @@ export default function SidePanel() {
                         </div>
                     </SidebarGroupContent>
                 </SidebarGroup>
-                
+
                 {/* Main Navigation */}
                 <SidebarGroup>
                     <SidebarGroupContent>
@@ -894,7 +898,7 @@ export default function SidePanel() {
                                     const isActive = orgGroup.workspaces.some(
                                         ws => pathname.startsWith(`/dashboard/workspaces/${ws.uuid ?? ws.id}`)
                                     );
-                                    
+
                                     return (
                                         <SidebarMenuItem key={orgGroup.id}>
                                             <SidebarMenuButton
@@ -931,7 +935,7 @@ export default function SidePanel() {
                                                         const isWorkspaceExpanded = expandedWorkspaces.has(workspace.id);
                                                         const workspaceCollections = getWorkspaceCollections(workspace.id);
                                                         const hasCollections = workspaceCollections.length > 0;
-                                                        
+
                                                         return (
                                                             <SidebarMenuSubItem key={workspace.id}>
                                                                 <div className="w-full">
@@ -982,10 +986,10 @@ export default function SidePanel() {
                                                                         <div className="ml-6 mt-1 space-y-1 relative z-0">
                                                                             {workspaceCollections.map((collection, index) => {
                                                                                 const isLast = index === workspaceCollections.length - 1;
-                                                                const collectionSegment = collection.uuid ?? collection.id;
-                                                                const isCollectionActive = pathname.startsWith(
-                                                                    `/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections/${collectionSegment}`
-                                                                );
+                                                                                const collectionSegment = collection.uuid ?? collection.id;
+                                                                                const isCollectionActive = pathname.startsWith(
+                                                                                    `/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections/${collectionSegment}`
+                                                                                );
                                                                                 // Get article count for this collection (use allCollections and allNoteQueries)
                                                                                 const collectionIndex = allCollections?.findIndex(c => c.id === collection.id) ?? -1;
                                                                                 // Prefer query data if available, otherwise use collection.members as fallback
@@ -1001,9 +1005,9 @@ export default function SidePanel() {
                                                                                 } else {
                                                                                     articleCount = collection.members || 0;
                                                                                 }
-                                                                                
+
                                                                                 const collectionNotes = getCollectionNotes(collection.id);
-                                                                                
+
                                                                                 return (
                                                                                     <div key={collection.id} className={`flex items-center group relative z-0 ${isLast ? 'rounded-b-md overflow-hidden' : ''}`}>
                                                                                         <SidebarMenuSubButton
