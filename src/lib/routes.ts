@@ -62,7 +62,7 @@ const routes = {
   },
   notes: {
     get: "/note",
-    getById: (id: number) => `/note/${id}`,
+    getById: (idOrUuid: number | string) => `/note/${idOrUuid}`,
     create: "/note",
     update: (id: number) => `/note/${id}`,
     delete: (id: number) => `/note/${id}`,

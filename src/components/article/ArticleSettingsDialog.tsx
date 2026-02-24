@@ -339,14 +339,14 @@ export default function ArticleSettingsDialog({
                                     <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-3 bg-muted/30">
                                         {selectedMembers.map((memberId) => {
                                             const member = tenantUsers.find((u) => u.id === memberId);
-                                            if (!member) return null;
+                                            const displayName = member?.full_name || member?.email || `User ${memberId}`;
                                             return (
                                                 <Badge
                                                     key={memberId}
                                                     variant="secondary"
                                                     className="flex items-center gap-2 w-fit"
                                                 >
-                                                    <span>{member.full_name || member.email}</span>
+                                                    <span>{displayName}</span>
                                                     <button
                                                         onClick={() => handleRemoveMember(memberId)}
                                                         className="ml-1 hover:text-destructive"

@@ -58,6 +58,7 @@ export default function ChatSidePanel() {
     const [loadingChatId, setLoadingChatId] = useState<string | null>(null); // UUID as string
     const signOut = useSignOut();
     const currentTenantId = useAuthStore((s) => s.tenantId);
+    const hydrated = useAuthStore((s) => s.hydrated);
     const { data: tenants } = useUserTenants();
     const { data: userProfile } = useUserProfile();
     const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
@@ -97,7 +98,7 @@ export default function ChatSidePanel() {
     const { data: chatTabs = [], isLoading: isLoadingChatTabs, refetch: refetchChatTabs } = useQuery({
         queryKey: ["chatTabs", currentTenantId],
         queryFn: getChatTabs,
-        enabled: !!currentTenantId,
+        enabled: !!currentTenantId && hydrated, // Wait for both tenantId and hydration
         staleTime: 1000 * 30, // Consider data fresh for 30 seconds
         refetchOnWindowFocus: false, // Don't refetch when window regains focus
     });

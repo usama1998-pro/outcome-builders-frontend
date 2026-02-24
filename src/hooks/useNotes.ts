@@ -6,6 +6,7 @@ import { useAuthStore } from "../store/useAuth";
 
 interface NoteApiItem {
   id: number;
+  uuid?: string | null;
   title: string;
   content: string;
   collection_id: number;
@@ -20,6 +21,9 @@ interface NoteApiItem {
   visibility?: "private" | "public" | "shared";
   user_id?: number;
   is_owner?: boolean;
+  // Owner info (may be returned by backend)
+  owner_name?: string;
+  owner_email?: string;
 }
 
 interface NotesApiResponse {
@@ -60,6 +64,7 @@ interface UpdateNotePayload {
 
 interface SingleNoteApiItem {
   id: number;
+  uuid?: string | null;
   title: string;
   content: string;
   collection_id: number;
@@ -93,13 +98,18 @@ interface SingleNoteResponse {
 
 // ------------------ // Notes Fetch/Create/Delete // ------------------
 
-async function fetchCollectionNotes(collectionId: number): Promise<Notes[]> {
+async function fetchCollectionNotes(collectionIdOrUuid: number | string): Promise<Notes[]> {
+  const params =
+    typeof collectionIdOrUuid === "string"
+      ? { collection_uuid: collectionIdOrUuid }
+      : { collection_id: collectionIdOrUuid };
   const { data } = await api.get<NotesApiResponse>(routes.notes.get, {
-    params: { collection_id: collectionId },
+    params,
   });
   // backend returns data.notes array
   return data.data.notes.map((n) => ({
     id: n.id,
+    uuid: n.uuid ?? null,
     title: n.title,
     createdAt: n.created_at ?? "",
     createdBy: String(n.created_by || n.user_id || ""),
@@ -110,8 +120,11 @@ async function fetchCollectionNotes(collectionId: number): Promise<Notes[]> {
     is_trained: n.is_trained,
     is_pinned: n.is_pinned,
     visibility: n.visibility,
-    user_id: n.user_id,
+    // Use created_by as the primary user_id since it's always present
+    user_id: n.created_by || n.user_id,
     is_owner: n.is_owner,
+    owner_name: n.owner_name,
+    owner_email: n.owner_email,
   }));
 }
 
@@ -141,7 +154,7 @@ async function createNote(
   return data;
 }
 
-async function fetchNoteById(noteId: number): Promise<SingleNoteApiItem> {
+async function fetchNoteById(noteId: number | string): Promise<SingleNoteApiItem> {
   const { data } = await api.get<SingleNoteResponse>(
     routes.notes.getById(noteId)
   );
@@ -184,16 +197,21 @@ async function deleteNote(
 
 // ------------------ // Hooks // ------------------
 
-export function useCollectionNotes(collectionId: number) {
+export function useCollectionNotes(collectionIdOrUuid: number | string | null) {
   const tenantId = useAuthStore((state) => state.tenantId);
   const hydrated = useAuthStore((state) => state.hydrated);
+  const enabled =
+    (collectionIdOrUuid !== null &&
+      collectionIdOrUuid !== undefined &&
+      (typeof collectionIdOrUuid === "string" ? collectionIdOrUuid.length > 0 : true)) &&
+    !!tenantId &&
+    hydrated;
 
   const { data, isLoading, isError, error, refetch } = useQuery<Notes[], Error>(
     {
-      queryKey: ["collectionNotes", collectionId, tenantId],
-      queryFn: () => fetchCollectionNotes(collectionId),
-      // Only run query if collectionId AND tenantId are available and store is hydrated
-      enabled: !!collectionId && !!tenantId && hydrated,
+      queryKey: ["collectionNotes", collectionIdOrUuid, tenantId],
+      queryFn: () => fetchCollectionNotes(collectionIdOrUuid!),
+      enabled: !!enabled,
     }
   );
 
@@ -226,46 +244,36 @@ export function useCreateNote() {
   });
 }
 
-export function useNote(noteId: number | null | undefined) {
+export function useNote(noteId: number | string | null | undefined) {
   const tenantId = useAuthStore((state) => state.tenantId);
   const hydrated = useAuthStore((state) => state.hydrated);
 
-  // Ensure noteId is a valid number (not NaN, null, or undefined)
-  const validNoteId = noteId != null && !isNaN(noteId) ? noteId : null;
+  // Accept numeric id or uuid string
+  const validNoteId =
+    noteId != null && noteId !== ""
+      ? typeof noteId === "number"
+        ? (isNaN(noteId) ? null : noteId)
+        : String(noteId)
+      : null;
 
   const isEnabled = !!validNoteId && !!tenantId && hydrated;
-
-  // Debug logging
-  console.log(
-    "[useNote] noteId:",
-    noteId,
-    "validNoteId:",
-    validNoteId,
-    "tenantId:",
-    tenantId,
-    "hydrated:",
-    hydrated,
-    "enabled:",
-    isEnabled
-  );
 
   const queryResult = useQuery<SingleNoteApiItem, Error>({
     queryKey: ["note", validNoteId, tenantId],
     queryFn: () => fetchNoteById(validNoteId!),
     enabled: isEnabled,
-    // Ensure fresh data on every mount
     staleTime: 0,
     refetchOnMount: true,
   });
 
   return {
     data: queryResult.data,
-    isLoading: queryResult.isLoading || !hydrated, // Consider loading while not hydrated
+    isLoading: queryResult.isLoading || !hydrated,
     isError: queryResult.isError,
     error: queryResult.error,
     refetch: queryResult.refetch,
     isFetching: queryResult.isFetching,
-    isEnabled, // Expose this for debugging
+    isEnabled,
   };
 }
 

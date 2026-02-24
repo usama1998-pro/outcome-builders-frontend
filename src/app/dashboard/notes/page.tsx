@@ -45,7 +45,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useDeleteNote, useToggleTrainNote, useCreateNote, useMoveNote } from "@/src/hooks/useNotes";
-import { FileText, Plus, Search, FolderOpen, Sparkles, BookOpen, RefreshCw, Move } from "lucide-react";
+import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
+import { FileText, Plus, Sparkles, BookOpen, RefreshCw, Move } from "lucide-react";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +70,7 @@ import { useRouter } from "next/navigation";
 
 interface NoteWithCollection extends Notes {
     collectionId: number;
+    collectionUuid?: string | null;
     workspaceId: number;
     collectionName: string;
     workspaceName: string;
@@ -81,6 +89,8 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
     const { mutate: deleteNote, isPending: isDeleting } = useDeleteNote();
     const { mutate: toggleTrain } = useToggleTrainNote();
     const { mutate: moveNote, isPending: isMoving } = useMoveNote();
+    const { data: workspaces } = useUserWorkspaces();
+    const getWorkspaceUuid = (id: number) => workspaces?.find((w) => w.id === id)?.uuid ?? id;
     // Fetch all collections (no workspace filter) to show all available collections including private ones
     const { data: collections = [] } = useUserCollections(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -88,6 +98,21 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
     const [noteToDelete, setNoteToDelete] = useState<number | null>(null);
     const [noteToMove, setNoteToMove] = useState<NoteWithCollection | null>(null);
     const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
+
+    // Memoize notes with owner info from API response
+    const notesWithOwnerInfo = useMemo(() => {
+        return notes.map((note) => {
+            // Get owner name from API (now included in response)
+            const ownerName = note.owner_name || "Unknown";
+            const initials = ownerName
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2) || "U";
+            return { ...note, ownerInfo: { name: ownerName, email: note.owner_email || "", initials } };
+        });
+    }, [notes]);
 
     const handleDeleteClick = (noteId: number, e: React.MouseEvent) => {
         e.preventDefault();
@@ -180,14 +205,14 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
 
     // Filter notes based on search query (matching NotesList behavior)
     const filteredNotes = useMemo(() => {
-        if (!searchQuery.trim()) return notes;
+        if (!searchQuery.trim()) return notesWithOwnerInfo;
 
         const query = searchQuery.toLowerCase().trim();
-        return notes.filter(note =>
+        return notesWithOwnerInfo.filter(note =>
             note.title.toLowerCase().includes(query) ||
-            note.createdBy?.toLowerCase().includes(query)
+            note.ownerInfo.name.toLowerCase().includes(query)
         );
-    }, [notes, searchQuery]);
+    }, [notesWithOwnerInfo, searchQuery]);
 
     return (
         <>
@@ -205,97 +230,134 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                     </Card>
                 )}
 
-                {filteredNotes.map((note) => (
-                    <div key={note.id} className="relative">
-                        <Link
-                            href={`/dashboard/workspaces/${note.workspaceId}/collections/${note.collectionId}/notes/${note.id}`}
-                            className="no-underline"
-                        >
-                            <Card className="w-[300px] h-[200px] flex flex-col justify-between">
-                                <CardHeader>
-                                    <div className="flex items-center gap-2">
-                                        <CardTitle className="truncate max-w-[180px]" title={note.title}>
-                                            {note.title}
-                                        </CardTitle>
-                                        {note.is_trained && (
-                                            <span
-                                                title="Trained"
-                                                className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500"
-                                            >
-                                                <FaBrain size={12} className="text-white" />
-                                            </span>
-                                        )}
-                                    </div>
-                                    <CardDescription>{formatDateTime(note.createdAt)}</CardDescription>
-                                    <CardAction>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                }}
-                                                className="focus:outline-none"
-                                            >
-                                                <BsThreeDotsVertical />
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                                <DropdownMenuItem
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        window.location.href = `/dashboard/workspaces/${note.workspaceId}/collections/${note.collectionId}/notes/${note.id}`;
-                                                    }}
-                                                    className="cursor-pointer"
-                                                >
-                                                    <FaEye className="mr-2" />
-                                                    View Article
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        window.location.href = `/dashboard/articles/new?noteId=${note.id}&collection_id=${note.collectionId}`;
-                                                    }}
-                                                    className="cursor-pointer"
-                                                >
-                                                    <FaEdit className="mr-2" />
-                                                    Edit Article
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={(e) => handleTrainClick(note.id, note.is_trained || false, e)}
-                                                    className={`cursor-pointer ${note.is_trained ? "text-cyan-600 focus:text-cyan-600" : ""}`}
-                                                >
-                                                    <FaBrain className="mr-2" />
-                                                    {note.is_trained ? "Untrain Article" : "Train Article"}
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={(e) => handleMoveClick(note, e)}
-                                                    className="cursor-pointer"
-                                                >
-                                                    <Move className="mr-2" />
-                                                    Move to Collection
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={(e) => handleDeleteClick(note.id, e)}
-                                                    className="text-red-600 focus:text-red-600 cursor-pointer"
-                                                >
-                                                    <FaTrash className="mr-2" />
-                                                    Delete Article
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </CardAction>
-                                </CardHeader>
-                                <CardFooter>
-                                    <Avatar>
-                                        <AvatarImage src={note.createdBy} />
-                                        <AvatarFallback>CN</AvatarFallback>
-                                    </Avatar>
-                                </CardFooter>
-                            </Card>
-                        </Link>
-                    </div>
-                ))}
+                {filteredNotes.map((note) => {
+                    return (
+                        <div key={note.id} className="relative">
+                            <Link
+                                href={`/dashboard/workspaces/${getWorkspaceUuid(note.workspaceId)}/collections/${note.collectionUuid ?? note.collectionId}/notes/${note.uuid ?? note.id}`}
+                                className="no-underline"
+                            >
+                                {/* Gradient border wrapper for trained articles */}
+                                <div className={`rounded-xl transition-all duration-200 ${note.is_trained ? "p-[2px] bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500" : ""}`}>
+                                    <Card className={`w-[300px] h-[200px] flex flex-col justify-between border border-border hover:border-foreground/30 transition-colors duration-200 ${note.is_trained ? "rounded-[10px]" : ""}`}>
+                                        <CardHeader>
+                                            <div className="flex items-center gap-2">
+                                                <CardTitle className="truncate max-w-[180px]" title={note.title}>
+                                                    {note.title}
+                                                </CardTitle>
+                                                {note.is_trained && (
+                                                    <span
+                                                        title="Trained"
+                                                        className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 shadow-lg shadow-purple-500/30"
+                                                    >
+                                                        <FaBrain size={12} className="text-white" />
+                                                    </span>
+                                                )}
+                                                {note.visibility && (
+                                                    <span
+                                                        title={note.visibility === "private" ? "Only Me" : note.visibility === "public" ? "All (Anyone can edit)" : "Collaborate"}
+                                                        className={`text-xs px-2 py-0.5 rounded ${note.visibility === "private"
+                                                            ? "bg-gray-500 text-white"
+                                                            : note.visibility === "public"
+                                                                ? "bg-blue-500 text-white"
+                                                                : "bg-green-500 text-white"
+                                                            }`}
+                                                    >
+                                                        {note.visibility === "private" ? "Only Me" : note.visibility === "public" ? "All" : "Collaborate"}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <CardDescription>{formatDateTime(note.createdAt)}</CardDescription>
+                                            <CardAction>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                        }}
+                                                        className="focus:outline-none"
+                                                    >
+                                                        <BsThreeDotsVertical />
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent>
+                                                        <DropdownMenuItem
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                window.location.href = `/dashboard/workspaces/${getWorkspaceUuid(note.workspaceId)}/collections/${note.collectionUuid ?? note.collectionId}/notes/${note.uuid ?? note.id}`;
+                                                            }}
+                                                            className="cursor-pointer"
+                                                        >
+                                                            <FaEye className="mr-2" />
+                                                            View Article
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                window.location.href = `/dashboard/articles/new?noteId=${note.id}&collection_id=${note.collectionId}`;
+                                                            }}
+                                                            className="cursor-pointer"
+                                                        >
+                                                            <FaEdit className="mr-2" />
+                                                            Edit Article
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={(e) => handleTrainClick(note.id, note.is_trained || false, e)}
+                                                            className={`cursor-pointer ${note.is_trained ? "text-cyan-600 focus:text-cyan-600" : ""}`}
+                                                        >
+                                                            <FaBrain className="mr-2" />
+                                                            {note.is_trained ? "Untrain Article" : "Train Article"}
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={(e) => handleMoveClick(note, e)}
+                                                            className="cursor-pointer"
+                                                        >
+                                                            <Move className="mr-2" />
+                                                            Move to Collection
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={(e) => handleDeleteClick(note.id, e)}
+                                                            className="text-red-600 focus:text-red-600 cursor-pointer"
+                                                        >
+                                                            <FaTrash className="mr-2" />
+                                                            Delete Article
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </CardAction>
+                                        </CardHeader>
+                                        <CardFooter>
+                                            <TooltipProvider delayDuration={300}>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <div className="flex items-center gap-2.5 cursor-pointer pointer-events-auto">
+                                                            <Avatar className="h-8 w-8 border-2 border-background shadow-md">
+                                                                <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-semibold">
+                                                                    {note.ownerInfo.initials}
+                                                                </AvatarFallback>
+                                                            </Avatar>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-medium text-foreground truncate max-w-[180px]">
+                                                                    {note.ownerInfo.name}
+                                                                </span>
+                                                                <span className="text-xs text-muted-foreground">Owner</span>
+                                                            </div>
+                                                        </div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="z-[100] bg-popover text-popover-foreground border border-border">
+                                                        <p className="font-medium text-popover-foreground">{note.ownerInfo.name}</p>
+                                                        {note.ownerInfo.email && <p className="text-xs text-muted-foreground">{note.ownerInfo.email}</p>}
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </CardFooter>
+                                    </Card>
+                                </div>
+                            </Link>
+                        </div>
+                    );
+                })}
             </div>
 
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -394,6 +456,7 @@ interface NotesApiResponse {
     data: {
         notes: Array<{
             id: number;
+            uuid?: string | null;
             title: string;
             content: string;
             collection_id: number;
@@ -405,6 +468,10 @@ interface NotesApiResponse {
             has_file: boolean;
             is_trained: boolean;
             is_pinned: boolean;
+            visibility?: "private" | "public" | "shared";
+            user_id?: number;
+            owner_name?: string;
+            owner_email?: string;
         }>;
     };
     pagination: number | null;
@@ -416,6 +483,7 @@ async function fetchCollectionNotes(collectionId: number): Promise<Notes[]> {
     });
     return data.data.notes.map((n) => ({
         id: n.id,
+        uuid: n.uuid ?? null,
         title: n.title,
         createdAt: n.created_at ?? "",
         createdBy: String(n.created_by),
@@ -425,6 +493,10 @@ async function fetchCollectionNotes(collectionId: number): Promise<Notes[]> {
         hasFile: n.has_file,
         is_trained: n.is_trained,
         is_pinned: n.is_pinned,
+        visibility: n.visibility,
+        user_id: n.created_by || n.user_id,
+        owner_name: n.owner_name,
+        owner_email: n.owner_email,
     }));
 }
 
@@ -485,6 +557,7 @@ export default function AllNotesPage() {
                     notes.push({
                         ...note,
                         collectionId: collection.id,
+                        collectionUuid: collection.uuid ?? null,
                         workspaceId: collection.workspaceId,
                         collectionName: collection.title,
                         workspaceName: collection.workspaceName,
@@ -522,7 +595,7 @@ export default function AllNotesPage() {
                     />
 
                     {filteredCollections && filteredCollections.length > 0 && !permissionsLoading && canCreateNote && (
-                        <Button 
+                        <Button
                             className="gap-2"
                             onClick={() => {
                                 // If only one collection, redirect with it pre-selected

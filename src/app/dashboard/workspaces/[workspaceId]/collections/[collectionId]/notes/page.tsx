@@ -8,6 +8,8 @@ import { FaPlus } from "react-icons/fa";
 import { FileText, Plus, Sparkles, BookOpen } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useCollectionNotes } from "@/src/hooks/useNotes";
+import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
+import { useUserCollections } from "@/src/hooks/useCollection";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import RequireAuth from "@/src/components/auth/requireAuth";
@@ -18,28 +20,28 @@ import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
 export default function NotesPage() {
     const router = useRouter();
     const params = useParams();
-    const workspaceId = Array.isArray(params.workspaceId) ? params.workspaceId[0] : params.workspaceId; // workspace id from URL
-    const collectionId = Array.isArray(params.collectionId) ? params.collectionId[0] : params.collectionId;
+    const workspaceParam = Array.isArray(params.workspaceId) ? params.workspaceId[0] : params.workspaceId; // UUID or legacy id from URL
+    const collectionIdParam = Array.isArray(params.collectionId) ? params.collectionId[0] : params.collectionId; // UUID in URL
     const { setCurrentBrainSpaceId, currentBrainSpaceId } = useBrainSpaceStore();
+    const { data: workspaces } = useUserWorkspaces();
+    const workspace = workspaces?.find((w) => w.uuid === workspaceParam || String(w.id) === workspaceParam);
+    const workspaceIdNum = workspace?.id;
+    const { data: collections = [] } = useUserCollections(workspaceIdNum ?? undefined);
+    const collection = collectionIdParam ? collections.find((c) => c.uuid === collectionIdParam || String(c.id) === collectionIdParam) : null;
 
-    const { data: notes, isLoading, isError, error, refetch } = useCollectionNotes(Number(collectionId));
+    const { data: notes, isLoading, isError, error, refetch } = useCollectionNotes(collectionIdParam ?? null);
     const [searchQuery, setSearchQuery] = useState("");
 
-    // Set the workspace from URL when page loads
     useEffect(() => {
-        if (workspaceId) {
-            const workspaceIdNum = Number(workspaceId);
-            if (workspaceIdNum && workspaceIdNum !== currentBrainSpaceId) {
-                setCurrentBrainSpaceId(workspaceIdNum);
-            }
+        if (workspaceIdNum && workspaceIdNum !== currentBrainSpaceId) {
+            setCurrentBrainSpaceId(workspaceIdNum);
         }
-    }, [workspaceId, currentBrainSpaceId, setCurrentBrainSpaceId]);
+    }, [workspaceIdNum, currentBrainSpaceId, setCurrentBrainSpaceId]);
 
-    // Use shared permission hook
     const {
         canCreateNote,
         permissionsLoading
-    } = useNotePermissions(Number(collectionId));
+    } = useNotePermissions(collection?.id);
 
 
 
@@ -55,10 +57,10 @@ export default function NotesPage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
 
-                    {canCreateNote && (
+                    {canCreateNote && collection && (
                         <Button
                             onClick={() => {
-                                router.push(`/dashboard/articles/new?collection_id=${collectionId}`);
+                                router.push(`/dashboard/articles/new?collection_id=${collection.id}`);
                             }}
                         >
                             <FaPlus className="mr-2" /> New Article
@@ -85,11 +87,37 @@ export default function NotesPage() {
                     </div>
                 )}
 
-                {notes && notes.length > 0 && (
-                    <NotesList notes={notes} collection={{ id: Number(collectionId) }} workspace={{ id: Number(workspaceId) }} searchQuery={searchQuery} />
+                {workspaceParam && !workspace && workspaces && workspaces.length > 0 && (
+                    <div className="w-full flex justify-center p-10">
+                        <Card className="max-w-md">
+                            <CardHeader>
+                                <CardTitle>Brainspace not found</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-muted-foreground">This brainspace does not exist or you don&apos;t have access to it.</p>
+                            </CardContent>
+                        </Card>
+                    </div>
                 )}
 
-                {notes && notes.length === 0 && !isLoading && (
+                {collectionIdParam && workspaceIdNum != null && collections.length > 0 && !collection && !isLoading && (
+                    <div className="w-full flex justify-center p-10">
+                        <Card className="max-w-md">
+                            <CardHeader>
+                                <CardTitle>Collection not found</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-muted-foreground">This collection does not exist or you don&apos;t have access to it.</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+
+                {notes && notes.length > 0 && workspaceIdNum != null && collection && (
+                    <NotesList notes={notes} collection={{ id: collection.id, uuid: collection.uuid ?? undefined }} workspace={{ id: workspaceIdNum, uuid: workspace?.uuid ?? undefined }} searchQuery={searchQuery} />
+                )}
+
+                {notes && notes.length === 0 && !isLoading && workspaceIdNum != null && collection && (
                     <div className="w-full flex items-center justify-center p-10 mt-10">
                         <div className="flex flex-col items-center text-center max-w-lg">
                             <div className="relative mb-8">
@@ -120,7 +148,7 @@ export default function NotesPage() {
                             {canCreateNote && (
                                 <Button
                                     onClick={() => {
-                                        router.push(`/dashboard/articles/new?collection_id=${collectionId}`);
+                                        router.push(`/dashboard/articles/new?collection_id=${collection.id}`);
                                     }}
                                     className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all"
                                 >

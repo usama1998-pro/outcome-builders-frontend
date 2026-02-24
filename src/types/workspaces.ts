@@ -5,6 +5,7 @@ export interface TenantInfo {
 
 export interface WorkSpaceList {
     id: number;
+    uuid?: string | null;
     title: string;
     createdAt: string;
     createdBy: string;

@@ -22,6 +22,7 @@ import {
     useTenantUsers,
     useAddCollectionMember
 } from "@/src/hooks/useCollection";
+import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useForm, Controller } from "react-hook-form";
@@ -53,19 +54,23 @@ type CreateCollectionFormValues = z.infer<typeof createCollectionSchema>;
 
 export default function WorkspacePage() {
     const params = useParams();
-    const workspaceId = Array.isArray(params.workspaceId) ? params.workspaceId[0] : params.workspaceId;
+    const workspaceParam = Array.isArray(params.workspaceId) ? params.workspaceId[0] : params.workspaceId; // UUID or legacy numeric id
     const { setCurrentBrainSpaceId, currentBrainSpaceId } = useBrainSpaceStore();
     const { data: allCollections, isLoading, isError, error, refetch } = useUserCollections();
+    const { data: workspaces } = useUserWorkspaces();
+
+    // Resolve URL param (UUID or legacy id) to workspace
+    const workspace = workspaces?.find(
+        (w) => w.uuid === workspaceParam || String(w.id) === workspaceParam
+    );
+    const workspaceIdNum = workspace?.id;
 
     // Set the workspace from URL when page loads
     useEffect(() => {
-        if (workspaceId) {
-            const workspaceIdNum = Number(workspaceId);
-            if (workspaceIdNum && workspaceIdNum !== currentBrainSpaceId) {
-                setCurrentBrainSpaceId(workspaceIdNum);
-            }
+        if (workspaceIdNum && workspaceIdNum !== currentBrainSpaceId) {
+            setCurrentBrainSpaceId(workspaceIdNum);
         }
-    }, [workspaceId, currentBrainSpaceId, setCurrentBrainSpaceId]);
+    }, [workspaceIdNum, currentBrainSpaceId, setCurrentBrainSpaceId]);
     const { mutate: createCollection, isPending } = useCreateUserCollection();
     const { mutate: addMember, isPending: isAddingMember } = useAddCollectionMember();
     const userId = useAuthStore((state) => state.userId);
@@ -84,7 +89,8 @@ export default function WorkspacePage() {
 
     // Permission checks - hide elements until permissions are loaded and confirmed
     const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
-    const canCreateCollection = !permissionsLoading && (
+    const hasBrainSpaces = (workspaces?.length ?? 0) > 0;
+    const canCreateCollection = hasBrainSpaces && !!workspace && !permissionsLoading && (
         hasPermission(PERMISSIONS.COLLECTION_CREATE) || isOwnerOrAdmin
     );
     const canCreatePrivateCollection = !permissionsLoading && (
@@ -92,9 +98,9 @@ export default function WorkspacePage() {
     );
 
     // Filter collections for current workspace only
-    const collections = allCollections?.filter(
-        (collection) => collection.workspaceId === Number(workspaceId)
-    );
+    const collections = workspaceIdNum != null
+        ? allCollections?.filter((collection) => collection.workspaceId === workspaceIdNum)
+        : [];
 
     const form = useForm<CreateCollectionFormValues>({
         resolver: zodResolver(createCollectionSchema),
@@ -105,10 +111,13 @@ export default function WorkspacePage() {
         },
     });
 
-    // Update default visibility based on permissions when they load
-    if (!permissionsLoading && !canCreatePrivateCollection && form.getValues("visibility") === "private") {
-        form.setValue("visibility", "public");
-    }
+    // Update default visibility based on permissions when they load (in effect to avoid setState during render)
+    useEffect(() => {
+        if (!permissionsLoading && !canCreatePrivateCollection && form.getValues("visibility") === "private") {
+            form.setValue("visibility", "public");
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- form.setValue is stable; form ref would cause loops
+    }, [permissionsLoading, canCreatePrivateCollection]);
 
     const handleAddMember = () => {
         if (!selectedUserId) return;
@@ -121,12 +130,13 @@ export default function WorkspacePage() {
     };
 
     const onSubmit = (values: CreateCollectionFormValues) => {
+        if (workspaceIdNum == null) return;
         createCollection(
             {
                 name: values.name,
                 description: values.description || null,
                 visibility: values.visibility,
-                workspace_id: Number(workspaceId),
+                workspace_id: workspaceIdNum,
             },
             {
                 onSuccess: async (res) => {
@@ -446,9 +456,22 @@ export default function WorkspacePage() {
                     </div>
                 )}
 
-                {collections && collections.length > 0 && (
+                {workspaceParam && !workspace && workspaces && workspaces.length > 0 && (
+                    <div className="w-full flex justify-center p-10">
+                        <Card className="max-w-md">
+                            <CardHeader>
+                                <CardTitle>Brainspace not found</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-muted-foreground">This brainspace does not exist or you don&apos;t have access to it.</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+
+                {collections && collections.length > 0 && workspaceIdNum != null && (
                     <div className="w-full mt-4" style={{ position: 'relative', zIndex: 0 }}>
-                        <CollectionList collections={collections} workspace={{ id: Number(workspaceId) }} searchQuery={searchQuery} />
+                        <CollectionList collections={collections} workspace={{ id: workspaceIdNum, uuid: workspace?.uuid ?? undefined }} searchQuery={searchQuery} />
                     </div>
                 )}
 

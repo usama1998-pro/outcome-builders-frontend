@@ -20,10 +20,20 @@ api.interceptors.request.use((config) => {
   const tenantId = useAuthStore.getState().tenantId;
   const hydrated = useAuthStore.getState().hydrated;
 
-  // Only add tenant header if tenantId exists and store is hydrated
-  // Queries should be disabled until hydrated, but this is a safety check
-  if (tenantId && hydrated) {
-    config.headers["X-Tenant"] = String(tenantId);
+  // Get tenantId from store or localStorage as fallback
+  // This ensures the header is added even if the store isn't hydrated yet
+  let finalTenantId = tenantId;
+  if (!finalTenantId && typeof window !== "undefined") {
+    const storedTenantId = localStorage.getItem("tenant_id");
+    if (storedTenantId) {
+      finalTenantId = Number(storedTenantId);
+    }
+  }
+
+  // Add tenant header if tenantId exists (from store or localStorage)
+  // This ensures the header is always added when tenantId is available
+  if (finalTenantId) {
+    config.headers["X-Tenant"] = String(finalTenantId);
   }
 
   return config;

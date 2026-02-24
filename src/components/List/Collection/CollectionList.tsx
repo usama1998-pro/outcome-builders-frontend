@@ -67,9 +67,10 @@ function CollectionMemberCount({ collectionId }: { collectionId: number }) {
 
 type CollectionListProps = {
     collections: Array<Collections>;
-    workspace: { id: number };
+    workspace: { id: number; uuid?: string | null };
     onDelete?: () => void;
     searchQuery?: string;
+    getWorkspaceUuid?: (workspaceId: number) => string | null | undefined;
 };
 
 const ITEMS_PER_PAGE = 6;
@@ -82,7 +83,7 @@ const updateCollectionSchema = z.object({
 
 type UpdateCollectionFormValues = z.infer<typeof updateCollectionSchema>;
 
-export function CollectionList({ collections, workspace, onDelete, searchQuery = "" }: CollectionListProps) {
+export function CollectionList({ collections, workspace, onDelete, searchQuery = "", getWorkspaceUuid }: CollectionListProps) {
     const { mutate: deleteCollection, isPending: isDeleting } = useDeleteUserCollection();
     const { mutate: updateCollection, isPending: isUpdating } = useUpdateUserCollection();
     const { mutate: addMember, isPending: isAddingMember } = useAddCollectionMember();
@@ -371,7 +372,7 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
                             return (
                                 <Link
                                     key={collection.id}
-                                    href={`/dashboard/workspaces/${collection.workspaceId}/collections/${collection.id}/notes`}
+                                    href={`/dashboard/workspaces/${(collection.workspaceId === workspace.id ? workspace.uuid : getWorkspaceUuid?.(collection.workspaceId)) ?? collection.workspaceId}/collections/${collection.uuid ?? collection.id}/notes`}
                                     className="group block"
                                     style={{ position: 'relative', zIndex: 0 }}
                                     onClick={() => {

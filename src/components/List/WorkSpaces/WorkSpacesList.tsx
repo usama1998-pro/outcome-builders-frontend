@@ -218,7 +218,7 @@ export default function WorkSpacesList({ filter, currentTenantId, searchQuery, o
                         {paginatedWorkspaces.map((workspace, index) => (
                             <Link 
                                 key={workspace.id} 
-                                href={`/dashboard/workspaces/${workspace.id}/collections`}
+                                href={`/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections`}
                                 className="group block"
                             >
                                 <div className="relative bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/10 hover:border-violet-500/30 hover:-translate-y-1">

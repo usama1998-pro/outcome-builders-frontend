@@ -98,24 +98,33 @@ export default function SidePanel() {
         defaultValues: { name: "" },
     });
     
-    // Extract current brain space from pathname or use stored value
+    // Extract current brain space from pathname (supports both legacy numeric id and UUID)
     useEffect(() => {
-        const workspaceMatch = pathname.match(/\/dashboard\/workspaces\/(\d+)/);
-        if (workspaceMatch) {
-            const workspaceId = Number(workspaceMatch[1]);
+        const segmentMatch = pathname.match(/\/dashboard\/workspaces\/([^/]+)/);
+        if (!segmentMatch) return;
+        const segment = segmentMatch[1];
+        // Legacy URL: segment is purely numeric
+        if (/^\d+$/.test(segment)) {
+            const workspaceId = Number(segment);
             if (workspaceId && workspaceId !== currentBrainSpaceId) {
                 setCurrentBrainSpaceId(workspaceId);
             }
+            return;
         }
-    }, [pathname, currentBrainSpaceId, setCurrentBrainSpaceId]);
+        // UUID URL: resolve to workspace id so Select value stays in sync
+        const workspace = workspaces?.find((w) => w.uuid === segment);
+        if (workspace && workspace.id !== currentBrainSpaceId) {
+            setCurrentBrainSpaceId(workspace.id);
+        }
+    }, [pathname, currentBrainSpaceId, setCurrentBrainSpaceId, workspaces]);
     
-    // Validate that the current brain space still exists
+    // Validate that the current brain space still exists (use stable dep to avoid loop)
+    const workspaceIds = useMemo(() => new Set((workspaces ?? []).map((ws) => ws.id)), [workspaces]);
     useEffect(() => {
-        if (currentBrainSpaceId && workspaces && !workspaces.find(ws => ws.id === currentBrainSpaceId)) {
-            // Current brain space no longer exists, clear selection
+        if (currentBrainSpaceId && workspaceIds.size > 0 && !workspaceIds.has(currentBrainSpaceId)) {
             setCurrentBrainSpaceId(null);
         }
-    }, [currentBrainSpaceId, workspaces, setCurrentBrainSpaceId]);
+    }, [currentBrainSpaceId, workspaceIds]);
     
     // Get current brain space
     const currentBrainSpace = workspaces?.find(ws => ws.id === currentBrainSpaceId);
@@ -136,8 +145,8 @@ export default function SidePanel() {
         }
         const workspaceId = Number(value);
         setCurrentBrainSpaceId(workspaceId);
-        // Navigate to the workspace
-        router.push(`/dashboard/workspaces/${workspaceId}/collections`);
+        const ws = workspaces?.find((w) => w.id === workspaceId);
+        router.push(`/dashboard/workspaces/${ws?.uuid ?? workspaceId}/collections`);
     };
     
     // Handle create brain space
@@ -156,7 +165,7 @@ export default function SidePanel() {
                     const newWorkspace = refetchedWorkspaces?.find((ws) => ws.title === workspaceName);
                     if (newWorkspace) {
                         setCurrentBrainSpaceId(newWorkspace.id);
-                        router.push(`/dashboard/workspaces/${newWorkspace.id}/collections`);
+                        router.push(`/dashboard/workspaces/${newWorkspace.uuid ?? newWorkspace.id}/collections`);
                     } else {
                         // If not found, navigate to workspaces page
                         router.push('/dashboard/workspaces');
@@ -883,7 +892,7 @@ export default function SidePanel() {
                                 {Object.values(groupedWorkspaces).map((orgGroup) => {
                                     const isExpanded = expandedOrgs.has(orgGroup.id);
                                     const isActive = orgGroup.workspaces.some(
-                                        ws => pathname.startsWith(`/dashboard/workspaces/${ws.id}`)
+                                        ws => pathname.startsWith(`/dashboard/workspaces/${ws.uuid ?? ws.id}`)
                                     );
                                     
                                     return (
@@ -917,7 +926,7 @@ export default function SidePanel() {
                                                 <SidebarMenuSub>
                                                     {orgGroup.workspaces.map((workspace) => {
                                                         const isWorkspaceActive = pathname.startsWith(
-                                                            `/dashboard/workspaces/${workspace.id}`
+                                                            `/dashboard/workspaces/${workspace.uuid ?? workspace.id}`
                                                         );
                                                         const isWorkspaceExpanded = expandedWorkspaces.has(workspace.id);
                                                         const workspaceCollections = getWorkspaceCollections(workspace.id);
@@ -951,7 +960,7 @@ export default function SidePanel() {
                                                                             </div>
                                                                         ) : (
                                                                             <Link
-                                                                                href={`/dashboard/workspaces/${workspace.id}/collections`}
+                                                                                href={`/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections`}
                                                                                 title={workspace.title}
                                                                                 onClick={() => {
                                                                                     // Close the dropdown when a workspace is clicked
@@ -973,9 +982,10 @@ export default function SidePanel() {
                                                                         <div className="ml-6 mt-1 space-y-1 relative z-0">
                                                                             {workspaceCollections.map((collection, index) => {
                                                                                 const isLast = index === workspaceCollections.length - 1;
-                                                                                const isCollectionActive = pathname.startsWith(
-                                                                                    `/dashboard/workspaces/${workspace.id}/collections/${collection.id}`
-                                                                                );
+                                                                const collectionSegment = collection.uuid ?? collection.id;
+                                                                const isCollectionActive = pathname.startsWith(
+                                                                    `/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections/${collectionSegment}`
+                                                                );
                                                                                 // Get article count for this collection (use allCollections and allNoteQueries)
                                                                                 const collectionIndex = allCollections?.findIndex(c => c.id === collection.id) ?? -1;
                                                                                 // Prefer query data if available, otherwise use collection.members as fallback
@@ -1002,7 +1012,7 @@ export default function SidePanel() {
                                                                                             className={`pl-4 flex-1 relative z-0 ${isLast ? 'rounded-b-md' : ''}`}
                                                                                         >
                                                                                             <Link
-                                                                                                href={`/dashboard/workspaces/${workspace.id}/collections/${collection.id}/notes`}
+                                                                                                href={`/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections/${collection.uuid ?? collection.id}/notes`}
                                                                                                 title={collection.title}
                                                                                             >
                                                                                                 <Layers className="h-3 w-3 text-cyan-600 dark:text-cyan-400 shrink-0" />

@@ -1,5 +1,6 @@
 export default interface Collections {
     id: number;
+    uuid?: string | null;
     title: string;
     description: string;
     createdAt: string;

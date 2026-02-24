@@ -17,23 +17,19 @@ import {
 } from "@/components/ui/select";
 import { useUserCollections } from "@/src/hooks/useCollection";
 import { useCreateNote, useUpdateNote, useNote } from "@/src/hooks/useNotes";
+import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
 import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
 import { toast } from "sonner";
 import RequireAuth from "@/src/components/auth/requireAuth";
-import { useTenantUsers } from "@/src/hooks/useCollection";
-import { useNotePermissions } from "@/src/hooks/useNotePermissions";
-import { Search, UserPlus, X } from "lucide-react";
-import { useAuthStore } from "@/src/store/useAuth";
 
 export default function NewArticlePage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { currentBrainSpaceId } = useBrainSpaceStore();
+    const { data: workspaces } = useUserWorkspaces();
     const { data: collections = [] } = useUserCollections(currentBrainSpaceId);
     const { mutate: createNote, isPending: isCreating } = useCreateNote();
     const { mutate: updateNote, isPending: isUpdating } = useUpdateNote();
-    const { data: tenantUsers = [] } = useTenantUsers();
-    const userId = useAuthStore((state) => state.userId);
 
     // Get noteId from URL if editing
     const noteIdParam = searchParams.get("noteId");
@@ -43,13 +39,10 @@ export default function NewArticlePage() {
     const { data: existingNote, isLoading: isLoadingNote } = useNote(editingNoteId);
     
     const [title, setTitle] = useState("");
-    const [selectedCollectionId, setSelectedCollectionId] = useState<string>(
-        searchParams.get("collection_id") || ""
-    );
-    const [visibility, setVisibility] = useState<"private" | "public" | "shared">("private");
-    const [selectedMembers, setSelectedMembers] = useState<number[]>([]);
-    const [selectedUserId, setSelectedUserId] = useState<number | "">("");
-    const [memberSearchQuery, setMemberSearchQuery] = useState("");
+    // Check if collection_id is provided in URL (coming from collection page)
+    const urlCollectionId = searchParams.get("collection_id") || "";
+    const isFromCollection = !!urlCollectionId;
+    const [selectedCollectionId, setSelectedCollectionId] = useState<string>(urlCollectionId);
     const [noteId, setNoteId] = useState<number | null>(editingNoteId); // Track created note ID for updates
     const noteIdRef = useRef<number | null>(editingNoteId); // Ref to track latest noteId for callbacks
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -70,9 +63,6 @@ export default function NewArticlePage() {
         noteIdRef.current = noteId;
     }, [noteId]);
 
-    // Get collection permissions
-    const collectionIdNum = selectedCollectionId ? Number(selectedCollectionId) : null;
-    const { isCollectionPrivate } = useNotePermissions(collectionIdNum || 0);
 
     const editor = useEditor({
         extensions: [StarterKit],
@@ -96,37 +86,11 @@ export default function NewArticlePage() {
         if (existingNote) {
             setTitle(existingNote.title || "");
             setSelectedCollectionId(String(existingNote.collection_id || ""));
-            setVisibility(existingNote.visibility || "private");
             if (editor && existingNote.content) {
                 editor.commands.setContent(existingNote.content);
             }
-            // Load shared members if any
-            if (existingNote.shared_members && existingNote.shared_members.length > 0) {
-                setSelectedMembers(existingNote.shared_members.map((m: any) => m.user_id));
-            }
         }
     }, [existingNote, editor]);
-
-    // Filter available users for sharing
-    const availableUsers = tenantUsers.filter(
-        (user) =>
-            user.id !== userId &&
-            !selectedMembers.includes(user.id) &&
-            (memberSearchQuery === "" ||
-                (user.full_name?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-                    user.email.toLowerCase().includes(memberSearchQuery.toLowerCase())))
-    );
-
-    const handleAddMember = () => {
-        if (!selectedUserId) return;
-        setSelectedMembers([...selectedMembers, Number(selectedUserId)]);
-        setSelectedUserId("");
-        setMemberSearchQuery("");
-    };
-
-    const handleRemoveMember = (userId: number) => {
-        setSelectedMembers(selectedMembers.filter((id) => id !== userId));
-    };
 
     // Auto-save as draft
     const saveAsDraft = useCallback(async () => {
@@ -155,7 +119,7 @@ export default function NewArticlePage() {
             title: articleTitle,
             content: content,
             collection_id: Number(selectedCollectionId),
-            visibility: visibility,
+            visibility: "private" as const, // Articles are private by default (draft mode)
         };
 
         // Use ref to get the latest noteId value (important for callbacks)
@@ -250,7 +214,7 @@ export default function NewArticlePage() {
                 },
             });
         }
-    }, [title, editor, selectedCollectionId, visibility, createNote, updateNote, router]);
+    }, [title, editor, selectedCollectionId, createNote, updateNote, router]);
 
     // Manual save with toast notification
     const handleSaveDraft = useCallback(async () => {
@@ -280,7 +244,7 @@ export default function NewArticlePage() {
             title: articleTitle,
             content: content,
             collection_id: Number(selectedCollectionId),
-            visibility: visibility,
+            visibility: "private" as const, // Articles are private by default (draft mode)
         };
 
         // Use ref to get the latest noteId value (important for callbacks)
@@ -379,7 +343,7 @@ export default function NewArticlePage() {
                 },
             });
         }
-    }, [title, editor, selectedCollectionId, visibility, createNote, updateNote, router]);
+    }, [title, editor, selectedCollectionId, createNote, updateNote, router]);
 
     // Handle back button - save as draft
     const handleBack = useCallback(() => {
@@ -422,34 +386,7 @@ export default function NewArticlePage() {
         }, 5000); // Auto-save after 5 seconds of no changes (increased to prevent race conditions)
 
         return () => clearTimeout(autoSaveTimer);
-    }, [title, editorContentHash, hasUnsavedChanges, selectedCollectionId, visibility, saveAsDraft, editor]);
-
-    // Also auto-save on visibility change if article exists
-    useEffect(() => {
-        // Don't autosave if already saving
-        if (isSavingRef.current) {
-            return;
-        }
-
-        const currentNoteId = noteIdRef.current;
-        if (currentNoteId && hasUnsavedChanges && selectedCollectionId) {
-            const timer = setTimeout(() => {
-                // Double-check we're not already saving
-                if (!isSavingRef.current) {
-                    saveAsDraft();
-                }
-            }, 2000); // Debounce auto-save
-            return () => clearTimeout(timer);
-        }
-    }, [visibility, hasUnsavedChanges, selectedCollectionId, saveAsDraft]);
-
-    // Handle visibility change for private collections
-    useEffect(() => {
-        if (visibility === "shared" && isCollectionPrivate) {
-            setVisibility("private");
-            toast.warning("Collection is private. 'Collaborate' option is not available. Please make the collection 'Shared' first.");
-        }
-    }, [isCollectionPrivate, visibility]);
+    }, [title, editorContentHash, hasUnsavedChanges, selectedCollectionId, saveAsDraft, editor]);
 
     const handlePublish = () => {
         if (!title.trim()) {
@@ -468,7 +405,7 @@ export default function NewArticlePage() {
             title: title.trim(),
             content: content,
             collection_id: Number(selectedCollectionId),
-            visibility: visibility,
+            visibility: "private" as const, // Articles are private by default
         };
 
         if (noteId) {
@@ -481,26 +418,13 @@ export default function NewArticlePage() {
                 {
                     onSuccess: async (res) => {
                         if (res?.status) {
-                            // If visibility is "shared" and there are members, share the note
-                            if (visibility === "shared" && selectedMembers.length > 0) {
-                                try {
-                                    const api = (await import("@/src/lib/axios")).default;
-                                    const routes = (await import("@/src/lib/routes")).default;
-                                    await api.post(routes.notes.share(noteId), {
-                                        user_ids: selectedMembers,
-                                    });
-                                    toast.success("Article published and shared!");
-                                } catch (err) {
-                                    toast.success("Article published!");
-                                }
-                            } else {
-                                toast.success("Article published!");
-                            }
+                            toast.success("Article published!");
                             setHasUnsavedChanges(false);
                             // Navigate to the article
                             const collection = collections.find(c => c.id === Number(selectedCollectionId));
                             if (collection) {
-                                router.push(`/dashboard/workspaces/${collection.workspaceId}/collections/${selectedCollectionId}/notes/${noteId}`);
+                                const wsUuid = workspaces?.find(w => w.id === collection.workspaceId)?.uuid ?? collection.workspaceId;
+                                router.push(`/dashboard/workspaces/${wsUuid}/collections/${selectedCollectionId}/notes/${noteId}`);
                             } else {
                                 router.back();
                             }
@@ -522,26 +446,13 @@ export default function NewArticlePage() {
                         const newNoteId = (res.data as any)?.id || (res.data as any)?.note?.id;
                         if (newNoteId) {
                             setNoteId(newNoteId);
-                            // If visibility is "shared" and there are members, share the note
-                            if (visibility === "shared" && selectedMembers.length > 0) {
-                                try {
-                                    const api = (await import("@/src/lib/axios")).default;
-                                    const routes = (await import("@/src/lib/routes")).default;
-                                    await api.post(routes.notes.share(newNoteId), {
-                                        user_ids: selectedMembers,
-                                    });
-                                    toast.success("Article published and shared!");
-                                } catch (err) {
-                                    toast.success("Article published!");
-                                }
-                            } else {
-                                toast.success("Article published!");
-                            }
+                            toast.success("Article published!");
                             setHasUnsavedChanges(false);
                             // Navigate to the article
                             const collection = collections.find(c => c.id === Number(selectedCollectionId));
                             if (collection) {
-                                router.push(`/dashboard/workspaces/${collection.workspaceId}/collections/${selectedCollectionId}/notes/${newNoteId}`);
+                                const wsUuid = workspaces?.find(w => w.id === collection.workspaceId)?.uuid ?? collection.workspaceId;
+                                router.push(`/dashboard/workspaces/${wsUuid}/collections/${selectedCollectionId}/notes/${newNoteId}`);
                             }
                         } else {
                             toast.success("Article published!");
@@ -590,6 +501,31 @@ export default function NewArticlePage() {
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Back
                         </Button>
+                        
+                        {/* Collection selector - only show when coming from side menu (no collection_id in URL) */}
+                        {!isFromCollection && (
+                            <div className="flex items-center gap-2">
+                                <Label htmlFor="collection-select" className="text-sm text-muted-foreground whitespace-nowrap">
+                                    Save to:
+                                </Label>
+                                <Select
+                                    value={selectedCollectionId}
+                                    onValueChange={setSelectedCollectionId}
+                                >
+                                    <SelectTrigger id="collection-select" className="w-[200px]">
+                                        <SelectValue placeholder="Select collection" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {collections.map((collection) => (
+                                            <SelectItem key={collection.id} value={String(collection.id)}>
+                                                {collection.title}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         <div className="flex-1 flex justify-center">
                             <Input
                                 placeholder="Article Title"

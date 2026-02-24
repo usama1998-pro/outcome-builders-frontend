@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useUpdateNote, useToggleTrainNote, useShareNote, useUnshareNote, useNote, useMoveNote } from "@/src/hooks/useNotes";
 import { useTenantUsers, useUserCollections } from "@/src/hooks/useCollection";
+import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
 import { useAuthStore } from "@/src/store/useAuth";
 import { useNotePermissions } from "@/src/hooks/useNotePermissions";
 import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
@@ -52,9 +53,8 @@ export default function NoteViewPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const workspaceId = Array.isArray(params.workspaceId) ? params.workspaceId[0] : params.workspaceId;
-    const collectionId = Array.isArray(params.collectionId) ? params.collectionId[0] : params.collectionId;
+    const collectionIdParam = Array.isArray(params.collectionId) ? params.collectionId[0] : params.collectionId;
     const noteIdParam = Array.isArray(params.noteId) ? params.noteId[0] : params.noteId;
-    const noteId = noteIdParam ? Number(noteIdParam) : null;
 
     const tenantId = useAuthStore((s) => s.tenantId);
 
@@ -85,9 +85,18 @@ export default function NoteViewPage() {
     const { mutate: moveNote, isPending: isMoving } = useMoveNote();
     const userId = useAuthStore((state) => state.userId);
     const { data: tenantUsers = [] } = useTenantUsers();
-    const { currentBrainSpaceId } = useBrainSpaceStore();
-    // Use brain space ID if available, otherwise fall back to workspaceId
-    const { data: collectionsData = [] } = useUserCollections(currentBrainSpaceId || (workspaceId ? Number(workspaceId) : undefined));
+    const { setCurrentBrainSpaceId, currentBrainSpaceId } = useBrainSpaceStore();
+    const { data: workspaces } = useUserWorkspaces();
+    const workspace = workspaces?.find((w) => w.uuid === workspaceId || String(w.id) === workspaceId);
+    const workspaceIdNum = workspace?.id;
+    const { data: collectionsData = [] } = useUserCollections(currentBrainSpaceId || workspaceIdNum);
+    const collection = collectionIdParam ? collectionsData.find((c) => c.uuid === collectionIdParam || String(c.id) === collectionIdParam) : null;
+
+    useEffect(() => {
+        if (workspaceIdNum && workspaceIdNum !== currentBrainSpaceId) {
+            setCurrentBrainSpaceId(workspaceIdNum);
+        }
+    }, [workspaceIdNum, currentBrainSpaceId, setCurrentBrainSpaceId]);
     
     // Map collections to the format expected by ArticleSettingsDialog
     const collections = collectionsData.map((c) => ({
@@ -96,11 +105,14 @@ export default function NoteViewPage() {
         visibility: c.visibility,
     }));
 
-    // Use shared permission hook
+    // Use shared permission hook (collection.id from resolved collection by UUID)
     const {
         canPerformNoteActions,
         isCollectionPrivate
-    } = useNotePermissions(Number(collectionId));
+    } = useNotePermissions(collection?.id);
+
+    // Numeric note id from fetched note (for API calls that still use id)
+    const noteId = note?.id;
 
     // Reset visibility if it's "shared" but collection is private
     useEffect(() => {
@@ -158,9 +170,9 @@ export default function NoteViewPage() {
         setMounted(true);
     }, []);
 
-    // Fetch note when tenantId is available (RequireAuth handles hydration)
+    // Fetch note when tenantId is available (by ID or UUID)
     useEffect(() => {
-        if (!mounted || !tenantId || !noteId) return;
+        if (!mounted || !tenantId || !noteIdParam) return;
 
         const fetchNote = async () => {
             setIsLoading(true);
@@ -168,10 +180,8 @@ export default function NoteViewPage() {
             setError(null);
 
             try {
-                const response = await api.get(routes.notes.getById(noteId));
+                const response = await api.get(routes.notes.getById(noteIdParam));
                 const noteData = response.data.data.note;
-                console.log("[NoteViewPage] Fetched note data:", noteData);
-                console.log("[NoteViewPage] Shared members:", noteData.shared_members);
                 setNote(noteData);
             } catch (err: any) {
                 console.error("[NoteViewPage] Error fetching note:", err);
@@ -183,7 +193,7 @@ export default function NoteViewPage() {
         };
 
         fetchNote();
-    }, [mounted, tenantId, noteId]);
+    }, [mounted, tenantId, noteIdParam]);
 
     // Populate edit form when note loads
     useEffect(() => {
@@ -212,9 +222,9 @@ export default function NoteViewPage() {
         if (searchParams.get("edit") === "true" && (note?.is_owner || canPerformNoteActions) && !editDialogOpen) {
             setEditDialogOpen(true);
             // Remove the query param from URL without navigation
-            router.replace(`/dashboard/workspaces/${workspaceId}/collections/${collectionId}/notes/${noteId}`);
+            router.replace(`/dashboard/workspaces/${workspaceId}/collections/${collectionIdParam}/notes/${noteIdParam}`);
         }
-    }, [searchParams, note, workspaceId, collectionId, noteId, router, editDialogOpen]);
+    }, [searchParams, note, workspaceId, collectionIdParam, noteIdParam, router, editDialogOpen]);
 
     const handleEditSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -312,7 +322,7 @@ export default function NoteViewPage() {
                 <nav className="sticky top-0 z-[60] w-[90%] mx-auto self-center flex justify-between items-center bg-background border-b border-border py-3">
                     <Button
                         variant="outline"
-                        onClick={() => router.push(`/dashboard/workspaces/${workspaceId}/collections/${collectionId}/notes`)}
+                        onClick={() => router.push(`/dashboard/workspaces/${workspaceId}/collections/${collectionIdParam}/notes`)}
                     >
                         <FaArrowLeft className="mr-2" /> Back to Articles
                     </Button>
@@ -358,7 +368,7 @@ export default function NoteViewPage() {
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                         onClick={() => {
-                                            router.push(`/dashboard/articles/new?noteId=${noteId}&collection_id=${collectionId}`);
+                                            router.push(`/dashboard/articles/new?noteId=${note?.id}&collection_id=${collection?.id ?? ""}`);
                                         }}
                                     >
                                         <FaEdit className="w-4 h-4 mr-2" />
@@ -563,7 +573,8 @@ export default function NoteViewPage() {
                                             <div className="space-y-2 max-h-40 overflow-y-auto">
                                                 {editSelectedMembers.map((memberId) => {
                                                     const member = tenantUsers.find((u) => u.id === memberId);
-                                                    if (!member) return null;
+                                                    const displayName = member?.full_name || member?.email || `User ${memberId}`;
+                                                    const displayEmail = member?.email || "";
                                                     return (
                                                         <div
                                                             key={memberId}
@@ -571,11 +582,13 @@ export default function NoteViewPage() {
                                                         >
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-sm font-medium truncate">
-                                                                    {member.full_name || member.email}
+                                                                    {displayName}
                                                                 </p>
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {member.email}
-                                                                </p>
+                                                                {displayEmail && (
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        {displayEmail}
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                             <Button
                                                                 type="button"
@@ -692,7 +705,8 @@ export default function NoteViewPage() {
                                         <Label className="text-base font-semibold mb-2 block">Selected Members</Label>
                                         {shareUserIds.map((memberId) => {
                                             const member = tenantUsers.find((u) => u.id === memberId);
-                                            if (!member) return null;
+                                            const displayName = member?.full_name || member?.email || `User ${memberId}`;
+                                            const displayEmail = member?.email || "";
                                             return (
                                                 <div
                                                     key={memberId}
@@ -700,11 +714,13 @@ export default function NoteViewPage() {
                                                 >
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-sm font-medium truncate">
-                                                            {member.full_name || member.email}
+                                                            {displayName}
                                                         </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {member.email}
-                                                        </p>
+                                                        {displayEmail && (
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {displayEmail}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <Button
                                                         type="button"
@@ -784,7 +800,7 @@ export default function NoteViewPage() {
                         open={settingsDialogOpen}
                         onOpenChange={setSettingsDialogOpen}
                         noteId={noteId}
-                        currentCollectionId={Number(collectionId)}
+                        currentCollectionId={collection?.id ?? 0}
                         currentVisibility={note.visibility || "private"}
                         currentMembers={note.shared_members?.map((m: any) => m.user_id) || []}
                         collections={collections}
@@ -905,9 +921,10 @@ export default function NoteViewPage() {
                                     {
                                         onSuccess: () => {
                                             toast.success("Article moved successfully!");
-                                            // Navigate to new collection
+                                            const targetCollectionUuid = collectionsData.find((c) => c.id === targetCollectionId)?.uuid ?? targetCollectionId;
+                                            const noteUuid = note?.uuid ?? note?.id;
                                             router.push(
-                                                `/dashboard/workspaces/${workspaceId}/collections/${targetCollectionId}/notes/${noteId}`
+                                                `/dashboard/workspaces/${workspaceId}/collections/${targetCollectionUuid}/notes/${noteUuid}`
                                             );
                                             resolve();
                                         },

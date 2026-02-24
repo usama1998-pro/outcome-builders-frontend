@@ -67,10 +67,13 @@ export default function ArticleMembersDialog({
     // Get full user details for each member
     const membersWithDetails = filteredMembers.map((member) => {
         const user = tenantUsers.find((u) => u.id === member.user_id);
+        const fullName = user?.full_name || member.user_name || null;
+        const email = user?.email || member.user_email || `User ${member.user_id}`;
         return {
             ...member,
-            full_name: user?.full_name || member.user_name,
-            email: user?.email || member.user_email,
+            full_name: fullName,
+            email: email,
+            displayName: fullName || email,
         };
     });
 
@@ -107,9 +110,9 @@ export default function ArticleMembersDialog({
                                 >
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-medium truncate">
-                                            {member.full_name || member.email}
+                                            {member.displayName}
                                         </p>
-                                        {member.full_name && (
+                                        {member.full_name && member.email && (
                                             <p className="text-xs text-muted-foreground truncate">
                                                 {member.email}
                                             </p>

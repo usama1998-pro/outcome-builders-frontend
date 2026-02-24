@@ -7,6 +7,7 @@ import { useAuthStore } from "../store/useAuth";
 
 interface CollectionApiItem {
     id: number;
+    uuid?: string | null;
     name: string;
     description: string | null;
     visibility: string;
@@ -60,6 +61,7 @@ async function fetchUserCollections(workspaceId?: number | null): Promise<Collec
     // backend returns data.collections array
     return data.data.collections.map((c) => ({
         id: c.id,
+        uuid: c.uuid ?? null,
         title: c.name,
         createdAt: c.created_at ?? "",
         createdBy: String(c.owner_id),
@@ -210,9 +212,13 @@ export function useCollectionMembers(collectionId: number) {
 }
 
 export function useTenantUsers() {
+    const tenantId = useAuthStore((state) => state.tenantId);
+    const hydrated = useAuthStore((state) => state.hydrated);
+    
     return useQuery<TenantUser[], Error>({
-        queryKey: ["tenantUsers"],
+        queryKey: ["tenantUsers", tenantId],
         queryFn: getTenantUsers,
+        enabled: !!tenantId && hydrated,
     });
 }
 

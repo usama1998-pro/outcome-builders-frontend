@@ -1,5 +1,6 @@
 export default interface Notes {
     id: number;
+    uuid?: string | null;
     title: string;
     createdAt: string;
     createdBy: string;
@@ -12,6 +13,9 @@ export default interface Notes {
     visibility?: "private" | "public" | "shared";
     user_id?: number;
     is_owner?: boolean;
+    // Owner info
+    owner_name?: string;
+    owner_email?: string;
 }
 
 export interface NoteMember {

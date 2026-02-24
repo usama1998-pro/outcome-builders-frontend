@@ -714,10 +714,11 @@ export default function Chat() {
 
     // Load chat tabs to check if we should show landing page
     const currentTenantId = useAuthStore((s) => s.tenantId);
+    const hydrated = useAuthStore((s) => s.hydrated);
     const { data: chatTabs = [], isLoading: isLoadingChatTabs } = useQuery({
         queryKey: ["chatTabs", currentTenantId],
         queryFn: getChatTabs,
-        enabled: !!currentTenantId,
+        enabled: !!currentTenantId && hydrated, // Wait for both tenantId and hydration
         staleTime: 1000 * 30, // Consider data fresh for 30 seconds
         refetchOnWindowFocus: false, // Don't refetch when window regains focus
     });

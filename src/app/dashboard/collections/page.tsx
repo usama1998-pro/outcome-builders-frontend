@@ -77,7 +77,8 @@ export default function AllCollectionsPage() {
 
     // Permission checks - hide elements until permissions are loaded and confirmed
     const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
-    const canCreateCollection = !permissionsLoading && (
+    const hasBrainSpaces = (workspaces?.length ?? 0) > 0;
+    const canCreateCollection = hasBrainSpaces && !permissionsLoading && (
         hasPermission(PERMISSIONS.COLLECTION_CREATE) || isOwnerOrAdmin
     );
     const canCreatePrivateCollection = !permissionsLoading && (
@@ -94,19 +95,24 @@ export default function AllCollectionsPage() {
         },
     });
 
-    // Update default visibility based on permissions when they load
-    if (!permissionsLoading && !canCreatePrivateCollection && form.getValues("visibility") === "private") {
-        form.setValue("visibility", "public");
-    }
+    // Update default visibility based on permissions when they load (in effect to avoid setState during render)
+    useEffect(() => {
+        if (!permissionsLoading && !canCreatePrivateCollection && form.getValues("visibility") === "private") {
+            form.setValue("visibility", "public");
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- form.setValue is stable; form ref would cause loops
+    }, [permissionsLoading, canCreatePrivateCollection]);
 
-    // Update default workspace_id when workspaces load or brain space changes
+    // Update default workspace_id when workspaces load or brain space changes (use primitive deps to avoid loop from new array refs)
+    const firstWorkspaceId = workspaces?.[0]?.id;
     useEffect(() => {
         if (currentBrainSpaceId && form.getValues("workspace_id") !== currentBrainSpaceId) {
             form.setValue("workspace_id", currentBrainSpaceId);
-        } else if (!currentBrainSpaceId && workspaces && workspaces.length > 0 && form.getValues("workspace_id") === 0) {
-            form.setValue("workspace_id", workspaces[0].id);
+        } else if (!currentBrainSpaceId && firstWorkspaceId != null && form.getValues("workspace_id") === 0) {
+            form.setValue("workspace_id", firstWorkspaceId);
         }
-    }, [currentBrainSpaceId, workspaces, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- form only for setValue; form in deps causes loops
+    }, [currentBrainSpaceId, firstWorkspaceId]);
 
     const handleAddMember = () => {
         if (!selectedUserId) return;
@@ -471,7 +477,11 @@ export default function AllCollectionsPage() {
                     <div className="w-full mt-4" style={{ position: 'relative', zIndex: 0 }}>
                         <CollectionList
                             collections={filteredCollections}
-                            workspace={{ id: currentBrainSpaceId || 0 }}
+                            workspace={{
+                                id: currentBrainSpaceId || 0,
+                                uuid: workspaces?.find((w) => w.id === currentBrainSpaceId)?.uuid ?? undefined,
+                            }}
+                            getWorkspaceUuid={(id) => workspaces?.find((w) => w.id === id)?.uuid ?? undefined}
                             searchQuery={searchQuery}
                         />
                     </div>

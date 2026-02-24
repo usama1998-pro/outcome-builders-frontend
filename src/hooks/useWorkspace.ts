@@ -20,6 +20,7 @@ interface WorkspaceResponse {
         joined_at: string; 
         workspace: { 
             id: number; 
+            uuid?: string | null;
             name: string; 
             members_count: number;
             tenant_id: number;
@@ -45,6 +46,7 @@ async function fetchUserWorkspaces(): Promise<WorkSpaceList[]> {
     // Map backend → WorkSpaceList 
     return data.data.map((item) => ({ 
         id: item.workspace.id, 
+        uuid: item.workspace.uuid ?? null,
         title: item.workspace.name,
         createdAt: item.joined_at, 
         createdBy: item.role, 
