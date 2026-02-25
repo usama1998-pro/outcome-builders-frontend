@@ -99,8 +99,9 @@ export default function ChatSidePanel() {
         queryKey: ["chatTabs", currentTenantId],
         queryFn: getChatTabs,
         enabled: !!currentTenantId && hydrated, // Wait for both tenantId and hydration
-        staleTime: 1000 * 30, // Consider data fresh for 30 seconds
+        staleTime: 0, // Always consider data stale to ensure refetch on mount
         refetchOnWindowFocus: false, // Don't refetch when window regains focus
+        refetchOnMount: "always", // Always refetch on mount (page refresh), even if data is fresh
     });
 
     // Get last message for each chat tab (for display)

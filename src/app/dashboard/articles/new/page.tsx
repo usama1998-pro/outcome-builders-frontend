@@ -15,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { useUserCollections } from "@/src/hooks/useCollection";
+import { useUserCollections, useCreateUserCollection } from "@/src/hooks/useCollection";
 import { useCreateNote, useUpdateNote, useNote } from "@/src/hooks/useNotes";
 import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
 import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
@@ -27,9 +27,10 @@ function NewArticlePageContent() {
     const searchParams = useSearchParams();
     const { currentBrainSpaceId } = useBrainSpaceStore();
     const { data: workspaces } = useUserWorkspaces();
-    const { data: collections = [] } = useUserCollections(currentBrainSpaceId);
+    const { data: collections = [], refetch: refetchCollections } = useUserCollections(currentBrainSpaceId);
     const { mutate: createNote, isPending: isCreating } = useCreateNote();
     const { mutate: updateNote, isPending: isUpdating } = useUpdateNote();
+    const { mutate: createCollection, isPending: isCreatingCollection } = useCreateUserCollection();
 
     // Get noteId from URL if editing
     const noteIdParam = searchParams.get("noteId");
@@ -63,14 +64,13 @@ function NewArticlePageContent() {
         noteIdRef.current = noteId;
     }, [noteId]);
 
-
     const editor = useEditor({
         extensions: [StarterKit],
         content: existingNote?.content || "<p>Start writing...</p>",
         immediatelyRender: false,
         editorProps: {
             attributes: {
-                class: "focus:outline-none min-h-full p-4 text-foreground",
+                class: "focus:outline-none text-foreground prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto",
             },
         },
         onUpdate: ({ editor }) => {
@@ -80,6 +80,97 @@ function NewArticlePageContent() {
             setEditorContentHash(content);
         },
     });
+
+    // Prevent body scrolling when component mounts
+    useEffect(() => {
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, []);
+
+    // Simple markdown to HTML converter
+    const markdownToHtml = (markdown: string): string => {
+        let html = markdown;
+        
+        // Headers
+        html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+        html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+        html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+        
+        // Bold
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+        
+        // Italic
+        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+        
+        // Code blocks
+        html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+            return `<pre><code>${code.trim()}</code></pre>`;
+        });
+        
+        // Inline code
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+        
+        // Links
+        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+        
+        // Lists - unordered
+        html = html.replace(/^\* (.*$)/gim, '<li>$1</li>');
+        html = html.replace(/^- (.*$)/gim, '<li>$1</li>');
+        // Wrap consecutive list items in ul
+        html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
+            return `<ul>${match}</ul>`;
+        });
+        
+        // Lists - ordered
+        html = html.replace(/^\d+\. (.*$)/gim, '<li>$1</li>');
+        // Note: This is simplified - in real markdown, ordered lists need special handling
+        
+        // Blockquotes
+        html = html.replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>');
+        
+        // Horizontal rules
+        html = html.replace(/^---$/gim, '<hr>');
+        html = html.replace(/^\*\*\*$/gim, '<hr>');
+        
+        // Split by double newlines for paragraphs
+        const blocks = html.split(/\n\n+/).filter(b => b.trim());
+        html = blocks.map(block => {
+            const trimmed = block.trim();
+            // If already an HTML tag, use as-is
+            if (trimmed.startsWith('<')) {
+                return trimmed;
+            }
+            // Otherwise wrap in paragraph
+            return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+        }).join("");
+        
+        return html || `<p>${markdown.trim()}</p>`;
+    };
+
+    // Load pending article content from sessionStorage (from chat)
+    useEffect(() => {
+        if (editor && !existingNote) {
+            const pendingContent = sessionStorage.getItem("pendingArticleContent");
+            if (pendingContent) {
+                // Convert markdown to HTML
+                let htmlContent = pendingContent;
+                
+                // If content doesn't look like HTML, convert markdown to HTML
+                if (!pendingContent.trim().startsWith("<")) {
+                    htmlContent = markdownToHtml(pendingContent);
+                }
+                
+                editor.commands.setContent(htmlContent);
+                // Clear the pending content after loading
+                sessionStorage.removeItem("pendingArticleContent");
+                setHasUnsavedChanges(true);
+            }
+        }
+    }, [editor, existingNote]);
 
     // Load existing note data when editing
     useEffect(() => {
@@ -92,6 +183,75 @@ function NewArticlePageContent() {
         }
     }, [existingNote, editor]);
 
+    // Helper function to ensure a collection exists, create one if needed
+    const ensureCollectionExists = useCallback((): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            // If a collection is already selected, use it
+            if (selectedCollectionId) {
+                resolve(selectedCollectionId);
+                return;
+            }
+
+            // If collections exist but none selected, use the first one
+            if (collections.length > 0) {
+                const firstCollectionId = String(collections[0].id);
+                setSelectedCollectionId(firstCollectionId);
+                resolve(firstCollectionId);
+                return;
+            }
+
+            // No collections exist, create one
+            if (!currentBrainSpaceId) {
+                reject(new Error("No workspace selected. Please select a workspace first."));
+                return;
+            }
+
+            const collectionName = title.trim() || "My Articles";
+            
+            createCollection(
+                {
+                    name: collectionName,
+                    description: null,
+                    visibility: "private",
+                    workspace_id: currentBrainSpaceId,
+                },
+                {
+                    onSuccess: async (res) => {
+                        if (res?.status) {
+                            // Extract collection ID from response
+                            const collectionId = (res?.data as any)?.message?.collection?.id ||
+                                (res?.data as any)?.collection?.id ||
+                                (res?.data as any)?.id;
+
+                            if (collectionId) {
+                                // Refetch collections to get the new one
+                                const { data: updatedCollections } = await refetchCollections();
+                                const newCollectionId = String(collectionId);
+                                setSelectedCollectionId(newCollectionId);
+                                resolve(newCollectionId);
+                            } else {
+                                // If we can't get the ID, refetch and use the first collection
+                                const { data: updatedCollections } = await refetchCollections();
+                                if (updatedCollections && updatedCollections.length > 0) {
+                                    const firstCollectionId = String(updatedCollections[0].id);
+                                    setSelectedCollectionId(firstCollectionId);
+                                    resolve(firstCollectionId);
+                                } else {
+                                    reject(new Error("Collection created but could not be retrieved."));
+                                }
+                            }
+                        } else {
+                            reject(new Error(res?.message || "Failed to create collection"));
+                        }
+                    },
+                    onError: (err: any) => {
+                        reject(new Error(err?.message || "Failed to create collection"));
+                    },
+                }
+            );
+        });
+    }, [selectedCollectionId, collections, currentBrainSpaceId, title, createCollection, refetchCollections]);
+
     // Auto-save as draft
     const saveAsDraft = useCallback(async () => {
         // Prevent multiple simultaneous saves
@@ -99,9 +259,16 @@ function NewArticlePageContent() {
             return;
         }
 
-        if (!selectedCollectionId) {
-            // Don't show error for autosave, only for manual save
-            return;
+        // Ensure a collection exists
+        let collectionIdToUse = selectedCollectionId;
+        if (!collectionIdToUse) {
+            try {
+                collectionIdToUse = await ensureCollectionExists();
+            } catch (error: any) {
+                // Silent fail for autosave
+                console.error("Autosave failed - could not ensure collection:", error);
+                return;
+            }
         }
 
         const content = editor?.getHTML() || "<p></p>";
@@ -118,7 +285,7 @@ function NewArticlePageContent() {
         const payload = {
             title: articleTitle,
             content: content,
-            collection_id: Number(selectedCollectionId),
+            collection_id: Number(collectionIdToUse),
             visibility: "private" as const, // Articles are private by default (draft mode)
         };
 
@@ -193,7 +360,7 @@ function NewArticlePageContent() {
                             setNoteId(noteIdNum);
                             noteIdRef.current = noteIdNum; // Update ref immediately
                             // Update URL to include noteId for future saves
-                            const newUrl = `/dashboard/articles/new?noteId=${noteIdNum}&collection_id=${selectedCollectionId}`;
+                            const newUrl = `/dashboard/articles/new?noteId=${noteIdNum}&collection_id=${collectionIdToUse}`;
                             router.replace(newUrl, { scroll: false });
                             setHasUnsavedChanges(false);
                             isSavingRef.current = false;
@@ -214,7 +381,7 @@ function NewArticlePageContent() {
                 },
             });
         }
-    }, [title, editor, selectedCollectionId, createNote, updateNote, router]);
+    }, [title, editor, selectedCollectionId, createNote, updateNote, router, ensureCollectionExists]);
 
     // Manual save with toast notification
     const handleSaveDraft = useCallback(async () => {
@@ -224,9 +391,18 @@ function NewArticlePageContent() {
             return;
         }
 
-        if (!selectedCollectionId) {
-            toast.error("Please select a collection before saving");
-            return;
+        // Ensure a collection exists
+        let collectionIdToUse = selectedCollectionId;
+        if (!collectionIdToUse) {
+            try {
+                toast.loading("Creating collection...");
+                collectionIdToUse = await ensureCollectionExists();
+                toast.dismiss();
+            } catch (error: any) {
+                toast.dismiss();
+                toast.error(error?.message || "Failed to create collection. Please try again.");
+                return;
+            }
         }
 
         const content = editor?.getHTML() || "<p></p>";
@@ -243,7 +419,7 @@ function NewArticlePageContent() {
         const payload = {
             title: articleTitle,
             content: content,
-            collection_id: Number(selectedCollectionId),
+            collection_id: Number(collectionIdToUse),
             visibility: "private" as const, // Articles are private by default (draft mode)
         };
 
@@ -321,7 +497,7 @@ function NewArticlePageContent() {
                             setNoteId(noteIdNum);
                             noteIdRef.current = noteIdNum; // Update ref immediately
                             // Update URL to include noteId for future saves
-                            router.replace(`/dashboard/articles/new?noteId=${noteIdNum}&collection_id=${selectedCollectionId}`, { scroll: false });
+                            router.replace(`/dashboard/articles/new?noteId=${noteIdNum}&collection_id=${collectionIdToUse}`, { scroll: false });
                             setHasUnsavedChanges(false);
                             isSavingRef.current = false;
                             toast.success("Article saved");
@@ -343,7 +519,7 @@ function NewArticlePageContent() {
                 },
             });
         }
-    }, [title, editor, selectedCollectionId, createNote, updateNote, router]);
+    }, [title, editor, selectedCollectionId, createNote, updateNote, router, ensureCollectionExists]);
 
     // Handle back button - save as draft
     const handleBack = useCallback(() => {
@@ -388,15 +564,24 @@ function NewArticlePageContent() {
         return () => clearTimeout(autoSaveTimer);
     }, [title, editorContentHash, hasUnsavedChanges, selectedCollectionId, saveAsDraft, editor]);
 
-    const handlePublish = () => {
+    const handlePublish = async () => {
         if (!title.trim()) {
             toast.error("Please enter a title");
             return;
         }
 
-        if (!selectedCollectionId) {
-            toast.error("Please select a collection");
-            return;
+        // Ensure a collection exists
+        let collectionIdToUse = selectedCollectionId;
+        if (!collectionIdToUse) {
+            try {
+                toast.loading("Creating collection...");
+                collectionIdToUse = await ensureCollectionExists();
+                toast.dismiss();
+            } catch (error: any) {
+                toast.dismiss();
+                toast.error(error?.message || "Failed to create collection. Please try again.");
+                return;
+            }
         }
 
         const content = editor?.getHTML() || "<p></p>";
@@ -404,7 +589,7 @@ function NewArticlePageContent() {
         const payload = {
             title: title.trim(),
             content: content,
-            collection_id: Number(selectedCollectionId),
+            collection_id: Number(collectionIdToUse),
             visibility: "private" as const, // Articles are private by default
         };
 
@@ -421,10 +606,10 @@ function NewArticlePageContent() {
                             toast.success("Article published!");
                             setHasUnsavedChanges(false);
                             // Navigate to the article
-                            const collection = collections.find(c => c.id === Number(selectedCollectionId));
+                            const collection = collections.find(c => c.id === Number(collectionIdToUse));
                             if (collection) {
                                 const wsUuid = workspaces?.find(w => w.id === collection.workspaceId)?.uuid ?? collection.workspaceId;
-                                router.push(`/dashboard/workspaces/${wsUuid}/collections/${selectedCollectionId}/notes/${noteId}`);
+                                router.push(`/dashboard/workspaces/${wsUuid}/collections/${collectionIdToUse}/notes/${noteId}`);
                             } else {
                                 router.back();
                             }
@@ -449,10 +634,10 @@ function NewArticlePageContent() {
                             toast.success("Article published!");
                             setHasUnsavedChanges(false);
                             // Navigate to the article
-                            const collection = collections.find(c => c.id === Number(selectedCollectionId));
+                            const collection = collections.find(c => c.id === Number(collectionIdToUse));
                             if (collection) {
                                 const wsUuid = workspaces?.find(w => w.id === collection.workspaceId)?.uuid ?? collection.workspaceId;
-                                router.push(`/dashboard/workspaces/${wsUuid}/collections/${selectedCollectionId}/notes/${newNoteId}`);
+                                router.push(`/dashboard/workspaces/${wsUuid}/collections/${collectionIdToUse}/notes/${newNoteId}`);
                             }
                         } else {
                             toast.success("Article published!");
@@ -488,14 +673,9 @@ function NewArticlePageContent() {
 
     return (
         <RequireAuth>
-            <div className="flex flex-col w-full h-screen bg-background">
+            <div className="flex flex-col w-full h-screen bg-background overflow-hidden">
                 {/* Header with Title and Actions */}
-                <div className="px-8 pt-3 pb-3 border-b flex-shrink-0">
-                    {editingNoteId && (
-                        <div className="mb-1">
-                            <span className="text-sm text-muted-foreground">Editing Article</span>
-                        </div>
-                    )}
+                <div className="px-8 pt-3 pb-3 border-b flex-shrink-0 bg-background z-10">
                     <div className="flex items-center gap-4">
                         <Button variant="ghost" size="sm" onClick={handleBack}>
                             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -542,7 +722,7 @@ function NewArticlePageContent() {
                                 variant="outline"
                                 size="sm"
                                 onClick={handleSaveDraft}
-                                disabled={isCreating || isUpdating || !selectedCollectionId}
+                                disabled={isCreating || isUpdating || isCreatingCollection || !currentBrainSpaceId}
                             >
                                 <Save className="h-4 w-4 mr-2" />
                                 {isCreating || isUpdating ? "Saving..." : "Save Draft"}
@@ -550,7 +730,7 @@ function NewArticlePageContent() {
                             {/* Publish button disabled for now */}
                             {/* <Button
                                 onClick={handlePublish}
-                                disabled={isCreating || isUpdating || !title.trim() || !selectedCollectionId}
+                                disabled={isCreating || isUpdating || isCreatingCollection || !title.trim() || !currentBrainSpaceId}
                             >
                                 {isCreating || isUpdating ? "Publishing..." : "Publish"}
                             </Button> */}
@@ -560,10 +740,9 @@ function NewArticlePageContent() {
                 </div>
 
                 {/* Editor - Takes full remaining space */}
-                <div className="flex-1 overflow-hidden min-h-0">
-                    <div className="flex flex-col h-full w-full">
-                        {/* Toolbar */}
-                        <div className="border-b p-2 flex items-center justify-center gap-1 flex-wrap bg-background flex-shrink-0">
+                <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+                    {/* Toolbar */}
+                    <div className="border-b p-2 flex items-center justify-center gap-1 flex-wrap bg-background flex-shrink-0 z-10">
                             <Button
                                 variant={editor.isActive("bold") ? "default" : "ghost"}
                                 size="sm"
@@ -672,13 +851,14 @@ function NewArticlePageContent() {
                             </Button>
                         </div>
 
-                        {/* Editor Content */}
-                        <div className="flex-1 overflow-auto min-h-0 bg-background">
-                            <div className="max-w-4xl mx-auto p-4">
-                                <EditorContent editor={editor} className="h-full" />
+                        {/* Editor Content - Scrollable */}
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 bg-background">
+                            <div className="max-w-4xl mx-auto p-4 py-8">
+                                <div className="min-h-[calc(100vh-300px)]">
+                                    <EditorContent editor={editor} />
+                                </div>
                             </div>
                         </div>
-                    </div>
                 </div>
             </div>
         </RequireAuth>
