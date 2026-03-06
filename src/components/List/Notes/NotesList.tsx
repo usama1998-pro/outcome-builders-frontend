@@ -14,12 +14,13 @@ import Notes from "@/src/types/notes";
 import Link from "next/link";
 import { BsThreeDotsVertical } from "react-icons/bs";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
-import { FaTrash, FaEdit, FaEye, FaBrain } from "react-icons/fa";
+import { FaTrash, FaBrain } from "react-icons/fa";
 import { useState, useMemo } from "react";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -35,7 +36,7 @@ import {
 import { toast } from "sonner";
 import { useDeleteNote, useToggleTrainNote, useMoveNote } from "@/src/hooks/useNotes";
 import { useUserCollections } from "@/src/hooks/useCollection";
-import { Move } from "lucide-react";
+import { FolderKanban, Sparkles, Copy, Pencil, Loader2 } from "lucide-react";
 import {
     Tooltip,
     TooltipContent,
@@ -53,8 +54,9 @@ type NotesListProps = {
 
 export function NotesList({ workspace, collection, notes, searchQuery = "" }: NotesListProps) {
     const { mutate: deleteNote, isPending: isDeleting } = useDeleteNote();
-    const { mutate: toggleTrain } = useToggleTrainNote();
+    const { mutate: toggleTrain, isPending: isTraining } = useToggleTrainNote();
     const { mutate: moveNote, isPending: isMoving } = useMoveNote();
+    const [trainingNoteId, setTrainingNoteId] = useState<number | null>(null);
     // Fetch all collections (no workspace filter) to show all available collections including private ones
     const { data: collections = [] } = useUserCollections(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -99,6 +101,7 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
     const handleTrainClick = (noteId: number, isTrained: boolean, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        setTrainingNoteId(noteId);
         toggleTrain(noteId, {
             onSuccess: (res) => {
                 if (res?.status) {
@@ -106,10 +109,12 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                 } else {
                     toast.error("Could not update training status.");
                 }
+                setTrainingNoteId(null);
             },
             onError: (err: unknown) => {
                 const error = err as { message?: string };
                 toast.error(error?.message || "Request failed, please try again.");
+                setTrainingNoteId(null);
             },
         });
     };
@@ -242,13 +247,29 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
                                                                     e.stopPropagation();
-                                                                    window.location.href = `/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections/${collection.uuid ?? collection.id}/notes/${note.uuid ?? note.id}`;
+                                                                    window.open(
+                                                                        `/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections/${collection.uuid ?? collection.id}/notes/${note.uuid ?? note.id}`,
+                                                                        "_blank",
+                                                                        "noopener,noreferrer"
+                                                                    );
                                                                 }}
                                                                 className="cursor-pointer"
                                                             >
-                                                                <FaEye className="mr-2" />
-                                                                View Article
+                                                                <Copy className="mr-2 h-4 w-4" />
+                                                                Open in new pane
                                                             </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    toast.info("Ask AI for this article is coming soon.");
+                                                                }}
+                                                                className="cursor-pointer"
+                                                            >
+                                                                <Sparkles className="mr-2 h-4 w-4" />
+                                                                Ask AI
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
                                                             <DropdownMenuItem
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
@@ -257,22 +278,27 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                                                                 }}
                                                                 className="cursor-pointer"
                                                             >
-                                                                <FaEdit className="mr-2" />
+                                                                <Pencil className="mr-2 h-4 w-4" />
                                                                 Edit Article
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem
                                                                 onClick={(e) => handleTrainClick(note.id, note.is_trained || false, e)}
-                                                                className={`cursor-pointer ${note.is_trained ? "text-cyan-600 focus:text-cyan-600" : ""}`}
+                                                                className={`cursor-pointer ${note.is_trained ? "text-cyan-600 focus:text-cyan-600" : ""} ${trainingNoteId === note.id && isTraining ? "opacity-50 cursor-not-allowed" : ""}`}
+                                                                disabled={trainingNoteId === note.id && isTraining}
                                                             >
-                                                                <FaBrain className="mr-2" />
-                                                                {note.is_trained ? "Untrain Article" : "Train Article"}
+                                                                {trainingNoteId === note.id && isTraining ? (
+                                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                                ) : (
+                                                                    <FaBrain className="mr-2" />
+                                                                )}
+                                                                {trainingNoteId === note.id && isTraining ? "Processing..." : note.is_trained ? "Untrain Article" : "Train Article"}
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem
                                                                 onClick={(e) => handleMoveClick(note.id, e)}
                                                                 className="cursor-pointer"
                                                             >
-                                                                <Move className="mr-2" />
-                                                                Move to Collection
+                                                                <FolderKanban className="mr-2 h-4 w-4" />
+                                                                Move to
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem
                                                                 onClick={(e) => handleDeleteClick(note.id, e)}
@@ -344,7 +370,7 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle className="flex items-center gap-2">
-                            <Move className="w-5 h-5 text-teal-500" />
+                            <FolderKanban className="w-5 h-5 text-teal-500" />
                             Move Article to Collection
                         </AlertDialogTitle>
                         <AlertDialogDescription>

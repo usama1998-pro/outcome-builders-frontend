@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Send, Bot, User, Sparkles, Copy, Check, Square, Loader2, Brain, MessageSquare, ChevronDown, Star, RefreshCw, X, FileText, Plus, Search, Upload, Image as ImageIcon, PenTool } from "lucide-react";
+import { Send, Bot, User, Sparkles, Copy, Check, Square, Loader2, Brain, MessageSquare, ChevronDown, Star, RefreshCw, X, FileText, Plus, Search, Upload, Image as ImageIcon, PenTool, AtSign, SlidersHorizontal, Paperclip } from "lucide-react";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,26 +10,54 @@ import { ChatMessage, ChatTab } from "../../../types/chat";
 import { useRef, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { streamChat, getChatHistory, getChatTabs, updateChatTabName } from "../../../api/chat";
+import { searchKnowledgeBase } from "../../../api/knowledgeBase";
+import { useBrainSpaceStore } from "../../../store/useBrainSpace";
+import { useUserWorkspaces } from "../../../hooks/useWorkspace";
+import { useUserCollections } from "../../../hooks/useCollection";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../../../store/useAuth";
+import { useUserProfile } from "../../../hooks/useProfile";
 import ChatLandingPage from "../page";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+
+// 4-pointed star SVG component
+function FourPointedStar({ className }: { className?: string }) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className={className}
+        >
+            <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" />
+        </svg>
+    );
+}
 
 interface MessageBubbleProps {
     message: ChatMessage;
     index: number;
     isStreaming?: boolean;
     onAddContext?: (text: string) => void;
-    onCreateArticle?: (content: string) => void;
+    onCreateArticle?: (content: string, messageId?: number) => void;
+    isSelectedForArticle?: boolean;
+    currentStatus?: string | null;
 }
 
 // Context separator for parsing stored questions
 const CONTEXT_SEPARATOR = '\n\n---CONTEXT---\n\n';
 
-function MessageBubble({ message, index, isStreaming = false, onAddContext, onCreateArticle }: MessageBubbleProps) {
+function MessageBubble({
+    message,
+    index,
+    isStreaming = false,
+    onAddContext,
+    onCreateArticle,
+    isSelectedForArticle,
+    currentStatus,
+}: MessageBubbleProps) {
     // User message has question, bot message has answer
     const isUser = !!message.question && !message.answer;
     const [copied, setCopied] = useState(false);
@@ -234,7 +262,7 @@ function MessageBubble({ message, index, isStreaming = false, onAddContext, onCr
                 <div
                     className={`relative max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl rounded-2xl px-4 py-3 ${isUser
                         ? "bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 dark:from-violet-500 dark:via-purple-500 dark:to-indigo-500 shadow-lg shadow-violet-500/20"
-                        : "bg-card border shadow-sm"
+                        : `bg-card border shadow-sm ${!isUser && isSelectedForArticle ? "border-violet-500 ring-1 ring-violet-300/60" : ""}`
                         }`}
                 >
                     {/* Subtle shine effect for user messages */}
@@ -243,22 +271,33 @@ function MessageBubble({ message, index, isStreaming = false, onAddContext, onCr
                     )}
 
                     {!isUser && isStreaming && (!displayContent || displayContent === "") ? (
-                        <div className="relative z-10 py-2">
-                            <div className="flex gap-1.5">
-                                {[0, 1, 2].map((i) => (
-                                    <motion.div
-                                        key={i}
-                                        className="w-2 h-2 bg-violet-500 rounded-full"
-                                        animate={{ y: [0, -5, 0] }}
-                                        transition={{
-                                            duration: 0.6,
-                                            repeat: Infinity,
-                                            delay: i * 0.15
-                                        }}
-                                    />
-                                ))}
+                        currentStatus ? (
+                            // Show status message instead of 3-dot loader
+                            <div className="relative z-10 py-2">
+                                <div className="flex items-center gap-2">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-500" />
+                                    <span className="text-xs text-muted-foreground">{currentStatus}</span>
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            // Show 3-dot loader when no status
+                            <div className="relative z-10 py-2">
+                                <div className="flex gap-1.5">
+                                    {[0, 1, 2].map((i) => (
+                                        <motion.div
+                                            key={i}
+                                            className="w-2 h-2 bg-violet-500 rounded-full"
+                                            animate={{ y: [0, -5, 0] }}
+                                            transition={{
+                                                duration: 0.6,
+                                                repeat: Infinity,
+                                                delay: i * 0.15
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )
                     ) : (
                         <div className={`relative z-10 text-sm sm:text-base leading-relaxed ${isUser ? "!text-white" : "text-foreground"}`}>
                             {isUser ? (
@@ -365,9 +404,9 @@ function MessageBubble({ message, index, isStreaming = false, onAddContext, onCr
                 )}
             </div>
 
-            {/* Copy and Create Article buttons for bot messages - appears below bubble on hover */}
+            {/* Copy / Article actions for bot messages - appears below bubble on hover */}
             {!isUser && displayContent && (
-                <div className={`opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1 ${isUser ? "mr-11" : "ml-11"}`}>
+                <div className={`opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-wrap gap-1 ${isUser ? "mr-11" : "ml-11"}`}>
                     <Button
                         onClick={handleCopy}
                         size="sm"
@@ -390,16 +429,25 @@ function MessageBubble({ message, index, isStreaming = false, onAddContext, onCr
                     <Button
                         onClick={() => {
                             if (onCreateArticle && displayContent) {
-                                onCreateArticle(displayContent);
+                                onCreateArticle(displayContent, message.id);
                             }
                         }}
                         size="sm"
-                        variant="ghost"
-                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                        title="Create Article from this response"
+                        variant={isSelectedForArticle ? "default" : "ghost"}
+                        className={`h-7 px-2 text-xs flex items-center gap-1 ${isSelectedForArticle ? "bg-violet-600 text-white hover:bg-violet-700" : "text-muted-foreground hover:text-foreground"}`}
+                        title={isSelectedForArticle ? "Remove from article selection" : "Add/remove this response in article selection"}
                     >
-                        <PenTool className="h-3 w-3 mr-1" />
-                        Create Article
+                        {isSelectedForArticle ? (
+                            <>
+                                <Check className="h-3 w-3" />
+                                Selected
+                            </>
+                        ) : (
+                            <>
+                                <PenTool className="h-3 w-3" />
+                                Create Article
+                            </>
+                        )}
                     </Button>
                 </div>
             )}
@@ -506,6 +554,19 @@ export default function Chat() {
         name: string | null;
         text?: string | null;
     }>({ type: null, id: null, name: null, text: null });
+    const { data: userProfile } = useUserProfile();
+
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return "morning";
+        if (hour < 18) return "afternoon";
+        return "evening";
+    };
+
+    const timeOfDay = getGreeting();
+    const firstName = userProfile?.data?.full_name
+        ? userProfile.data.full_name.split(" ")[0]
+        : null;
 
     const handleAddTextContext = (text: string) => {
         // Truncate long text (max 200 characters for display)
@@ -527,10 +588,37 @@ export default function Chat() {
         }, 0);
     };
 
-    const handleCreateArticle = (content: string) => {
-        // Store the content in sessionStorage to pass to article creation page
-        sessionStorage.setItem("pendingArticleContent", content);
-        // Navigate to article creation page
+    const [selectedArticleMessageIds, setSelectedArticleMessageIds] = useState<number[]>([]);
+
+    // Clicking "Create Article" on a message now toggles it in the multi-select list.
+    // The actual article is created from the bottom selection bar.
+    const handleCreateArticle = (_content: string, messageId?: number) => {
+        if (typeof messageId !== "number") return;
+
+        setSelectedArticleMessageIds((prev) =>
+            prev.includes(messageId)
+                ? prev.filter((id) => id !== messageId)
+                : [...prev, messageId]
+        );
+    };
+
+    const handleCreateArticleFromSelection = () => {
+        const selectedMessagesInOrder = messages.filter(
+            (msg) => msg.answer && !msg.question && selectedArticleMessageIds.includes(msg.id)
+        );
+
+        const combinedContent = selectedMessagesInOrder
+            .map((msg) => msg.answer || "")
+            .filter(Boolean)
+            .join("\n\n");
+
+        if (!combinedContent.trim()) {
+            toast.error("Please select at least one AI response to create an article.");
+            return;
+        }
+
+        sessionStorage.setItem("pendingArticleContent", combinedContent);
+        setSelectedArticleMessageIds([]);
         router.push("/dashboard/articles/new");
     };
 
@@ -746,6 +834,13 @@ export default function Chat() {
     // Load chat tabs to check if we should show landing page
     const currentTenantId = useAuthStore((s) => s.tenantId);
     const hydrated = useAuthStore((s) => s.hydrated);
+    
+    // Get brain space store values
+    const { currentBrainSpaceId } = useBrainSpaceStore();
+    
+    // Get workspaces and collections for knowledge base filtering
+    const { data: workspaces } = useUserWorkspaces();
+    const { data: collections } = useUserCollections(currentBrainSpaceId || undefined);
 
     // Invalidate and refetch chat tabs when tenantId becomes available after hydration
     useEffect(() => {
@@ -906,21 +1001,24 @@ export default function Chat() {
                 // Auto-send the message
                 const originalQuestion = pendingQuestion.trim();
                 if (originalQuestion) {
-                    // Prepare question for backend (with context concatenated)
-                    // Store context before clearing to ensure it's included in the query
+                    // For pending questions, we don't have knowledge base context yet
+                    // Just use selected context if available
                     const contextToSend = selectedContext.type === 'text' && selectedContext.text
                         ? selectedContext.text
                         : null;
-
-                    let questionForBackend = originalQuestion;
-                    if (contextToSend) {
-                        questionForBackend = `${contextToSend}\n\n${originalQuestion}`;
-                    }
 
                     // Store question with context separator for display parsing
                     const storedQuestion = contextToSend
                         ? `${contextToSend}${CONTEXT_SEPARATOR}${originalQuestion}`
                         : originalQuestion;
+
+                    // Prepare context object for backend API (separate from question)
+                    const contextForBackend = contextToSend
+                        ? { type: 'text' as const, text: contextToSend }
+                        : undefined;
+
+                    // Use original question without concatenation - context will be passed separately
+                    const questionForBackend = originalQuestion;
 
                     // Add user message immediately
                     const userMessage: ChatMessage = {
@@ -955,10 +1053,10 @@ export default function Chat() {
 
                     try {
                         const controller = streamChat(
-                            questionForBackend, // Send concatenated version to backend
+                            questionForBackend, // Send original question without context concatenation
                             undefined, // No chat_tab_id - will create new one
                             pendingAgentMode === "true",
-                            undefined, // Don't send context separately since it's in the question
+                            contextForBackend, // Pass context separately so backend can use it in system prompt
                             {
                                 onStart: (messageId, chatTabId, streamId) => {
                                     setCurrentStatus(null);
@@ -1063,9 +1161,8 @@ export default function Chat() {
                                     });
                                 },
                                 onStatus: (status, step) => {
-                                    if (pendingAgentMode === "true") {
-                                        setCurrentStatus(status);
-                                    }
+                                    // Always show status messages (not just in agent mode)
+                                    setCurrentStatus(status);
                                 },
                                 onComplete: () => {
                                     setIsStreaming(false);
@@ -1242,21 +1339,86 @@ export default function Chat() {
         const originalQuestion = inputValue.trim();
         setInputValue("");
 
-        // Prepare question for backend (with context concatenated)
-        // Store context before clearing to ensure it's included in the query
+        // Status message "Checking experts Knowledge" will be sent from backend
+        setIsStreaming(true);
+
+        // Get current workspace and collection UUIDs for filtering
+        const currentWorkspace = currentBrainSpaceId 
+            ? workspaces?.find((w) => w.id === currentBrainSpaceId)
+            : null;
+        const workspaceUuid = currentWorkspace?.uuid || null;
+        
+        // Get collection UUID if we have a current workspace
+        const currentCollection = workspaceUuid && collections
+            ? collections.find((c) => c.workspaceId === currentBrainSpaceId)
+            : null;
+        const collectionUuid = currentCollection?.uuid || null;
+        
+        // Get user UUID for access control
+        // Backend will automatically extract user_uuid from current_user if not provided
+        const userUuid = undefined;
+
+        // Log filter parameters
+        console.log("[KB Search] Filters:", {
+            workspace_uuid: workspaceUuid,
+            collection_uuid: collectionUuid,
+            user_uuid: userUuid,
+            currentBrainSpaceId,
+            query: originalQuestion
+        });
+
+        // Search knowledge base for relevant context with filters (silently, no loader)
+        let knowledgeBaseContext = "";
+        try {
+            const searchResults = await searchKnowledgeBase(
+                originalQuestion,
+                10,  // Get top 10 chunks (filtered by score threshold 0.45)
+                {
+                    workspace_uuid: workspaceUuid || undefined,
+                    collection_uuid: collectionUuid || undefined,
+                    user_uuid: userUuid || undefined,
+                }
+            );
+            
+            // Extract context silently (don't log details to avoid exposing to user)
+            if (searchResults.results && searchResults.results.length > 0) {
+                // Combine all relevant content chunks
+                const contextChunks = searchResults.results
+                    .map((result) => result.properties.content)
+                    .filter((content): content is string => !!content);
+                knowledgeBaseContext = contextChunks.join("\n\n");
+            }
+        } catch (error) {
+            console.error("[KB Search] Error searching knowledge base:", error);
+            // Continue without knowledge base context if search fails
+        }
+
+        // Prepare context for backend
+        // Combine knowledge base context with selected context
         const contextToSend = selectedContext.type === 'text' && selectedContext.text
             ? selectedContext.text
             : null;
 
-        let questionForBackend = originalQuestion;
-        if (contextToSend) {
-            questionForBackend = `${contextToSend}\n\n${originalQuestion}`;
+        let allContextText = "";
+        if (knowledgeBaseContext && contextToSend) {
+            allContextText = `${knowledgeBaseContext}\n\n${contextToSend}`;
+        } else if (knowledgeBaseContext) {
+            allContextText = knowledgeBaseContext;
+        } else if (contextToSend) {
+            allContextText = contextToSend;
         }
 
-        // Store question with context separator for display parsing
-        const storedQuestion = contextToSend
-            ? `${contextToSend}${CONTEXT_SEPARATOR}${originalQuestion}`
-            : originalQuestion;
+        // Store question without context (context is hidden from user)
+        // Context will be sent separately to backend but not shown in UI
+        const storedQuestion = originalQuestion;
+
+        // Prepare context object for backend API (separate from question)
+        const contextForBackend = allContextText
+            ? { type: 'text' as const, text: allContextText }
+            : undefined;
+
+        // Use original question without concatenation - context will be passed separately
+        const questionForBackend = originalQuestion;
 
         // Add user message immediately
         const userMessage: ChatMessage = {
@@ -1290,11 +1452,18 @@ export default function Chat() {
         abortControllerRef.current = abortController;
 
         try {
+            console.log("[Chat] Sending to backend:", {
+                question: questionForBackend,
+                hasContext: !!contextForBackend,
+                contextLength: contextForBackend?.text?.length || 0,
+                agentMode
+            });
+
             const controller = streamChat(
-                questionForBackend, // Send concatenated version to backend
+                questionForBackend, // Send original question without context concatenation
                 currentChatTabId || undefined,
                 agentMode,
-                undefined, // Don't send context separately since it's in the question
+                contextForBackend, // Pass context separately so backend can use it in system prompt
                 {
                     onStart: (messageId, chatTabId, streamId) => {
                         setCurrentStatus(null);
@@ -1401,9 +1570,8 @@ export default function Chat() {
                         });
                     },
                     onStatus: (status, step) => {
-                        if (agentMode) {
-                            setCurrentStatus(status);
-                        }
+                        // Always show status messages (not just in agent mode)
+                        setCurrentStatus(status);
                     },
                     onComplete: () => {
                         setIsStreaming(false);
@@ -1515,18 +1683,6 @@ export default function Chat() {
 
     return (
         <div className="flex flex-col h-full w-full">
-            {/* Chat Header - Status Message Only */}
-            {(agentMode && currentStatus) && (
-                <div className="flex-shrink-0 px-4 sm:px-6 py-3 border-b bg-background/80 backdrop-blur-sm">
-                    <div className="max-w-4xl mx-auto">
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-muted">
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-500" />
-                            <span className="text-xs text-muted-foreground">{currentStatus}</span>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Chat Messages */}
             <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6">
                 <div className="max-w-4xl mx-auto space-y-4">
@@ -1540,32 +1696,35 @@ export default function Chat() {
                     )}
                     {/* Empty State - Only show when not loading tabs, not loading history, not fetching, and we have loaded history (or confirmed empty) */}
                     {!isLoadingChatTabs && !isLoadingHistory && !isFetchingHistory && chatHistory !== undefined && messages.length === 0 && !isStreaming && chatId !== "new" && (
-                        <div className="w-full flex items-center justify-center py-12 min-h-[400px]">
-                            <div className="flex flex-col items-center text-center max-w-lg">
-                                <div className="relative mb-8">
-                                    {/* Animated background gradient */}
-                                    <div className="absolute inset-0 bg-gradient-to-br from-violet-500/20 via-purple-500/20 to-indigo-500/20 rounded-full blur-3xl animate-pulse"></div>
-                                    {/* Main icon container */}
-                                    <div className="relative w-32 h-32 bg-gradient-to-br from-violet-500/10 via-purple-500/10 to-indigo-500/10 dark:from-violet-900/30 dark:via-purple-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center border border-violet-500/20 dark:border-violet-500/30 shadow-lg">
-                                        <MessageSquare className="w-16 h-16 text-violet-500 dark:text-violet-400" />
-                                    </div>
-                                    {/* Decorative sparkles */}
-                                    <div className="absolute -top-2 -right-2">
-                                        <Sparkles className="w-6 h-6 text-violet-400 animate-pulse" />
-                                    </div>
-                                    <div className="absolute -bottom-2 -left-2">
-                                        <Sparkles className="w-5 h-5 text-purple-400 animate-pulse delay-300" />
-                                    </div>
-                                </div>
+                        <div className="w-full flex flex-col items-center justify-center py-16 min-h-[400px]">
+                            {/* Greeting */}
+                            <div className="flex items-center gap-3 mb-8">
+                                <FourPointedStar className="w-6 h-6 text-[#2D4739] dark:text-emerald-400" />
+                                <h1 className="text-3xl sm:text-4xl font-semibold text-neutral-900 dark:text-white tracking-tight">
+                                    {firstName ? `Good ${timeOfDay}, ${firstName}` : `Good ${timeOfDay}`}
+                                </h1>
+                            </div>
 
-                                <h3 className="text-2xl font-bold text-foreground mb-3">
-                                    Start a Conversation
-                                </h3>
-
-                                <p className="text-muted-foreground mb-8 text-base leading-relaxed">
-                                    Ask questions, get insights from your trained articles, and explore your knowledge base.
-                                    Your AI assistant is ready to help!
-                                </p>
+                            {/* Quick Actions */}
+                            <div className="flex flex-wrap justify-center gap-2.5">
+                                {[
+                                    { label: "Build Workspace", href: "/dashboard/workspaces" },
+                                    { label: "Plan & Work", href: "/chat/new" },
+                                    { label: "Research", href: "/chat/new" },
+                                    { label: "Organize Files", href: "/dashboard/collections" },
+                                    { label: "Create Prompt", href: "/chat/new" },
+                                ].map((action) => (
+                                    <Button
+                                        key={action.label}
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => router.push(action.href)}
+                                        className="rounded-full text-sm px-4 py-2 h-auto border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white shadow-sm"
+                                    >
+                                        {action.label}
+                                    </Button>
+                                ))}
                             </div>
                         </div>
                     )}
@@ -1578,12 +1737,52 @@ export default function Chat() {
                                 isStreaming={isStreaming && streamingMessageId === msg.id && chatCreatedRef.current}
                                 onAddContext={handleAddTextContext}
                                 onCreateArticle={handleCreateArticle}
+                                isSelectedForArticle={selectedArticleMessageIds.includes(msg.id)}
+                                currentStatus={currentStatus}
                             />
                         ))}
                     </AnimatePresence>
                     <div ref={messagesEndRef} />
                 </div>
             </div>
+
+            {/* Article selection bar */}
+            {selectedArticleMessageIds.length > 0 && (
+                <div className="flex-shrink-0 px-4 sm:px-6 pb-2">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="mb-2 px-3 py-2 rounded-lg border bg-muted/60 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-violet-600" />
+                                <span>
+                                    {selectedArticleMessageIds.length}{" "}
+                                    {selectedArticleMessageIds.length === 1 ? "response selected" : "responses selected"}{" "}
+                                    for article
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => setSelectedArticleMessageIds([])}
+                                >
+                                    Clear
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-7 px-3 text-xs bg-violet-600 hover:bg-violet-700 text-white"
+                                    onClick={handleCreateArticleFromSelection}
+                                >
+                                    <PenTool className="h-3 w-3 mr-1" />
+                                    Create Article from Selection
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Chat Input */}
             <div className="flex-shrink-0 px-4 sm:px-6 py-4 sm:py-6 border-t bg-background/80 backdrop-blur-sm">
@@ -1622,14 +1821,14 @@ export default function Chat() {
                         className="relative"
                         noValidate
                     >
-                        {/* Input Container - like ChatGPT/Cursor */}
-                        <div className="relative bg-card border rounded-2xl shadow-lg overflow-hidden">
+                        {/* Input Container - matching landing page style */}
+                        <div className="flex flex-col rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
                             {/* Input Row */}
-                            <div className="flex items-center gap-2 p-1.5 sm:p-2">
+                            <div className="flex items-center px-5 py-4">
                                 <Input
                                     ref={inputRef}
                                     type="text"
-                                    placeholder="Type your message..."
+                                    placeholder="Plan, @ for context, / for commands"
                                     value={inputValue}
                                     onChange={(e) => setInputValue(e.target.value)}
                                     onKeyDown={(e) => {
@@ -1642,121 +1841,114 @@ export default function Chat() {
                                         }
                                     }}
                                     disabled={isStreaming}
-                                    className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-3"
+                                    className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-[15px] text-neutral-700 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 px-2 py-2"
                                 />
-                                {isStreaming ? (
-                                    <Button
-                                        type="button"
-                                        onClick={handleStop}
-                                        size="icon"
-                                        variant="destructive"
-                                        className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl flex-shrink-0"
-                                    >
-                                        <Square className="h-4 w-4" />
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        type="submit"
-                                        size="icon"
-                                        disabled={!inputValue.trim()}
-                                        className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 dark:from-violet-500 dark:via-purple-500 dark:to-indigo-500 hover:opacity-90 transition-opacity shadow-md !text-white flex-shrink-0"
-                                    >
-                                        <Send className="h-4 w-4" />
-                                    </Button>
-                                )}
                             </div>
 
-                            {/* Divider */}
-                            <div className="border-t border-border/50" />
+                            {/* Bottom Row - Icons and Controls */}
+                            <div className="flex items-center justify-between px-4 py-2.5 border-t border-neutral-100 dark:border-neutral-800">
+                                {/* Left icons */}
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        disabled={isStreaming}
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                        title="Attach file"
+                                    >
+                                        <Paperclip className="w-[18px] h-[18px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isStreaming}
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                        title="Add context"
+                                    >
+                                        <AtSign className="w-[18px] h-[18px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isStreaming}
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                        title="Upload image"
+                                    >
+                                        <ImageIcon className="w-[18px] h-[18px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isStreaming}
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                        title="Settings"
+                                    >
+                                        <SlidersHorizontal className="w-[18px] h-[18px]" />
+                                    </button>
+                                </div>
 
-                            {/* Options Row - Inside container, below input */}
-                            <div className="flex items-center justify-between px-3 sm:px-4 py-2">
-                                {/* Left side: Agent toggle */}
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
+                                {/* Right controls */}
+                                <div className="flex items-center gap-2">
+                                    {/* Agent/Chat Mode Toggle */}
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                disabled={isStreaming}
+                                                className="h-8 px-3 rounded-lg text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                                            >
+                                                {agentMode ? (
+                                                    <>
+                                                        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                                                        Agent
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+                                                        Chat
+                                                    </>
+                                                )}
+                                                <ChevronDown className="w-3.5 h-3.5 ml-1.5 opacity-60" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-36">
+                                            <DropdownMenuItem
+                                                onClick={() => setAgentMode(false)}
+                                                className="flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <MessageSquare className="w-3.5 h-3.5" />
+                                                <span>Chat Mode</span>
+                                                {!agentMode && <Check className="w-3 h-3 ml-auto text-emerald-500" />}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => setAgentMode(true)}
+                                                className="flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <RefreshCw className="w-3.5 h-3.5" />
+                                                <span>Agent Mode</span>
+                                                {agentMode && <Check className="w-3 h-3 ml-auto text-emerald-500" />}
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+
+                                    {isStreaming ? (
                                         <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            disabled={isStreaming}
-                                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                            type="button"
+                                            onClick={handleStop}
+                                            size="icon"
+                                            variant="destructive"
+                                            className="h-9 w-9 rounded-full flex-shrink-0"
                                         >
-                                            {agentMode ? (
-                                                <>
-                                                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                                                    Agent Mode
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-                                                    Chat Mode
-                                                </>
-                                            )}
-                                            <ChevronDown className="w-3 h-3 ml-1.5 opacity-50" />
+                                            <Square className="h-4 w-4" />
                                         </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start" className="w-40">
-                                        <DropdownMenuItem
-                                            onClick={() => setAgentMode(false)}
-                                            className="flex items-center gap-2 cursor-pointer"
+                                    ) : (
+                                        <Button
+                                            type="submit"
+                                            size="icon"
+                                            disabled={!inputValue.trim()}
+                                            className="h-9 w-9 rounded-full bg-[#2D4739] hover:bg-[#243B2E] dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white disabled:opacity-30 disabled:bg-neutral-200 dark:disabled:bg-neutral-700 disabled:text-neutral-400 dark:disabled:text-neutral-500 transition-all flex-shrink-0"
                                         >
-                                            <MessageSquare className="w-3.5 h-3.5" />
-                                            <span>Chat Mode</span>
-                                            {!agentMode && <Check className="w-3 h-3 ml-auto text-emerald-500" />}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onClick={() => setAgentMode(true)}
-                                            className="flex items-center gap-2 cursor-pointer"
-                                        >
-                                            <RefreshCw className="w-3.5 h-3.5" />
-                                            <span>Agent Mode</span>
-                                            {agentMode && <Check className="w-3 h-3 ml-auto text-emerald-500" />}
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-
-                                {/* Right side: Action buttons */}
-                                <div className="flex items-center gap-1.5">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        disabled={isStreaming}
-                                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                        title="Web Search"
-                                    >
-                                        <Search className="w-3.5 h-3.5 mr-1.5" />
-                                        <span className="hidden sm:inline">Web Search</span>
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        disabled={isStreaming}
-                                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                        title="Upload File"
-                                        onClick={() => {
-                                            // TODO: Implement file upload
-                                            console.log("File upload clicked");
-                                        }}
-                                    >
-                                        <Upload className="w-3.5 h-3.5 mr-1.5" />
-                                        <span className="hidden sm:inline">File</span>
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        disabled={isStreaming}
-                                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                        title="Upload Image"
-                                        onClick={() => {
-                                            // TODO: Implement image upload
-                                            console.log("Image upload clicked");
-                                        }}
-                                    >
-                                        <ImageIcon className="w-3.5 h-3.5 mr-1.5" />
-                                        <span className="hidden sm:inline">Image</span>
-                                    </Button>
+                                            <Send className="h-4 w-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </div>

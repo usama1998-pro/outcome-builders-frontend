@@ -564,6 +564,7 @@ function NewArticlePageContent() {
         return () => clearTimeout(autoSaveTimer);
     }, [title, editorContentHash, hasUnsavedChanges, selectedCollectionId, saveAsDraft, editor]);
 
+
     const handlePublish = async () => {
         if (!title.trim()) {
             toast.error("Please enter a title");
@@ -727,13 +728,6 @@ function NewArticlePageContent() {
                                 <Save className="h-4 w-4 mr-2" />
                                 {isCreating || isUpdating ? "Saving..." : "Save Draft"}
                             </Button>
-                            {/* Publish button disabled for now */}
-                            {/* <Button
-                                onClick={handlePublish}
-                                disabled={isCreating || isUpdating || isCreatingCollection || !title.trim() || !currentBrainSpaceId}
-                            >
-                                {isCreating || isUpdating ? "Publishing..." : "Publish"}
-                            </Button> */}
                         </div>
                     </div>
 

@@ -25,11 +25,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
 import { BsThreeDotsVertical } from "react-icons/bs";
 import { formatDateTime } from "@/src/utils/dateTimeFormat";
-import { FaTrash, FaEdit, FaEye, FaBrain } from "react-icons/fa";
+import { FaTrash, FaBrain } from "react-icons/fa";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -46,7 +47,7 @@ import {
 import { toast } from "sonner";
 import { useDeleteNote, useToggleTrainNote, useCreateNote, useMoveNote } from "@/src/hooks/useNotes";
 import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
-import { FileText, Plus, Sparkles, BookOpen, RefreshCw, Move } from "lucide-react";
+import { FileText, Plus, Sparkles, BookOpen, RefreshCw, FolderKanban, Copy, Pencil, Loader2 } from "lucide-react";
 import {
     Tooltip,
     TooltipContent,
@@ -87,8 +88,9 @@ type CreateNoteFormValues = z.infer<typeof createNoteSchema>;
 
 function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]; searchQuery?: string }) {
     const { mutate: deleteNote, isPending: isDeleting } = useDeleteNote();
-    const { mutate: toggleTrain } = useToggleTrainNote();
+    const { mutate: toggleTrain, isPending: isTraining } = useToggleTrainNote();
     const { mutate: moveNote, isPending: isMoving } = useMoveNote();
+    const [trainingNoteId, setTrainingNoteId] = useState<number | null>(null);
     const { data: workspaces } = useUserWorkspaces();
     const getWorkspaceUuid = (id: number) => workspaces?.find((w) => w.id === id)?.uuid ?? id;
     // Fetch all collections (no workspace filter) to show all available collections including private ones
@@ -124,6 +126,7 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
     const handleTrainClick = (noteId: number, isTrained: boolean, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        setTrainingNoteId(noteId);
         toggleTrain(noteId, {
             onSuccess: (res) => {
                 if (res?.status) {
@@ -131,10 +134,12 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                 } else {
                     toast.error("Could not update training status.");
                 }
+                setTrainingNoteId(null);
             },
             onError: (err: unknown) => {
                 const error = err as { message?: string };
                 toast.error(error?.message || "Request failed, please try again.");
+                setTrainingNoteId(null);
             },
         });
     };
@@ -279,42 +284,63 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                                                     >
                                                         <BsThreeDotsVertical />
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent>
-                                                        <DropdownMenuItem
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                window.location.href = `/dashboard/workspaces/${getWorkspaceUuid(note.workspaceId)}/collections/${note.collectionUuid ?? note.collectionId}/notes/${note.uuid ?? note.id}`;
-                                                            }}
-                                                            className="cursor-pointer"
-                                                        >
-                                                            <FaEye className="mr-2" />
-                                                            View Article
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                window.location.href = `/dashboard/articles/new?noteId=${note.id}&collection_id=${note.collectionId}`;
-                                                            }}
-                                                            className="cursor-pointer"
-                                                        >
-                                                            <FaEdit className="mr-2" />
-                                                            Edit Article
-                                                        </DropdownMenuItem>
+                                                        <DropdownMenuContent>
+                                                            <DropdownMenuItem
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    window.open(
+                                                                        `/dashboard/workspaces/${getWorkspaceUuid(note.workspaceId)}/collections/${note.collectionUuid ?? note.collectionId}/notes/${note.uuid ?? note.id}`,
+                                                                        "_blank",
+                                                                        "noopener,noreferrer"
+                                                                    );
+                                                                }}
+                                                                className="cursor-pointer"
+                                                            >
+                                                                <Copy className="mr-2 h-4 w-4" />
+                                                                Open in new pane
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    toast.info("Ask AI for this article is coming soon.");
+                                                                }}
+                                                                className="cursor-pointer"
+                                                            >
+                                                                <Sparkles className="mr-2 h-4 w-4" />
+                                                                Ask AI
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    window.location.href = `/dashboard/articles/new?noteId=${note.id}&collection_id=${note.collectionId}`;
+                                                                }}
+                                                                className="cursor-pointer"
+                                                            >
+                                                                <Pencil className="mr-2 h-4 w-4" />
+                                                                Edit Article
+                                                            </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             onClick={(e) => handleTrainClick(note.id, note.is_trained || false, e)}
-                                                            className={`cursor-pointer ${note.is_trained ? "text-cyan-600 focus:text-cyan-600" : ""}`}
+                                                            className={`cursor-pointer ${note.is_trained ? "text-cyan-600 focus:text-cyan-600" : ""} ${trainingNoteId === note.id && isTraining ? "opacity-50 cursor-not-allowed" : ""}`}
+                                                            disabled={trainingNoteId === note.id && isTraining}
                                                         >
-                                                            <FaBrain className="mr-2" />
-                                                            {note.is_trained ? "Untrain Article" : "Train Article"}
+                                                            {trainingNoteId === note.id && isTraining ? (
+                                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <FaBrain className="mr-2" />
+                                                            )}
+                                                            {trainingNoteId === note.id && isTraining ? "Processing..." : note.is_trained ? "Untrain Article" : "Train Article"}
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             onClick={(e) => handleMoveClick(note, e)}
                                                             className="cursor-pointer"
                                                         >
-                                                            <Move className="mr-2" />
-                                                            Move to Collection
+                                                            <FolderKanban className="mr-2 h-4 w-4" />
+                                                            Move to
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             onClick={(e) => handleDeleteClick(note.id, e)}
@@ -394,7 +420,7 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle className="flex items-center gap-2">
-                            <Move className="w-5 h-5 text-teal-500" />
+                            <FolderKanban className="w-5 h-5 text-teal-500" />
                             Move Article to Collection
                         </AlertDialogTitle>
                         <AlertDialogDescription>

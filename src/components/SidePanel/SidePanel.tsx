@@ -844,6 +844,32 @@ export default function SidePanel() {
                     {expandedSections.has('execution-tools') && (
                         <SidebarGroupContent>
                             <SidebarMenu>
+                                {/* Roadmap with inline progress bar */}
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/roadmap"
+                                            className={`px-2 py-1 rounded ${
+                                                pathname === "/dashboard/roadmap" ||
+                                                pathname.startsWith("/dashboard/roadmap/")
+                                                    ? "bg-gray-300 font-semibold"
+                                                    : "hover:bg-gray-200"
+                                            }`}
+                                        >
+                                            <BarChart3 className="mr-2 h-4 w-4 text-sky-600 dark:text-sky-400" />
+                                            <div className="flex flex-col flex-1">
+                                                <span>Roadmap</span>
+                                                <div className="mt-1 h-1.5 rounded-full bg-muted overflow-hidden w-full">
+                                                    <div
+                                                        className="h-full bg-emerald-500"
+                                                        style={{ width: "45%" }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
                                 <SidebarMenuItem>
                                     <SidebarMenuButton asChild>
                                         <Link

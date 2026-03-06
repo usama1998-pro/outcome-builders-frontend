@@ -21,7 +21,25 @@ import { useNotePermissions } from "@/src/hooks/useNotePermissions";
 import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
 import api from "@/src/lib/axios";
 import routes from "@/src/lib/routes";
-import { X, UserPlus, Search, Settings, MoreVertical, Users } from "lucide-react";
+import {
+    X,
+    UserPlus,
+    Search,
+    Settings,
+    MoreVertical,
+    Users,
+    Sparkles,
+    Pin,
+    Pencil,
+    FolderKanban,
+    Copy,
+    Share2,
+    Clock,
+    Download,
+    Info,
+    Trash2,
+    Loader2,
+} from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -45,6 +63,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -316,6 +335,79 @@ export default function NoteViewPage() {
         });
     };
 
+    // Article actions dropdown handlers (view page)
+    const handleOpenInNewPane = () => {
+        if (typeof window === "undefined") return;
+        const url = window.location.href;
+        window.open(url, "_blank", "noopener,noreferrer");
+    };
+
+    const handleAskAI = () => {
+        toast.info("Ask AI for this article is coming soon.");
+    };
+
+    const handlePin = () => {
+        toast.info("Pin / unpin from here is coming soon.");
+    };
+
+    const handleRename = () => {
+        if (!note) return;
+        // Navigate to full edit experience for this article
+        router.push(
+            `/dashboard/articles/new?noteId=${note.id}&collection_id=${collection?.id ?? ""}`
+        );
+    };
+
+    const handleMoveTo = () => {
+        if (note?.is_owner || canPerformNoteActions) {
+            setSettingsDialogOpen(true);
+        }
+    };
+
+    const handleDuplicate = () => {
+        if (!note) return;
+        router.push(
+            `/dashboard/articles/new?noteId=${note.id}&collection_id=${collection?.id ?? ""}`
+        );
+    };
+
+    const handleShare = () => {
+        if (note?.is_owner || canPerformNoteActions) {
+            setShareDialogOpen(true);
+        } else {
+            toast.info("You don't have permission to share this article.");
+        }
+    };
+
+    const handleVersionHistory = () => {
+        toast.info("Version history is not implemented yet.");
+    };
+
+    const handleDownload = () => {
+        if (!note?.content) return;
+        const html = note.content as string;
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const safeTitle = (note.title || "article").replace(/[\\/:*?"<>|]+/g, "_");
+        link.href = url;
+        link.download = `${safeTitle}.html`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleInformation = () => {
+        if (note?.is_owner || canPerformNoteActions) {
+            setSettingsDialogOpen(true);
+        }
+    };
+
+    const handleDelete = () => {
+        toast.info("Delete from this view is not implemented yet. Please delete from the articles list.");
+    };
+
     return (
         <RequireAuth>
             <div className="flex flex-col items-center p-4">
@@ -349,30 +441,75 @@ export default function NoteViewPage() {
                                 disabled={isTraining}
                                 className={note?.is_trained ? "bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 text-white border-0 hover:opacity-90" : ""}
                             >
-                                <FaBrain className="mr-2" />
+                                {isTraining ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <FaBrain className="mr-2" />
+                                )}
                                 {isTraining ? "Processing..." : note?.is_trained ? "Trained" : "Train"}
                             </Button>
                         )}
                         {(note?.is_owner || canPerformNoteActions) && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="outline">
-                                        <MoreVertical className="w-4 h-4 mr-2" />
-                                        Options
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-9 w-9"
+                                        aria-label="Article actions"
+                                    >
+                                        <MoreVertical className="w-4 h-4" />
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem onClick={() => setSettingsDialogOpen(true)}>
-                                        <Settings className="w-4 h-4 mr-2" />
-                                        Settings
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuItem onClick={handleOpenInNewPane}>
+                                        <Copy className="mr-2 h-4 w-4" />
+                                        <span>Open in new pane</span>
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleAskAI}>
+                                        <Sparkles className="mr-2 h-4 w-4" />
+                                        <span>Ask AI</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={handlePin}>
+                                        <Pin className="mr-2 h-4 w-4" />
+                                        <span>Pin</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleRename}>
+                                        <Pencil className="mr-2 h-4 w-4" />
+                                        <span>Edit</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleMoveTo}>
+                                        <FolderKanban className="mr-2 h-4 w-4" />
+                                        <span>Move to</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleDuplicate}>
+                                        <Copy className="mr-2 h-4 w-4" />
+                                        <span>Duplicate</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleShare}>
+                                        <Share2 className="mr-2 h-4 w-4" />
+                                        <span>Share</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleVersionHistory}>
+                                        <Clock className="mr-2 h-4 w-4" />
+                                        <span>Version History</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleDownload}>
+                                        <Download className="mr-2 h-4 w-4" />
+                                        <span>Download</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleInformation}>
+                                        <Info className="mr-2 h-4 w-4" />
+                                        <span>Information</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
                                     <DropdownMenuItem
-                                        onClick={() => {
-                                            router.push(`/dashboard/articles/new?noteId=${note?.id}&collection_id=${collection?.id ?? ""}`);
-                                        }}
+                                        onClick={handleDelete}
+                                        className="text-destructive focus:text-destructive"
                                     >
-                                        <FaEdit className="w-4 h-4 mr-2" />
-                                        Edit Article
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        <span>Delete</span>
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
