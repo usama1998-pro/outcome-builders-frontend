@@ -1,13 +1,14 @@
 "use client";
 
+import React from "react";
 import { Button } from "@/components/ui/button";
-import { Send, Bot, User, Sparkles, Copy, Check, Square, Loader2, Brain, MessageSquare, ChevronDown, Star, RefreshCw, X, FileText, Plus, Search, Upload, Image as ImageIcon, PenTool, AtSign, SlidersHorizontal, Paperclip } from "lucide-react";
+import { Send, Bot, User, Sparkles, Copy, Check, Square, Loader2, Brain, MessageSquare, ChevronDown, Star, RefreshCw, X, FileText, Plus, Upload, Image as ImageIcon, PenTool, AtSign, SlidersHorizontal, Paperclip, ChevronUp } from "lucide-react";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ChatMessage, ChatTab } from "../../../types/chat";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { streamChat, getChatHistory, getChatTabs, updateChatTabName } from "../../../api/chat";
 import { searchKnowledgeBase } from "../../../api/knowledgeBase";
@@ -44,10 +45,133 @@ interface MessageBubbleProps {
     onCreateArticle?: (content: string, messageId?: number) => void;
     isSelectedForArticle?: boolean;
     currentStatus?: string | null;
+    messageRef?: (node: HTMLDivElement | null) => void;
+    searchQuery?: string;
+    currentMatchIndex?: number;
+    searchMatches?: Array<{ messageId: number; matchIndex: number; textOffset?: number; isUserMatch?: boolean }>;
 }
 
 // Context separator for parsing stored questions
 const CONTEXT_SEPARATOR = '\n\n---CONTEXT---\n\n';
+
+// Track cumulative text offset per message to handle ReactMarkdown fragments
+const messageTextOffsets = new Map<string, number>();
+
+// Generate a unique key for each message to track fragments
+// Include a flag to differentiate user vs AI messages since they share the same ID
+function getMessageKey(messageId: number, searchQuery: string, isUserMessage: boolean = false): string {
+    return `${messageId}-${isUserMessage ? 'user' : 'ai'}-${searchQuery}`;
+}
+
+// Highlight text component for search
+function HighlightText({
+    text,
+    searchQuery,
+    messageId,
+    currentMatchIndex,
+    searchMatches,
+    isUserMessage = false
+}: {
+    text: string;
+    searchQuery: string;
+    messageId: number;
+    currentMatchIndex: number;
+    searchMatches: Array<{ messageId: number; matchIndex: number; textOffset?: number; isUserMatch?: boolean }>;
+    isUserMessage?: boolean;
+}) {
+    if (!searchQuery.trim() || !text) {
+        return <>{text}</>;
+    }
+
+    // Escape special regex characters and match character-by-character (substring matching)
+    const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match the query as a substring (character-by-character matching)
+    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+
+    // Use matchAll to find all matches and their positions
+    const allMatches = Array.from(text.matchAll(regex));
+    if (allMatches.length === 0) {
+        return <>{text}</>;
+    }
+
+    // Find all matches for this message AND message type (user vs AI)
+    // This is critical because user and AI messages share the same messageId
+    const messageMatches = searchMatches
+        .filter(m => m.messageId === messageId && m.isUserMatch === isUserMessage)
+        .sort((a, b) => a.matchIndex - b.matchIndex);
+
+    if (messageMatches.length === 0) {
+        return <>{text}</>;
+    }
+
+    // Use a unique key per message type and search query to track which matches we've processed
+    // This differentiates between user and AI messages that share the same messageId
+    const messageKey = getMessageKey(messageId, searchQuery, isUserMessage);
+
+    // Get the starting match index for this fragment (how many matches we've processed so far)
+    // This tracks cumulative matches across all fragments of this message
+    const startMatchIndex = messageTextOffsets.get(messageKey) || 0;
+
+    // Build highlighted text by inserting marks at match positions
+    const parts: Array<{ text: string; isMatch: boolean; matchIndex?: number }> = [];
+    let lastIndex = 0;
+    let localMatchCount = 0;
+
+    allMatches.forEach((match) => {
+        if (match.index === undefined) return;
+
+        // Add text before match
+        if (match.index > lastIndex) {
+            parts.push({ text: text.substring(lastIndex, match.index), isMatch: false });
+        }
+
+        // Add match - use the full matched text (match[0] contains the full match)
+        const matchedText = match[0];
+        // Get the global match index from the sorted message matches
+        // Use the cumulative index to find the right match
+        const matchIndexInMessage = startMatchIndex + localMatchCount;
+        const globalMatchIndex = messageMatches[matchIndexInMessage]?.matchIndex ?? -1;
+        parts.push({
+            text: matchedText,
+            isMatch: true,
+            matchIndex: globalMatchIndex
+        });
+
+        localMatchCount++;
+        lastIndex = match.index + matchedText.length;
+    });
+
+    // Update the match index counter for this message fragment
+    // This ensures the next fragment knows where to start
+    messageTextOffsets.set(messageKey, startMatchIndex + localMatchCount);
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+        parts.push({ text: text.substring(lastIndex), isMatch: false });
+    }
+
+    return (
+        <>
+            {parts.map((part, index) => {
+                if (part.isMatch) {
+                    const isActive = part.matchIndex === currentMatchIndex;
+                    return (
+                        <mark
+                            key={index}
+                            data-match-index={part.matchIndex}
+                            className={isActive
+                                ? 'bg-orange-400 dark:bg-orange-500 text-black dark:text-black font-semibold px-0.5 rounded-sm ring-2 ring-orange-500 dark:ring-orange-400 search-match-active'
+                                : 'bg-yellow-200 dark:bg-yellow-300/80 text-black dark:text-black px-0.5 rounded-sm search-match'}
+                        >
+                            {part.text}
+                        </mark>
+                    );
+                }
+                return <span key={index}>{part.text}</span>;
+            })}
+        </>
+    );
+}
 
 function MessageBubble({
     message,
@@ -57,6 +181,10 @@ function MessageBubble({
     onCreateArticle,
     isSelectedForArticle,
     currentStatus,
+    messageRef: externalMessageRef,
+    searchQuery = "",
+    currentMatchIndex = -1,
+    searchMatches = [],
 }: MessageBubbleProps) {
     // User message has question, bot message has answer
     const isUser = !!message.question && !message.answer;
@@ -66,6 +194,13 @@ function MessageBubble({
     const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
     const messageRef = useRef<HTMLDivElement>(null);
     const popupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Set external ref when component mounts/updates
+    useEffect(() => {
+        if (externalMessageRef && messageRef.current) {
+            externalMessageRef(messageRef.current);
+        }
+    }, [externalMessageRef]);
 
     const handleCopy = async () => {
         // For user messages, copy the original stored question (which includes context separator)
@@ -258,6 +393,13 @@ function MessageBubble({
                     </div>
                 )}
 
+                {/* User Avatar */}
+                {isUser && (
+                    <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center shadow-lg">
+                        <User className="w-4 h-4 text-white" />
+                    </div>
+                )}
+
                 {/* Message Content */}
                 <div
                     className={`relative max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl rounded-2xl px-4 py-3 ${isUser
@@ -306,12 +448,37 @@ function MessageBubble({
                                         <>
                                             <blockquote className="border-l-3 border-white/40 pl-3 italic text-white/90 text-sm bg-white/10 rounded-r py-2 mb-2">
                                                 <span className="text-xs font-semibold text-white/70 mb-1 block uppercase tracking-wide">Context</span>
-                                                {contextText}
+                                                <HighlightText
+                                                    text={contextText}
+                                                    searchQuery={searchQuery}
+                                                    messageId={message.id}
+                                                    currentMatchIndex={currentMatchIndex}
+                                                    searchMatches={searchMatches}
+                                                    isUserMessage={true}
+                                                />
                                             </blockquote>
-                                            <p className="mt-1">{displayQuestion}</p>
+                                            <p className="mt-1">
+                                                <HighlightText
+                                                    text={displayQuestion}
+                                                    searchQuery={searchQuery}
+                                                    messageId={message.id}
+                                                    currentMatchIndex={currentMatchIndex}
+                                                    searchMatches={searchMatches}
+                                                    isUserMessage={true}
+                                                />
+                                            </p>
                                         </>
                                     ) : (
-                                        <p>{displayQuestion}</p>
+                                        <p>
+                                            <HighlightText
+                                                text={displayQuestion}
+                                                searchQuery={searchQuery}
+                                                messageId={message.id}
+                                                currentMatchIndex={currentMatchIndex}
+                                                searchMatches={searchMatches}
+                                                isUserMessage={true}
+                                            />
+                                        </p>
                                     )}
                                 </div>
                             ) : (
@@ -324,12 +491,17 @@ function MessageBubble({
                                     }}
                                 >
                                     <ReactMarkdown
+                                        key={`md-${message.id}-${searchQuery}-${currentMatchIndex}`}
                                         remarkPlugins={[remarkGfm]}
                                         rehypePlugins={[rehypeHighlight]}
                                         components={{
+                                            // Helper function to highlight text in children
+                                            // This recursively processes children and highlights text strings
                                             // Customize code blocks
                                             code({ node, inline, className, children, ...props }: any) {
-                                                const match = /language-(\w+)/.exec(className || '');
+                                                const langPattern = 'language-(\\w+)';
+                                                const languageRegex = new RegExp(langPattern);
+                                                const match = languageRegex.exec(className || '');
                                                 return !inline && match ? (
                                                     <pre className="bg-muted rounded-lg p-4 overflow-x-auto border border-border">
                                                         <code className={className} {...props}>
@@ -342,9 +514,27 @@ function MessageBubble({
                                                     </code>
                                                 );
                                             },
-                                            // Customize paragraphs
+                                            // Customize paragraphs with text highlighting
                                             p({ children }: any) {
-                                                return <p className="mb-2 last:mb-0">{children}</p>;
+                                                const highlightChildren = (child: any): any => {
+                                                    if (typeof child === 'string' && searchQuery.trim()) {
+                                                        return (
+                                                            <HighlightText
+                                                                text={child}
+                                                                searchQuery={searchQuery}
+                                                                messageId={message.id}
+                                                                currentMatchIndex={currentMatchIndex}
+                                                                searchMatches={searchMatches}
+                                                                isUserMessage={false}
+                                                            />
+                                                        );
+                                                    }
+                                                    if (Array.isArray(child)) {
+                                                        return child.map((c, i) => <React.Fragment key={i}>{highlightChildren(c)}</React.Fragment>);
+                                                    }
+                                                    return child;
+                                                };
+                                                return <p className="mb-2 last:mb-0">{highlightChildren(children)}</p>;
                                             },
                                             // Customize lists
                                             ul({ children }: any) {
@@ -353,30 +543,214 @@ function MessageBubble({
                                             ol({ children }: any) {
                                                 return <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>;
                                             },
-                                            // Customize headings
+                                            // Customize list items with text highlighting
+                                            li({ children }: any) {
+                                                const highlightChildren = (child: any): any => {
+                                                    if (typeof child === 'string' && searchQuery.trim()) {
+                                                        return (
+                                                            <HighlightText
+                                                                text={child}
+                                                                searchQuery={searchQuery}
+                                                                messageId={message.id}
+                                                                currentMatchIndex={currentMatchIndex}
+                                                                searchMatches={searchMatches}
+                                                                isUserMessage={false}
+                                                            />
+                                                        );
+                                                    }
+                                                    if (Array.isArray(child)) {
+                                                        return child.map((c, i) => <React.Fragment key={i}>{highlightChildren(c)}</React.Fragment>);
+                                                    }
+                                                    return child;
+                                                };
+                                                return <li className="ml-4">{highlightChildren(children)}</li>;
+                                            },
+                                            // Helper to highlight children
+                                            strong({ children }: any) {
+                                                const highlightChildren = (child: any): any => {
+                                                    if (typeof child === 'string' && searchQuery.trim()) {
+                                                        return (
+                                                            <HighlightText
+                                                                text={child}
+                                                                searchQuery={searchQuery}
+                                                                messageId={message.id}
+                                                                currentMatchIndex={currentMatchIndex}
+                                                                searchMatches={searchMatches}
+                                                                isUserMessage={false}
+                                                            />
+                                                        );
+                                                    }
+                                                    if (Array.isArray(child)) {
+                                                        return child.map((c, i) => <React.Fragment key={i}>{highlightChildren(c)}</React.Fragment>);
+                                                    }
+                                                    return child;
+                                                };
+                                                return <strong>{highlightChildren(children)}</strong>;
+                                            },
+                                            em({ children }: any) {
+                                                const highlightChildren = (child: any): any => {
+                                                    if (typeof child === 'string' && searchQuery.trim()) {
+                                                        return (
+                                                            <HighlightText
+                                                                text={child}
+                                                                searchQuery={searchQuery}
+                                                                messageId={message.id}
+                                                                currentMatchIndex={currentMatchIndex}
+                                                                searchMatches={searchMatches}
+                                                                isUserMessage={false}
+                                                            />
+                                                        );
+                                                    }
+                                                    if (Array.isArray(child)) {
+                                                        return child.map((c, i) => <React.Fragment key={i}>{highlightChildren(c)}</React.Fragment>);
+                                                    }
+                                                    return child;
+                                                };
+                                                return <em>{highlightChildren(children)}</em>;
+                                            },
+                                            // Customize headings with text highlighting
                                             h1({ children }: any) {
-                                                return <h1 className="text-xl font-bold mb-2 mt-4 first:mt-0">{children}</h1>;
+                                                const highlightChildren = (child: any): any => {
+                                                    if (typeof child === 'string' && searchQuery.trim()) {
+                                                        return (
+                                                            <HighlightText
+                                                                text={child}
+                                                                searchQuery={searchQuery}
+                                                                messageId={message.id}
+                                                                currentMatchIndex={currentMatchIndex}
+                                                                searchMatches={searchMatches}
+                                                                isUserMessage={false}
+                                                            />
+                                                        );
+                                                    }
+                                                    if (Array.isArray(child)) {
+                                                        return child.map((c, i) => <React.Fragment key={i}>{highlightChildren(c)}</React.Fragment>);
+                                                    }
+                                                    return child;
+                                                };
+                                                return <h1 className="text-2xl font-bold mb-2 mt-4 first:mt-0">{highlightChildren(children)}</h1>;
                                             },
                                             h2({ children }: any) {
-                                                return <h2 className="text-lg font-semibold mb-2 mt-3 first:mt-0">{children}</h2>;
+                                                const highlightChildren = (child: any): any => {
+                                                    if (typeof child === 'string' && searchQuery.trim()) {
+                                                        return (
+                                                            <HighlightText
+                                                                text={child}
+                                                                searchQuery={searchQuery}
+                                                                messageId={message.id}
+                                                                currentMatchIndex={currentMatchIndex}
+                                                                searchMatches={searchMatches}
+                                                                isUserMessage={false}
+                                                            />
+                                                        );
+                                                    }
+                                                    if (Array.isArray(child)) {
+                                                        return child.map((c, i) => <React.Fragment key={i}>{highlightChildren(c)}</React.Fragment>);
+                                                    }
+                                                    return child;
+                                                };
+                                                return <h2 className="text-xl font-bold mb-2 mt-4 first:mt-0">{highlightChildren(children)}</h2>;
                                             },
                                             h3({ children }: any) {
-                                                return <h3 className="text-base font-semibold mb-1 mt-2 first:mt-0">{children}</h3>;
+                                                const highlightChildren = (child: any): any => {
+                                                    if (typeof child === 'string' && searchQuery.trim()) {
+                                                        return (
+                                                            <HighlightText
+                                                                text={child}
+                                                                searchQuery={searchQuery}
+                                                                messageId={message.id}
+                                                                currentMatchIndex={currentMatchIndex}
+                                                                searchMatches={searchMatches}
+                                                                isUserMessage={false}
+                                                            />
+                                                        );
+                                                    }
+                                                    if (Array.isArray(child)) {
+                                                        return child.map((c, i) => <React.Fragment key={i}>{highlightChildren(c)}</React.Fragment>);
+                                                    }
+                                                    return child;
+                                                };
+                                                return <h3 className="text-lg font-bold mb-2 mt-4 first:mt-0">{highlightChildren(children)}</h3>;
                                             },
-                                            // Customize links
-                                            a({ children, href }: any) {
+                                            // Customize links with text highlighting
+                                            a({ href, children }: any) {
+                                                const highlightChildren = (child: any): any => {
+                                                    if (typeof child === 'string' && searchQuery.trim()) {
+                                                        return (
+                                                            <HighlightText
+                                                                text={child}
+                                                                searchQuery={searchQuery}
+                                                                messageId={message.id}
+                                                                currentMatchIndex={currentMatchIndex}
+                                                                searchMatches={searchMatches}
+                                                                isUserMessage={false}
+                                                            />
+                                                        );
+                                                    }
+                                                    if (Array.isArray(child)) {
+                                                        return child.map((c, i) => <React.Fragment key={i}>{highlightChildren(c)}</React.Fragment>);
+                                                    }
+                                                    return child;
+                                                };
                                                 return (
-                                                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-violet-600 dark:text-violet-400 hover:underline">
-                                                        {children}
+                                                    <a
+                                                        href={href}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-violet-600 dark:text-violet-400 hover:underline"
+                                                    >
+                                                        {highlightChildren(children)}
                                                     </a>
                                                 );
                                             },
-                                            // Customize blockquotes
+                                            // Customize blockquotes with text highlighting
                                             blockquote({ children }: any) {
+                                                const highlightChildren = (child: any): any => {
+                                                    if (typeof child === 'string' && searchQuery.trim()) {
+                                                        return (
+                                                            <HighlightText
+                                                                text={child}
+                                                                searchQuery={searchQuery}
+                                                                messageId={message.id}
+                                                                currentMatchIndex={currentMatchIndex}
+                                                                searchMatches={searchMatches}
+                                                                isUserMessage={false}
+                                                            />
+                                                        );
+                                                    }
+                                                    if (Array.isArray(child)) {
+                                                        return child.map((c, i) => <React.Fragment key={i}>{highlightChildren(c)}</React.Fragment>);
+                                                    }
+                                                    return child;
+                                                };
                                                 return (
-                                                    <blockquote className="border-l-4 border-muted-foreground/30 pl-4 italic my-2">
-                                                        {children}
+                                                    <blockquote className="border-l-4 border-violet-500 pl-4 italic my-2 text-muted-foreground">
+                                                        {highlightChildren(children)}
                                                     </blockquote>
+                                                );
+                                            },
+                                            // Customize tables
+                                            table({ children }: any) {
+                                                return (
+                                                    <div className="overflow-x-auto my-2">
+                                                        <table className="min-w-full border-collapse border border-border">
+                                                            {children}
+                                                        </table>
+                                                    </div>
+                                                );
+                                            },
+                                            th({ children }: any) {
+                                                return (
+                                                    <th className="border border-border px-4 py-2 bg-muted font-semibold">
+                                                        {children}
+                                                    </th>
+                                                );
+                                            },
+                                            td({ children }: any) {
+                                                return (
+                                                    <td className="border border-border px-4 py-2">
+                                                        {children}
+                                                    </td>
                                                 );
                                             },
                                         }}
@@ -388,20 +762,13 @@ function MessageBubble({
                         </div>
                     )}
 
-                    {/* Timestamp */}
+                    {/* Timestamp - inside bubble at bottom */}
                     {timestamp && (
-                        <p className={`text-[10px] mt-1.5 ${isUser ? "!text-white/80" : "text-muted-foreground"}`}>
+                        <p className={`relative z-10 text-[10px] mt-2 pt-1 border-t ${isUser ? "border-white/20 text-white/70" : "border-border text-muted-foreground"}`}>
                             {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                     )}
                 </div>
-
-                {/* User Avatar */}
-                {isUser && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center shadow-lg">
-                        <User className="w-4 h-4 text-white" />
-                    </div>
-                )}
             </div>
 
             {/* Copy / Article actions for bot messages - appears below bubble on hover */}
@@ -445,7 +812,7 @@ function MessageBubble({
                         ) : (
                             <>
                                 <PenTool className="h-3 w-3" />
-                                Create Article
+                                Select for Article
                             </>
                         )}
                     </Button>
@@ -539,10 +906,14 @@ export default function Chat() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const messageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState("");
     const [isStreaming, setIsStreaming] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchMatches, setSearchMatches] = useState<Array<{ messageId: number; matchIndex: number; textOffset?: number; isUserMatch?: boolean }>>([]);
+    const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
     const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
     const streamingMessageIdRef = useRef<number | null>(null);
     const [currentChatTabId, setCurrentChatTabId] = useState<string | null>(null); // UUID as string
@@ -590,7 +961,7 @@ export default function Chat() {
 
     const [selectedArticleMessageIds, setSelectedArticleMessageIds] = useState<number[]>([]);
 
-    // Clicking "Create Article" on a message now toggles it in the multi-select list.
+    // Clicking "Select for Article" on a message now toggles it in the multi-select list.
     // The actual article is created from the bottom selection bar.
     const handleCreateArticle = (_content: string, messageId?: number) => {
         if (typeof messageId !== "number") return;
@@ -697,23 +1068,29 @@ export default function Chat() {
 
         // Remove common question starters and make it more title-like
         // Remove question words at the start if they're standalone
-        title = title.replace(/^(what|why|how|who|when|where|can|could|should|would|will|is|are|do|does|did)\s+/i, '');
+        const questionWordsRegex = new RegExp('^(what|why|how|who|when|where|can|could|should|would|will|is|are|do|does|did)\\s+', 'i');
+        title = title.replace(questionWordsRegex, '');
 
         // Remove trailing punctuation and question marks
-        title = title.replace(/[.,;:!?]+$/, '');
+        const punctuationRegex = new RegExp('[.,;:!?]+$');
+        title = title.replace(punctuationRegex, '');
 
         // Remove common filler words/phrases at the start
-        title = title.replace(/^(can you|could you|please|i want|i need|i would like|tell me|explain|describe)\s+/i, '');
+        const fillerWordsRegex = new RegExp('^(can you|could you|please|i want|i need|i would like|tell me|explain|describe)\\s+', 'i');
+        title = title.replace(fillerWordsRegex, '');
 
         // If it starts with "what is" or "what are", remove those
-        title = title.replace(/^what\s+(is|are)\s+/i, '');
+        const whatIsRegex = new RegExp('^what\\s+(is|are)\\s+', 'i');
+        title = title.replace(whatIsRegex, '');
 
         // Capitalize first letter of each word for better title format
         // But preserve acronyms and important capitalization
-        const words = title.split(/\s+/);
+        const wordsRegex = new RegExp('\\s+');
+        const words = title.split(wordsRegex);
         const capitalizedWords = words.map((word, index) => {
             // Keep acronyms (all caps) as-is
-            if (word === word.toUpperCase() && word.length > 1 && /^[A-Z]+$/.test(word)) {
+            const acronymRegex = new RegExp('^[A-Z]+$');
+            if (word === word.toUpperCase() && word.length > 1 && acronymRegex.test(word)) {
                 return word;
             }
             // Capitalize first letter, lowercase the rest
@@ -734,7 +1111,8 @@ export default function Chat() {
         }
 
         // Remove trailing punctuation again (in case truncation added some)
-        title = title.replace(/[.,;:!?]+$/, '').trim();
+        const finalPunctuationRegex = new RegExp('[.,;:!?]+$');
+        title = title.replace(finalPunctuationRegex, '').trim();
 
         console.log("generateChatTitle: final title:", title);
 
@@ -834,10 +1212,10 @@ export default function Chat() {
     // Load chat tabs to check if we should show landing page
     const currentTenantId = useAuthStore((s) => s.tenantId);
     const hydrated = useAuthStore((s) => s.hydrated);
-    
+
     // Get brain space store values
     const { currentBrainSpaceId } = useBrainSpaceStore();
-    
+
     // Get workspaces and collections for knowledge base filtering
     const { data: workspaces } = useUserWorkspaces();
     const { data: collections } = useUserCollections(currentBrainSpaceId || undefined);
@@ -1313,10 +1691,187 @@ export default function Chat() {
         }
     }, [chatHistory, chatId, isStreaming]);
 
-    // Auto-scroll to bottom when messages change
+    // Search functionality - state declared above
+
+    // Refs to store current values for event handlers (avoid stale closures)
+    const searchMatchesRef = useRef(searchMatches);
+    const currentMatchIndexRef = useRef(currentMatchIndex);
+
+    // Keep refs in sync with state
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
+        searchMatchesRef.current = searchMatches;
+    }, [searchMatches]);
+
+    useEffect(() => {
+        currentMatchIndexRef.current = currentMatchIndex;
+        // Clear offset tracking when match index changes to ensure fresh rendering
+        messageTextOffsets.clear();
+    }, [currentMatchIndex]);
+
+    // Navigate to match - uses refs to get current values
+    const navigateToMatch = useCallback((direction: 'next' | 'prev') => {
+        const matches = searchMatchesRef.current;
+        const currentIndex = currentMatchIndexRef.current;
+
+        if (matches.length === 0) return;
+
+        let newIndex = currentIndex;
+        if (direction === 'next') {
+            newIndex = (currentIndex + 1) % matches.length;
+        } else {
+            newIndex = currentIndex <= 0 ? matches.length - 1 : currentIndex - 1;
+        }
+
+        // Clear offset tracking before state update to ensure fresh rendering
+        messageTextOffsets.clear();
+
+        setCurrentMatchIndex(newIndex);
+        currentMatchIndexRef.current = newIndex;
+
+        // Notify layout of current match index change
+        window.dispatchEvent(new CustomEvent('searchMatchesUpdate', {
+            detail: { count: matches.length, currentIndex: newIndex }
+        }));
+
+        // Scroll to the specific match element after state update
+        setTimeout(() => {
+            // Try to find the specific mark element with the match index
+            const markElement = document.querySelector(`mark[data-match-index="${newIndex}"]`);
+            if (markElement) {
+                markElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                // Fallback: scroll to the message element
+                const match = matches[newIndex];
+                if (match) {
+                    const messageElement = messageRefs.current.get(match.messageId);
+                    if (messageElement) {
+                        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            }
+        }, 50); // Small delay to allow React to re-render and update the DOM
+    }, []);
+
+    // Listen for search query changes from layout
+    useEffect(() => {
+        const handleSearchQueryChange = (e: CustomEvent) => {
+            setSearchQuery(e.detail || "");
+        };
+        const handleCloseSearch = () => {
+            setSearchQuery("");
+            setSearchMatches([]);
+            setCurrentMatchIndex(-1);
+        };
+        const handleSearchNavigate = (e: CustomEvent) => {
+            navigateToMatch(e.detail === 'next' ? 'next' : 'prev');
+        };
+
+        window.addEventListener('searchQueryChange', handleSearchQueryChange as EventListener);
+        window.addEventListener('closeSearch', handleCloseSearch);
+        window.addEventListener('searchNavigate', handleSearchNavigate as EventListener);
+        return () => {
+            window.removeEventListener('searchQueryChange', handleSearchQueryChange as EventListener);
+            window.removeEventListener('closeSearch', handleCloseSearch);
+            window.removeEventListener('searchNavigate', handleSearchNavigate as EventListener);
+        };
+    }, [navigateToMatch]);
+
+    // Perform search
+    useEffect(() => {
+        // Reset text offsets when search query changes
+        messageTextOffsets.clear();
+
+        if (!searchQuery.trim()) {
+            setSearchMatches([]);
+            setCurrentMatchIndex(-1);
+            return;
+        }
+
+        const matches: Array<{ messageId: number; matchIndex: number; textOffset: number; isUserMatch: boolean }> = [];
+        const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Ensure we're matching the full query string, not individual characters
+        const regex = new RegExp(escapedQuery, 'gi');
+        let globalMatchIndex = 0;
+
+        messages.forEach((msg) => {
+            // Search in both question (user) and answer (AI)
+            const questionText = msg.question || '';
+            const answerText = msg.answer || '';
+
+            // Search in question (user message) - search character-by-character
+            if (questionText) {
+                const questionMatches = Array.from(questionText.matchAll(regex));
+                questionMatches.forEach((match) => {
+                    if (match[0] && match[0].length > 0) {
+                        matches.push({
+                            messageId: msg.id,
+                            matchIndex: globalMatchIndex++,
+                            textOffset: match.index || 0,
+                            isUserMatch: true  // Mark as user message match
+                        });
+                    }
+                });
+            }
+
+            // Search in answer (AI response) - search character-by-character
+            if (answerText) {
+                const answerMatches = Array.from(answerText.matchAll(regex));
+                answerMatches.forEach((match) => {
+                    if (match[0] && match[0].length > 0) {
+                        matches.push({
+                            messageId: msg.id,
+                            matchIndex: globalMatchIndex++,
+                            textOffset: match.index || 0,
+                            isUserMatch: false  // Mark as AI message match
+                        });
+                    }
+                });
+            }
+        });
+
+        // Reset text offsets before setting new matches
+        messageTextOffsets.clear();
+        setSearchMatches(matches);
+
+        if (matches.length > 0) {
+            setCurrentMatchIndex(0);
+            // Scroll to first match after state update
+            setTimeout(() => {
+                const markElement = document.querySelector(`mark[data-match-index="0"]`);
+                if (markElement) {
+                    markElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    // Fallback: scroll to message
+                    const firstMatch = matches[0];
+                    const messageElement = messageRefs.current.get(firstMatch.messageId);
+                    if (messageElement) {
+                        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            }, 100);
+        } else {
+            setCurrentMatchIndex(-1);
+        }
+
+        // Notify layout of match count
+        window.dispatchEvent(new CustomEvent('searchMatchesUpdate', {
+            detail: { count: matches.length, currentIndex: matches.length > 0 ? 0 : -1 }
+        }));
+    }, [searchQuery, messages]);
+
+    // Update layout when match index changes
+    useEffect(() => {
+        window.dispatchEvent(new CustomEvent('searchMatchesUpdate', {
+            detail: { count: searchMatches.length, currentIndex: currentMatchIndex }
+        }));
+    }, [currentMatchIndex, searchMatches.length]);
+
+    // Auto-scroll to bottom when messages change (only if not searching)
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [messages, searchQuery]);
 
     // Scroll once when streaming starts
     useEffect(() => {
@@ -1343,17 +1898,17 @@ export default function Chat() {
         setIsStreaming(true);
 
         // Get current workspace and collection UUIDs for filtering
-        const currentWorkspace = currentBrainSpaceId 
+        const currentWorkspace = currentBrainSpaceId
             ? workspaces?.find((w) => w.id === currentBrainSpaceId)
             : null;
         const workspaceUuid = currentWorkspace?.uuid || null;
-        
+
         // Get collection UUID if we have a current workspace
         const currentCollection = workspaceUuid && collections
             ? collections.find((c) => c.workspaceId === currentBrainSpaceId)
             : null;
         const collectionUuid = currentCollection?.uuid || null;
-        
+
         // Get user UUID for access control
         // Backend will automatically extract user_uuid from current_user if not provided
         const userUuid = undefined;
@@ -1379,7 +1934,7 @@ export default function Chat() {
                     user_uuid: userUuid || undefined,
                 }
             );
-            
+
             // Extract context silently (don't log details to avoid exposing to user)
             if (searchResults.results && searchResults.results.length > 0) {
                 // Combine all relevant content chunks
@@ -1637,6 +2192,7 @@ export default function Chat() {
         }
     };
 
+
     // Show landing page if there are no chat tabs AND no pending question AND no messages
     const pendingQuestion = typeof window !== "undefined" ? sessionStorage.getItem("pendingChatQuestion") : null;
     // If no chat tabs exist and we're not loading, always show landing page (unless streaming or pending)
@@ -1731,7 +2287,7 @@ export default function Chat() {
                     <AnimatePresence mode="popLayout">
                         {messages.map((msg, index) => (
                             <MessageBubble
-                                key={`${msg.id}-${index}`}
+                                key={`${msg.id}-${index}-${searchQuery}-${currentMatchIndex}`}
                                 message={msg}
                                 index={index}
                                 isStreaming={isStreaming && streamingMessageId === msg.id && chatCreatedRef.current}
@@ -1739,6 +2295,16 @@ export default function Chat() {
                                 onCreateArticle={handleCreateArticle}
                                 isSelectedForArticle={selectedArticleMessageIds.includes(msg.id)}
                                 currentStatus={currentStatus}
+                                messageRef={(node) => {
+                                    if (node) {
+                                        messageRefs.current.set(msg.id, node);
+                                    } else {
+                                        messageRefs.current.delete(msg.id);
+                                    }
+                                }}
+                                searchQuery={searchQuery}
+                                currentMatchIndex={currentMatchIndex}
+                                searchMatches={searchMatches}
                             />
                         ))}
                     </AnimatePresence>
@@ -1776,7 +2342,7 @@ export default function Chat() {
                                     onClick={handleCreateArticleFromSelection}
                                 >
                                     <PenTool className="h-3 w-3 mr-1" />
-                                    Create Article from Selection
+                                    Select for Article
                                 </Button>
                             </div>
                         </div>

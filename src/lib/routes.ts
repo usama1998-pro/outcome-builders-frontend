@@ -53,6 +53,8 @@ const routes = {
     resendInvitation: (tenantId: number, invitationId: number) => `/user/invitations/${tenantId}/${invitationId}/resend`,
     deleteInvitation: (tenantId: number, invitationId: number) => `/user/invitations/${tenantId}/${invitationId}`,
     sendWorkspaceTokens: (tenantId: number, invitationId: number) => `/user/invitations/${tenantId}/${invitationId}/send-tokens`,
+    settings: "/user/settings",
+    updateSettings: "/user/settings",
   },
   tenant: {
     create: "/tenant",

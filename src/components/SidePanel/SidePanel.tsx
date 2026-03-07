@@ -14,21 +14,26 @@ import {
     SidebarMenuItem,
     SidebarMenuSub,
     SidebarMenuSubItem,
-    SidebarMenuSubButton
+    SidebarMenuSubButton,
+    SidebarMenuAction
 } from "@/components/ui/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, FolderOpen, Layers, FileText, Wrench, Sparkles, Settings, Building, Briefcase, BarChart3, Stethoscope, Compass, Network, Palette, Package, Megaphone, HelpCircle, Plus, Move, MoreVertical } from "lucide-react";
+import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, FolderOpen, Layers, FileText, Wrench, Sparkles, Settings, Building, Briefcase, BarChart3, Stethoscope, Compass, Network, Palette, Package, Megaphone, HelpCircle, Plus, Move, MoreVertical, Search, MoreHorizontal, Loader2 } from "lucide-react";
 import { useSignOut, useUserTenants } from "@/src/hooks/useAuth";
+import { useOrganizationDetails } from "@/src/hooks/useOrganization";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuthStore } from "@/src/store/useAuth";
 import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
 import { useUserProfile } from "@/src/hooks/useProfile";
 import { useUserWorkspaces, useCreateUserWorkspace } from "@/src/hooks/useWorkspace";
 import { useUserCollections } from "@/src/hooks/useCollection";
 import { useMoveNote } from "@/src/hooks/useNotes";
-import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/src/lib/axios";
 import routes from "@/src/lib/routes";
 import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
+import { ChatTab } from "../../types/chat";
+import { getChatTabs, deleteChatTab, clearChatTab } from "@/src/api/chat";
 import {
     Select,
     SelectContent,
@@ -45,6 +50,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
+    AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +74,7 @@ export default function SidePanel() {
     const currentTenantId = useAuthStore((s) => s.tenantId);
     const hydrated = useAuthStore((state) => state.hydrated);
     const { data: tenants } = useUserTenants();
+    const { data: organization } = useOrganizationDetails(currentTenantId || 0);
     const { data: userProfile } = useUserProfile();
     const { data: workspaces, isLoading: workspacesLoading, isError: workspacesError } = useUserWorkspaces();
     // SidePanel needs all collections (not filtered by workspace) for the tree structure
@@ -92,6 +99,28 @@ export default function SidePanel() {
     const canCreateBrainspace = !permissionsLoading && (
         hasPermission(PERMISSIONS.BRAINSPACE_CREATE) || isOwnerOrAdmin
     );
+
+    // Chat-specific state
+    const [chatsOpen, setChatsOpen] = useState(true);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [clearDialogOpen, setClearDialogOpen] = useState(false);
+    const [selectedChatId, setSelectedChatId] = useState<string | null>(null); // UUID as string
+    const [loadingChatId, setLoadingChatId] = useState<string | null>(null); // UUID as string
+
+    // Load chat tabs from API (filtered by current tenant)
+    const { data: chatTabs = [], isLoading: isLoadingChatTabs, refetch: refetchChatTabs } = useQuery({
+        queryKey: ["chatTabs", currentTenantId],
+        queryFn: getChatTabs,
+        enabled: !!currentTenantId && hydrated,
+        staleTime: 0,
+        refetchOnWindowFocus: false,
+        refetchOnMount: "always",
+    });
+
+    // Get last message for each chat tab (for display)
+    const getLastMessage = (chatTab: ChatTab): string => {
+        return "Click to continue conversation";
+    };
 
     const createForm = useForm<CreateBrainSpaceFormValues>({
         resolver: zodResolver(createBrainSpaceSchema),
@@ -344,8 +373,8 @@ export default function SidePanel() {
     const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<number>>(new Set());
 
     // State for managing expanded navigation sections
-    // Default: Knowledge Bank, Strategy Tools, and Execution Tools are all expanded
-    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['knowledge-bank', 'strategy-tools', 'execution-tools']));
+    // Default: Knowledge Bank, Strategy Tools, Execution Tools, and Chat are all expanded
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['knowledge-bank', 'strategy-tools', 'execution-tools', 'chat']));
 
     // Auto-expand first organization when workspaces load
     useEffect(() => {
@@ -405,8 +434,24 @@ export default function SidePanel() {
 
 
     return (
+        <>
         <Sidebar>
             <SidebarContent>
+                {/* Organization Logo */}
+                <div className="px-4 py-4 border-b">
+                    <Link href="/dashboard/organization" className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                            <AvatarImage src={organization?.logo || ""} alt={organization?.company_name || "Organization"} />
+                            <AvatarFallback className="text-lg font-semibold bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300">
+                                {organization?.company_name?.charAt(0).toUpperCase() || "O"}
+                            </AvatarFallback>
+                        </Avatar>
+                        <span className="font-semibold text-sm truncate">
+                            {organization?.company_name || "Organization"}
+                        </span>
+                    </Link>
+                </div>
+
                 {/* Brain Space Selector */}
                 <SidebarGroup>
                     <SidebarGroupContent>
@@ -656,11 +701,24 @@ export default function SidePanel() {
                                 <SidebarMenuButton asChild>
                                     <Link
                                         href="/chat"
-                                        className={`px-2 py-1 rounded ${pathname === "/chat" || pathname.startsWith("/chat/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                        className={`px-2 py-1 rounded ${pathname === "/chat" || pathname === "/chat/new" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                             }`}
                                     >
                                         <MessageSquare className="mr-2 h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
-                                        Chat
+                                        New Chat
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+
+                            <SidebarMenuItem>
+                                <SidebarMenuButton asChild>
+                                    <Link
+                                        href="/chat/search"
+                                        className={`px-2 py-1 rounded ${pathname === "/chat/search" || pathname.startsWith("/chat/search/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+                                            }`}
+                                    >
+                                        <Search className="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                        Chat Search
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -694,6 +752,109 @@ export default function SidePanel() {
                     </SidebarGroupContent>
                 </SidebarGroup>
 
+                {/* Chat History */}
+                {true && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel>
+                            <button
+                                onClick={() => setChatsOpen(!chatsOpen)}
+                                className="flex items-center gap-2 w-full text-left"
+                            >
+                                {chatsOpen ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                    <ChevronUp className="h-4 w-4 rotate-[-90deg]" />
+                                )}
+                                Chat History
+                            </button>
+                        </SidebarGroupLabel>
+                        {chatsOpen && (
+                            <SidebarGroupContent>
+                                <div className="max-h-[400px] overflow-y-auto pr-1">
+                                    {isLoadingChatTabs ? (
+                                        <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                                            <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                                            Loading chats...
+                                        </div>
+                                    ) : chatTabs.length === 0 ? (
+                                        <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                                            No chats yet. Start a new conversation!
+                                        </div>
+                                    ) : (
+                                        <SidebarMenu>
+                                            {chatTabs.map((chat) => {
+                                                const isLoading = loadingChatId === chat.id;
+                                                return (
+                                                    <SidebarMenuItem key={chat.id}>
+                                                        <SidebarMenuButton asChild disabled={isLoading}>
+                                                            <Link
+                                                                href={`/chat/${chat.id}`}
+                                                                className={`flex flex-col items-start px-2 py-2 rounded ${pathname === `/chat/${chat.id}`
+                                                                    ? "bg-gray-300 font-semibold"
+                                                                    : "hover:bg-gray-200"
+                                                                    } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                                                            >
+                                                                <div className="flex items-center gap-2 w-full">
+                                                                    {isLoading ? (
+                                                                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                                                                    ) : null}
+                                                                    <span className="flex-1">{chat.name}</span>
+                                                                </div>
+                                                                {!isLoading && (
+                                                                    <span className="text-xs text-gray-500 truncate">
+                                                                        {getLastMessage(chat)}
+                                                                    </span>
+                                                                )}
+                                                            </Link>
+                                                        </SidebarMenuButton>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild disabled={isLoading}>
+                                                                <SidebarMenuAction disabled={isLoading}>
+                                                                    {isLoading ? (
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    ) : (
+                                                                        <MoreHorizontal className="h-4 w-4" />
+                                                                    )}
+                                                                </SidebarMenuAction>
+                                                            </DropdownMenuTrigger>
+                                                            {!isLoading && (
+                                                                <DropdownMenuContent side="right" align="start">
+                                                                    <DropdownMenuItem
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                            setSelectedChatId(chat.id);
+                                                                            setClearDialogOpen(true);
+                                                                        }}
+                                                                    >
+                                                                        <span>Clear</span>
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                            setSelectedChatId(chat.id);
+                                                                            setDeleteDialogOpen(true);
+                                                                        }}
+                                                                        className="text-destructive focus:text-destructive"
+                                                                    >
+                                                                        <span>Delete</span>
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            )}
+                                                        </DropdownMenu>
+                                                    </SidebarMenuItem>
+                                                );
+                                            })}
+                                        </SidebarMenu>
+                                    )}
+                                </div>
+                            </SidebarGroupContent>
+                        )}
+                    </SidebarGroup>
+                )}
+
                 {/* Knowledge Bank - Collapsible */}
                 <SidebarGroup>
                     <SidebarGroupLabel>
@@ -713,14 +874,20 @@ export default function SidePanel() {
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton asChild>
-                                        <Link
-                                            href="/dashboard/workspaces"
-                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/workspaces" || pathname.startsWith("/dashboard/workspaces/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                                }`}
-                                        >
-                                            <Brain className="mr-2 h-4 w-4 text-violet-600 dark:text-violet-400" />
-                                            Brainspaces
+                                    <SidebarMenuButton
+                                        asChild
+                                        isActive={pathname === '/dashboard/workspaces' || pathname.startsWith('/dashboard/workspaces/')}
+                                    >
+                                        <Link href="/dashboard/workspaces" className="flex items-center justify-between w-full">
+                                            <div className="flex items-center gap-2">
+                                                <Brain className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                                <span>Brainspaces</span>
+                                            </div>
+                                            {!workspacesLoading && workspaces && (
+                                                <span className="text-xs text-muted-foreground ml-auto">
+                                                    ({workspaces.length})
+                                                </span>
+                                            )}
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
@@ -844,7 +1011,6 @@ export default function SidePanel() {
                     {expandedSections.has('execution-tools') && (
                         <SidebarGroupContent>
                             <SidebarMenu>
-                                {/* Roadmap with inline progress bar */}
                                 <SidebarMenuItem>
                                     <SidebarMenuButton asChild>
                                         <Link
@@ -857,15 +1023,7 @@ export default function SidePanel() {
                                             }`}
                                         >
                                             <BarChart3 className="mr-2 h-4 w-4 text-sky-600 dark:text-sky-400" />
-                                            <div className="flex flex-col flex-1">
-                                                <span>Roadmap</span>
-                                                <div className="mt-1 h-1.5 rounded-full bg-muted overflow-hidden w-full">
-                                                    <div
-                                                        className="h-full bg-emerald-500"
-                                                        style={{ width: "45%" }}
-                                                    />
-                                                </div>
-                                            </div>
+                                            Roadmap
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
@@ -1158,6 +1316,99 @@ export default function SidePanel() {
                 </SidebarMenu>
             </SidebarFooter>
         </Sidebar>
+
+        {/* Clear Chat Confirmation Dialog */}
+        <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Clear Chat</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Are you sure you want to clear all messages from this chat? This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={async () => {
+                            if (selectedChatId) {
+                                const chatIdToClear = selectedChatId;
+                                // Close dialog immediately
+                                setClearDialogOpen(false);
+                                setSelectedChatId(null);
+                                setLoadingChatId(chatIdToClear);
+                                try {
+                                    await clearChatTab(chatIdToClear);
+                                    toast.success("Chat cleared successfully");
+                                    // Invalidate chat history for this specific chat so it reloads with empty messages
+                                    queryClient.invalidateQueries({
+                                        predicate: (query) => {
+                                            const key = query.queryKey;
+                                            return Array.isArray(key) &&
+                                                key.length >= 2 &&
+                                                key[0] === "chatHistory" &&
+                                                String(key[1]) === String(chatIdToClear);
+                                        }
+                                    });
+                                } catch (error: any) {
+                                    toast.error(`Failed to clear chat: ${error.message || "Unknown error"}`);
+                                } finally {
+                                    setLoadingChatId(null);
+                                }
+                            }
+                        }}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                        Clear
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete Chat Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Are you sure you want to delete this chat? This will permanently delete the chat and all its messages. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={async () => {
+                            if (selectedChatId) {
+                                const chatIdToDelete = selectedChatId;
+                                // Close dialog immediately
+                                setDeleteDialogOpen(false);
+                                setSelectedChatId(null);
+                                setLoadingChatId(chatIdToDelete);
+                                try {
+                                    await deleteChatTab(chatIdToDelete);
+                                    toast.success("Chat deleted successfully");
+                                    // Immediately refetch chat tabs to update the list
+                                    await refetchChatTabs();
+                                    // Invalidate chat history for this specific chat (UUID string)
+                                    queryClient.invalidateQueries({ queryKey: ["chatHistory", chatIdToDelete] });
+                                    // If we're on this chat page, redirect to landing page
+                                    if (pathname === `/chat/${chatIdToDelete}`) {
+                                        router.push("/chat");
+                                    }
+                                } catch (error: any) {
+                                    toast.error(`Failed to delete chat: ${error.message || "Unknown error"}`);
+                                } finally {
+                                    setLoadingChatId(null);
+                                }
+                            }
+                        }}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                        Delete
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    </>
     );
 
 

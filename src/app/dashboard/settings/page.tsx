@@ -3,22 +3,42 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Shield, ShieldCheck, Moon, Sun, Palette } from "lucide-react";
+import { Shield, ShieldCheck, Moon, Sun, Palette, Bot, Save } from "lucide-react";
 import { use2FAStatus, useToggle2FA } from "@/src/hooks/use2FA";
+import { useGetUserSettings, useUpdateUserSettings } from "@/src/hooks/useUserSettings";
 import { useTheme } from "next-themes";
 import RequireAuth from "@/src/components/auth/requireAuth";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function SettingsPage() {
     const { data: twoFAData, isLoading: twoFALoading } = use2FAStatus();
     const { mutate: toggle2FA, isPending: isToggling2FA } = useToggle2FA();
+    const { data: settingsData, isLoading: settingsLoading } = useGetUserSettings();
+    const { mutate: updateSettings, isPending: isUpdatingSettings } = useUpdateUserSettings();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
+    const [customInstructions, setCustomInstructions] = useState("");
 
     // Handle theme mounting
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Load settings when data is available
+    useEffect(() => {
+        if (settingsData?.data) {
+            setCustomInstructions(settingsData.data.custom_instructions || "");
+        }
+    }, [settingsData]);
+
+    const handleSaveSettings = () => {
+        updateSettings({ custom_instructions: customInstructions.trim() || null });
+    };
+
+    const maxLength = 2000;
+    const remainingChars = maxLength - customInstructions.length;
 
     const is2FAEnabled = twoFAData?.data?.two_fa_enabled || false;
     const isDarkMode = theme === "dark";
@@ -131,6 +151,56 @@ export default function SettingsPage() {
                                         disabled
                                     />
                                 )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* AI Chat Settings */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Bot className="h-5 w-5" />
+                                AI Chat Settings
+                            </CardTitle>
+                            <CardDescription>
+                                Customize how the AI assistant responds to you by providing personalized instructions
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="custom-instructions" className="text-base font-semibold">
+                                    Custom Instructions
+                                </Label>
+                                <p className="text-sm text-muted-foreground">
+                                    Provide specific instructions or preferences for how the AI should respond to your questions. 
+                                    These instructions will be included in every chat conversation.
+                                </p>
+                                <Textarea
+                                    id="custom-instructions"
+                                    placeholder="e.g., Always respond in a professional tone, use bullet points when listing items, focus on practical solutions..."
+                                    value={customInstructions}
+                                    onChange={(e) => setCustomInstructions(e.target.value)}
+                                    maxLength={maxLength}
+                                    rows={6}
+                                    className="resize-none"
+                                    disabled={settingsLoading || isUpdatingSettings}
+                                />
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-muted-foreground">
+                                        {remainingChars >= 0 
+                                            ? `${remainingChars} characters remaining`
+                                            : `${Math.abs(remainingChars)} characters over limit`
+                                        }
+                                    </p>
+                                    <Button
+                                        onClick={handleSaveSettings}
+                                        disabled={settingsLoading || isUpdatingSettings || remainingChars < 0}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <Save className="h-4 w-4" />
+                                        {isUpdatingSettings ? "Saving..." : "Save Settings"}
+                                    </Button>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
