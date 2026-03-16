@@ -65,7 +65,7 @@ export default function SearchChatPage() {
                     <div className="flex items-center gap-4 mb-4">
                         <Link href="/chat">
                             <Button variant="ghost" size="icon" className="h-9 w-9">
-                                <ArrowLeft className="h-4 w-4" />
+                                <ArrowLeft className="h-4 w-4 text-[#DB2B30]" />
                             </Button>
                         </Link>
                         <h1 className="text-xl font-semibold">Search Chats</h1>
@@ -73,7 +73,7 @@ export default function SearchChatPage() {
                     
                     {/* Search Input */}
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#DB2B30]" />
                         <Input
                             type="text"
                             placeholder="Search chats by name or message content..."
@@ -84,7 +84,7 @@ export default function SearchChatPage() {
                         />
                         {(isLoading || isFetching) && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                <Loader2 className="h-4 w-4 animate-spin text-[#DB2B30]" />
                             </div>
                         )}
                     </div>
@@ -97,9 +97,9 @@ export default function SearchChatPage() {
                     {!debouncedQuery ? (
                         <div className="flex flex-col items-center justify-center py-12 min-h-[400px]">
                             <div className="relative mb-8">
-                                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/20 via-purple-500/20 to-indigo-500/20 rounded-full blur-3xl animate-pulse"></div>
-                                <div className="relative w-32 h-32 bg-gradient-to-br from-violet-500/10 via-purple-500/10 to-indigo-500/10 dark:from-violet-900/30 dark:via-purple-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center border border-violet-500/20 dark:border-violet-500/30 shadow-lg">
-                                    <Search className="w-16 h-16 text-violet-500 dark:text-violet-400" />
+                                <div className="absolute inset-0 bg-gradient-to-br from-[#DB2B30]/20 via-[#B52227]/20 to-[#8A1B1F]/20 rounded-full blur-3xl animate-pulse"></div>
+                                <div className="relative w-32 h-32 bg-gradient-to-br from-[#DB2B30]/10 via-[#B52227]/10 to-[#8A1B1F]/10 dark:from-[#DB2B30]/20 dark:via-[#B52227]/20 dark:to-[#8A1B1F]/20 rounded-2xl flex items-center justify-center border border-[#DB2B30]/30 shadow-lg">
+                                    <Search className="w-16 h-16 text-[#DB2B30]" />
                                 </div>
                             </div>
                             <h3 className="text-2xl font-bold text-foreground mb-3">
@@ -124,9 +124,9 @@ export default function SearchChatPage() {
                     ) : searchResults.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 min-h-[400px]">
                             <div className="relative mb-8">
-                                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/20 via-purple-500/20 to-indigo-500/20 rounded-full blur-3xl animate-pulse"></div>
-                                <div className="relative w-32 h-32 bg-gradient-to-br from-violet-500/10 via-purple-500/10 to-indigo-500/10 dark:from-violet-900/30 dark:via-purple-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center border border-violet-500/20 dark:border-violet-500/30 shadow-lg">
-                                    <MessageSquare className="w-16 h-16 text-violet-500 dark:text-violet-400" />
+                                <div className="absolute inset-0 bg-gradient-to-br from-[#DB2B30]/20 via-[#B52227]/20 to-[#8A1B1F]/20 rounded-full blur-3xl animate-pulse"></div>
+                                <div className="relative w-32 h-32 bg-gradient-to-br from-[#DB2B30]/10 via-[#B52227]/10 to-[#8A1B1F]/10 dark:from-[#DB2B30]/20 dark:via-[#B52227]/20 dark:to-[#8A1B1F]/20 rounded-2xl flex items-center justify-center border border-[#DB2B30]/30 shadow-lg">
+                                    <MessageSquare className="w-16 h-16 text-[#DB2B30]" />
                                 </div>
                             </div>
                             <h3 className="text-2xl font-bold text-foreground mb-3">
@@ -145,13 +145,13 @@ export default function SearchChatPage() {
                                 <div
                                     key={chat.id}
                                     onClick={() => handleChatClick(chat.id)}
-                                    className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-accent cursor-pointer transition-colors group"
+                                    className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-[#DB2B30]/5 cursor-pointer transition-colors group"
                                 >
-                                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-500 flex items-center justify-center">
+                                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-[#DB2B30] via-[#B52227] to-[#8A1B1F] flex items-center justify-center">
                                         <MessageSquare className="w-5 h-5 text-white" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-semibold text-foreground group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors truncate">
+                                        <h3 className="font-semibold text-foreground group-hover:text-[#DB2B30] dark:group-hover:text-[#DB2B30] transition-colors truncate">
                                             {chat.name}
                                         </h3>
                                         <p className="text-sm text-muted-foreground">

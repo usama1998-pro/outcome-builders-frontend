@@ -73,14 +73,14 @@ export default function SignInForm() {
             <div className="flex items-center justify-center h-screen">
                 <div className="w-full max-w-md flex items-center justify-center flex-col px-4">
                     <Image
-                        src="/assets/Primary-Logo-Stacked-Black.png"
+                        src="/assets/P-L-B.png"
                         alt="logo black"
                         className="dark:hidden"
                         width={300}
                         height={300}
                     />
                     <Image
-                        src="/assets/Primary-Logo-Stacked-White.png"
+                        src="/assets/P-L-W.png"
                         alt="logo white"
                         className="hidden dark:block"
                         width={300}
@@ -122,7 +122,7 @@ export default function SignInForm() {
 
                         {/* Forgot Password Link */}
                         <div className="text-right">
-                            <a href="/forgot-password" className="text-sm text-blue-500 hover:underline">
+                            <a href="/forgot-password" className="text-sm text-red-500 hover:underline">
                                 Forgot Password?
                             </a>
                         </div>
@@ -132,7 +132,7 @@ export default function SignInForm() {
                             {signIn.isPending ? "Signing In..." : "Sign In"}
                         </Button>
 
-                        <a href="/signup" className="text-sm text-blue-500 hover:underline mt-2 text-center">
+                        <a href="/signup" className="text-sm text-red-500 hover:underline mt-2 text-center">
                             {"Don't have an account? Sign Up"}
                         </a>
                     </form>

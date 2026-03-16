@@ -160,7 +160,7 @@ export default function InviteAdminPage() {
                     </Link>
                     <div>
                         <h1 className="text-3xl font-bold flex items-center gap-2">
-                            <UserPlus className="h-8 w-8 text-emerald-500" />
+                            <UserPlus className="h-8 w-8 text-[#DB2B30]" />
                             Invite New Member
                         </h1>
                         <p className="text-muted-foreground">
@@ -261,7 +261,7 @@ export default function InviteAdminPage() {
                                                         <div
                                                             key={workspace.id}
                                                             className={`flex items-center space-x-3 p-2 rounded-md transition-colors ${isSelected
-                                                                    ? "bg-blue-500/10 border border-blue-500/20"
+                                                                    ? "bg-[#DB2B30]/10 border border-[#DB2B30]/30"
                                                                     : "hover:bg-muted/50"
                                                                 }`}
                                                         >
@@ -276,7 +276,7 @@ export default function InviteAdminPage() {
                                                                     );
                                                                 }}
                                                             />
-                                                            <Brain className={`h-4 w-4 ${isSelected ? "text-blue-500" : "text-muted-foreground"}`} />
+                                                            <Brain className={`h-4 w-4 ${isSelected ? "text-[#DB2B30]" : "text-muted-foreground"}`} />
                                                             <label
                                                                 htmlFor={`workspace-invite-${workspace.id}`}
                                                                 className="text-sm flex-1 cursor-pointer"
@@ -284,7 +284,7 @@ export default function InviteAdminPage() {
                                                                 {workspace.name}
                                                             </label>
                                                             {isSelected && (
-                                                                <Check className="h-4 w-4 text-blue-500" />
+                                                                <Check className="h-4 w-4 text-[#DB2B30]" />
                                                             )}
                                                         </div>
                                                     );
@@ -298,14 +298,14 @@ export default function InviteAdminPage() {
                                 )}
 
                                 {/* Info Box */}
-                                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                <div className="bg-[#DB2B30]/5 dark:bg-[#DB2B30]/20 border border-[#DB2B30]/40 dark:border-[#DB2B30]/60 rounded-lg p-4">
                                     <div className="flex items-start gap-3">
-                                        <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                        <Mail className="h-5 w-5 text-[#DB2B30] flex-shrink-0 mt-0.5" />
                                         <div className="space-y-1">
-                                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                            <p className="text-sm font-medium text-[#DB2B30]">
                                                 How it works
                                             </p>
-                                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                                            <p className="text-xs text-[#DB2B30]">
                                                 The invited member will receive an email with a link to create their account.
                                                 Once they sign up, they&apos;ll automatically be added to your organization with the selected role.
                                             </p>
@@ -323,7 +323,7 @@ export default function InviteAdminPage() {
                                     <Button
                                         type="submit"
                                         disabled={isPending || !email.trim()}
-                                        className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0"
+                                        className="bg-gradient-to-r from-[#DB2B30] to-red-700 text-white border-0"
                                     >
                                         <UserPlus className="h-4 w-4 mr-2" />
                                         {isPending ? "Sending Invitation..." : "Send Invitation"}

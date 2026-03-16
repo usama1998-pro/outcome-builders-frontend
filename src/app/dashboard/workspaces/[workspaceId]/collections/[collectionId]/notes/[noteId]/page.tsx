@@ -416,7 +416,7 @@ export default function NoteViewPage() {
                         variant="outline"
                         onClick={() => router.push(`/dashboard/workspaces/${workspaceId}/collections/${collectionIdParam}/notes`)}
                     >
-                        <FaArrowLeft className="mr-2" /> Back to Articles
+                        <FaArrowLeft className="mr-2" /> Back to Resources
                     </Button>
 
                     <div className="flex gap-2">
@@ -439,7 +439,7 @@ export default function NoteViewPage() {
                                 variant={note?.is_trained ? "default" : "outline"}
                                 onClick={handleToggleTrain}
                                 disabled={isTraining}
-                                className={note?.is_trained ? "bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 text-white border-0 hover:opacity-90" : ""}
+                                className={note?.is_trained ? "bg-gradient-to-r from-[#FF6B6B] via-[#FF3B3B] to-[#E10000] text-white border-0 hover:opacity-90" : ""}
                             >
                                 {isTraining ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -546,13 +546,25 @@ export default function NoteViewPage() {
                                 <div className="flex gap-2">
                                     {note.is_pinned && <Badge>Pinned</Badge>}
                                     {note.is_trained && (
-                                        <Badge className="bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 text-white border-0">
+                                        <Badge className="bg-gradient-to-r from-[#FF6B6B] via-[#FF3B3B] to-[#E10000] text-white border-0">
                                             <FaBrain className="mr-1" size={10} /> Trained
                                         </Badge>
                                     )}
                                     {note.visibility && (
-                                        <Badge variant={note.visibility === "private" ? "secondary" : note.visibility === "public" ? "default" : "outline"}>
-                                            {note.visibility === "private" ? "Only Me" : note.visibility === "public" ? "All" : "Collaborate"}
+                                        <Badge
+                                            className={`border-0 text-white ${
+                                                note.visibility === "private"
+                                                    ? "bg-[#4B5563]"
+                                                    : note.visibility === "public"
+                                                    ? "bg-gradient-to-r from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]"
+                                                    : "bg-[#059669]"
+                                            }`}
+                                        >
+                                            {note.visibility === "private"
+                                                ? "Only Me"
+                                                : note.visibility === "public"
+                                                ? "All"
+                                                : "Collaborate"}
                                         </Badge>
                                     )}
                                 </div>

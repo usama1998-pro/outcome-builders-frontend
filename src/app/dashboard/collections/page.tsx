@@ -493,27 +493,27 @@ export default function AllCollectionsPage() {
                             {/* Empty State Icon with Animations */}
                             <div className="relative mb-6">
                                 {/* Animated background gradient */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/20 via-purple-500/20 to-fuchsia-500/20 rounded-full blur-3xl animate-pulse"></div>
+                                <div className="absolute inset-0 bg-gradient-to-br from-[#FF6B6B]/25 via-[#FF3B3B]/25 to-[#E10000]/25 rounded-full blur-3xl animate-pulse"></div>
 
                                 {/* Main icon container */}
-                                <div className="relative w-24 h-24 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center border border-violet-500/20 dark:border-violet-500/30 shadow-lg animate-pulse">
-                                    <Layers className="w-12 h-12 text-violet-500 dark:text-violet-400" />
+                                <div className="relative w-24 h-24 bg-gradient-to-br from-[#FF6B6B]/15 via-[#FF3B3B]/15 to-[#E10000]/15 dark:from-[#7F1D1D]/60 dark:via-[#991B1B]/60 dark:to-[#7F1D1D]/60 rounded-full flex items-center justify-center border border-[#DB2B30]/40 dark:border-[#DB2B30]/60 shadow-lg animate-pulse">
+                                    <Layers className="w-12 h-12 text-[#DB2B30] dark:text-[#FDEBEB]" />
                                 </div>
 
                                 {/* Animated folder icon badge */}
-                                <div className="absolute -bottom-1 -right-1 w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center shadow-lg animate-bounce">
+                                <div className="absolute -bottom-1 -right-1 w-10 h-10 bg-[#DB2B30] rounded-full flex items-center justify-center shadow-lg animate-bounce">
                                     <FolderOpen className="w-5 h-5 text-white" />
                                 </div>
 
                                 {/* Decorative sparkles */}
                                 <div className="absolute -top-2 -right-2">
-                                    <Sparkles className="w-5 h-5 text-violet-400 animate-pulse" style={{ animationDelay: '0s' }} />
+                                    <Sparkles className="w-5 h-5 text-[#FFB3B3] animate-pulse" style={{ animationDelay: '0s' }} />
                                 </div>
                                 <div className="absolute -bottom-2 -left-2">
-                                    <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" style={{ animationDelay: '0.5s' }} />
+                                    <Sparkles className="w-4 h-4 text-[#FF8A8A] animate-pulse" style={{ animationDelay: '0.5s' }} />
                                 </div>
                                 <div className="absolute top-1/2 -left-3">
-                                    <Sparkles className="w-3 h-3 text-fuchsia-400 animate-pulse" style={{ animationDelay: '1s' }} />
+                                    <Sparkles className="w-3 h-3 text-[#FF6B6B] animate-pulse" style={{ animationDelay: '1s' }} />
                                 </div>
                             </div>
 
@@ -532,7 +532,7 @@ export default function AllCollectionsPage() {
                             {canCreateCollection && workspaces && workspaces.length > 0 && (
                                 <Button
                                     onClick={() => setOpen(true)}
-                                    className="bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0 hover:from-violet-600 hover:to-purple-600 shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                                    className="bg-[#DB2B30] hover:bg-[#B52227] text-white border-0 shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
                                 >
                                     <FaPlus className="mr-2 h-4 w-4" />
                                     Create Your First Collection

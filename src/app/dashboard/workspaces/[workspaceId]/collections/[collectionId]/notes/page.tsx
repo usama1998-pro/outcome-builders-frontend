@@ -122,27 +122,27 @@ export default function NotesPage() {
                         <div className="flex flex-col items-center text-center max-w-lg">
                             <div className="relative mb-8">
                                 {/* Animated background gradient */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 rounded-full blur-3xl animate-pulse"></div>
+                                <div className="absolute inset-0 bg-gradient-to-br from-[#FF6B6B]/25 via-[#FF3B3B]/25 to-[#E10000]/25 rounded-full blur-3xl animate-pulse"></div>
                                 {/* Main icon container */}
-                                <div className="relative w-32 h-32 bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-red-500/10 dark:from-amber-900/30 dark:via-orange-900/30 dark:to-red-900/30 rounded-2xl flex items-center justify-center border border-amber-500/20 dark:border-amber-500/30 shadow-lg">
-                                    <FileText className="w-16 h-16 text-amber-500 dark:text-amber-400" />
+                                <div className="relative w-32 h-32 bg-gradient-to-br from-[#FF6B6B]/15 via-[#FF3B3B]/15 to-[#E10000]/15 dark:from-[#7F1D1D]/60 dark:via-[#991B1B]/60 dark:to-[#7F1D1D]/60 rounded-2xl flex items-center justify-center border border-[#DB2B30]/40 dark:border-[#DB2B30]/60 shadow-lg">
+                                    <FileText className="w-16 h-16 text-[#DB2B30] dark:text-[#FDEBEB]" />
                                 </div>
                                 {/* Decorative sparkles */}
                                 <div className="absolute -top-2 -right-2">
-                                    <Sparkles className="w-6 h-6 text-amber-400 animate-pulse" />
+                                    <Sparkles className="w-6 h-6 text-[#FFB3B3] animate-pulse" />
                                 </div>
                                 <div className="absolute -bottom-2 -left-2">
-                                    <Sparkles className="w-5 h-5 text-orange-400 animate-pulse delay-300" />
+                                    <Sparkles className="w-5 h-5 text-[#FF8A8A] animate-pulse delay-300" />
                                 </div>
                             </div>
 
                             <h3 className="text-2xl font-bold text-foreground mb-3">
-                                No Articles Yet
+                                No Resources Yet
                             </h3>
 
                             <p className="text-muted-foreground mb-8 text-base leading-relaxed">
-                                This collection is empty. Start documenting your knowledge by creating your first article.
-                                You can add content and train articles for your AI assistant.
+                                No resources have been created in this collection yet. Start documenting your knowledge by creating your first article.
+                                You can add content and train resources for your AI assistant.
                             </p>
 
                             {canCreateNote && (
@@ -150,7 +150,7 @@ export default function NotesPage() {
                                     onClick={() => {
                                         router.push(`/dashboard/articles/new?collection_id=${collection.id}`);
                                     }}
-                                    className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all"
+                                    className="bg-[#DB2B30] hover:bg-[#B52227] text-white shadow-lg hover:shadow-xl transition-all"
                                 >
                                     <Plus className="w-4 h-4 mr-2" />
                                     Create Your First Article

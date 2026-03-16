@@ -75,14 +75,14 @@ function SignUpFormContent() {
     return (
         <div className="w-full max-w-md flex items-center justify-center flex-col px-4">
             <Image
-                src="/assets/Primary-Logo-Stacked-Black.png"
+                src="/assets/P-L-B.png"
                 alt="logo black"
                 className="dark:hidden"
                 width={300}
                 height={300}
             />
             <Image
-                src="/assets/Primary-Logo-Stacked-White.png"
+                src="/assets/P-L-W.png"
                 alt="logo white"
                 className="hidden dark:block"
                 width={300}
@@ -148,7 +148,7 @@ function SignUpFormContent() {
                     {signUp.isPending ? "Signing Up..." : "Sign Up"}
                 </Button>
 
-                <a href="/signin" className="text-sm text-blue-500 hover:underline mt-2 text-center block">
+                <a href="/signin" className="text-sm text-red-500 hover:underline mt-2 text-center block">
                     Already have an account? Sign In
                 </a>
             </form>

@@ -11,6 +11,7 @@ interface CreateChatMessageRequest {
   question: string;
   chat_tab_id?: string; // UUID as string
   agent_mode?: boolean;
+  model?: string; // 'auto' | 'default' | specific model slug
 }
 
 interface StreamChatOptions {
@@ -53,7 +54,7 @@ export async function searchChatTabs(query: string): Promise<ChatTab[]> {
  */
 export async function getChatHistory(
   chatTabId: string, // UUID as string
-  limit: number = 10
+  limit: number = 10,
 ): Promise<ChatHistory> {
   const { data } = await api.get(routes.chat.history(chatTabId), {
     params: { limit },
@@ -72,8 +73,15 @@ export function streamChat(
   question: string,
   chatTabId: string | undefined, // UUID as string
   agentMode: boolean,
-  context?: { type: 'collection' | 'workspace' | 'article' | 'text'; id?: number; text?: string } | undefined,
-  options?: StreamChatOptions
+  context?:
+    | {
+        type: "collection" | "workspace" | "article" | "text";
+        id?: number;
+        text?: string;
+      }
+    | undefined,
+  options?: StreamChatOptions,
+  model?: string, // 'auto' | 'default' | specific model slug
 ): AbortController {
   const abortController = new AbortController();
   let streamId: string | null = null;
@@ -83,20 +91,20 @@ export function streamChat(
       // Get token and tenant from auth store
       const token = localStorage.getItem("access_token");
       const tenantId = localStorage.getItem("tenant_id");
-      
+
       // Build headers
       const headers: HeadersInit = {
         "Content-Type": "application/json",
       };
-      
+
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
-      
+
       if (tenantId) {
         headers["X-Tenant"] = tenantId;
       }
-      
+
       // Construct the full URL
       // axios baseURL should be like http://localhost:8000/api/v1
       // But if it's just http://localhost:8000, we need to add /api/v1
@@ -109,25 +117,25 @@ export function streamChat(
       }
       // routes.chat.stream is "/chat/stream", so full URL is baseURL + route
       const fullUrl = `${cleanBaseURL}${routes.chat.stream}`;
-      
-      const response = await fetch(
-        fullUrl,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            question,
-            chat_tab_id: chatTabId,
-            agent_mode: agentMode,
-            context: context ? {
-              type: context.type,
-              id: context.id,
-              text: context.text
-            } : undefined,
-          }),
-          signal: abortController.signal,
-        }
-      );
+
+      const response = await fetch(fullUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          question,
+          chat_tab_id: chatTabId,
+          agent_mode: agentMode,
+          model: model ?? undefined,
+          context: context
+            ? {
+                type: context.type,
+                id: context.id,
+                text: context.text,
+              }
+            : undefined,
+        }),
+        signal: abortController.signal,
+      });
 
       if (!response.ok) {
         // Try to get error message from response
@@ -136,7 +144,8 @@ export function streamChat(
           const errorText = await response.text();
           try {
             const errorData = JSON.parse(errorText);
-            errorMessage = errorData.detail || errorData.message || errorMessage;
+            errorMessage =
+              errorData.detail || errorData.message || errorMessage;
           } catch {
             // If not JSON, use the text
             if (errorText) errorMessage = errorText;
@@ -174,11 +183,15 @@ export function streamChat(
               switch (event.type) {
                 case "start":
                   streamId = event.stream_id;
-                  if (options?.onStart && event.message_id && event.chat_tab_id) {
+                  if (
+                    options?.onStart &&
+                    event.message_id &&
+                    event.chat_tab_id
+                  ) {
                     options.onStart(
                       event.message_id,
                       event.chat_tab_id,
-                      event.stream_id
+                      event.stream_id,
                     );
                   }
                   break;
@@ -259,22 +272,27 @@ export async function stopChatStream(streamId: string): Promise<void> {
 /**
  * Delete a chat tab and all its messages
  */
-export async function deleteChatTab(chatTabId: string): Promise<void> { // UUID as string
+export async function deleteChatTab(chatTabId: string): Promise<void> {
+  // UUID as string
   await api.delete(routes.chat.delete(chatTabId));
 }
 
 /**
  * Clear all messages from a chat tab (but keep the tab)
  */
-export async function clearChatTab(chatTabId: string): Promise<void> { // UUID as string
+export async function clearChatTab(chatTabId: string): Promise<void> {
+  // UUID as string
   await api.post(routes.chat.clear(chatTabId));
 }
 
 /**
  * Update the name of a chat tab
  */
-export async function updateChatTabName(chatTabId: string, name: string): Promise<ChatTab> { // UUID as string
+export async function updateChatTabName(
+  chatTabId: string,
+  name: string,
+): Promise<ChatTab> {
+  // UUID as string
   const { data } = await api.patch(routes.chat.updateTab(chatTabId), { name });
   return data.data.chat_tab;
 }
-

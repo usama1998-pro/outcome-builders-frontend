@@ -81,7 +81,7 @@ export default function Home() {
             gradient: "bg-gradient-to-br from-cyan-500 via-teal-500 to-emerald-500",
         },
         {
-            title: "Articles",
+            title: "Resources",
             value: analytics.total_notes,
             icon: <FileText className="w-6 h-6 text-white" />,
             gradient: "bg-gradient-to-br from-amber-500 via-orange-500 to-red-500",
@@ -93,7 +93,7 @@ export default function Home() {
             gradient: "bg-gradient-to-br from-rose-500 via-pink-500 to-fuchsia-500",
         },
         {
-            title: "Trained Articles",
+            title: "Trained Resources",
             value: analytics.total_trained_notes,
             icon: <Brain className="w-6 h-6 text-white" />,
             gradient: "bg-gradient-to-br from-indigo-500 via-blue-500 to-cyan-500",

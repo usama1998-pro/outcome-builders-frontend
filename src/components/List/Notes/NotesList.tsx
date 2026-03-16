@@ -185,12 +185,12 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
         <>
             <div className="w-full h-full flex flex-row flex-wrap gap-5 items-center justify-center p-5">
                 {filteredNotes.length === 0 && searchQuery.trim() && (
-                    <Card className="w-[300px] h-[200px] flex flex-col border border-muted shadow-md">
-                        <CardHeader className="border-b border-muted">
-                            <CardTitle className="text-lg font-semibold text-muted-foreground">No Results</CardTitle>
+                    <Card className="w-[300px] h-[200px] flex flex-col border border-[#DB2B30]/30 shadow-md bg-white dark:bg-card">
+                        <CardHeader className="border-b border-[#DB2B30]/30 bg-[#DB2B30]/5">
+                            <CardTitle className="text-lg font-semibold text-black dark:text-foreground">No Results</CardTitle>
                         </CardHeader>
                         <CardContent className="flex-1 flex items-center justify-center">
-                            <p className="text-muted-foreground text-center">
+                            <p className="text-black dark:text-muted-foreground text-center">
                                 No notes found matching &quot;{searchQuery}&quot;.
                             </p>
                         </CardContent>
@@ -203,7 +203,7 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                             <div key={key} className="relative">
                                 <Link href={`/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections/${collection.uuid ?? collection.id}/notes/${note.uuid ?? note.id}`} className="no-underline">
                                     {/* Gradient border wrapper for trained articles */}
-                                    <div className={`rounded-xl transition-all duration-200 ${note.is_trained ? "p-[2px] bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500" : ""}`}>
+                                    <div className={`rounded-xl transition-all duration-200 ${note.is_trained ? "p-[2px] bg-gradient-to-r from-[#DB2B30] via-[#B52227] to-[#8A1B1F]" : ""}`}>
                                         <Card className={`w-[300px] h-[200px] flex flex-col justify-between border border-border hover:border-foreground/30 transition-colors duration-200 ${note.is_trained ? "rounded-[10px]" : ""}`}>
                                             <CardHeader>
                                                 <div className="flex items-center gap-2">
@@ -211,7 +211,7 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                                                     {note.is_trained && (
                                                         <span
                                                             title="Trained"
-                                                            className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 shadow-lg shadow-purple-500/30"
+                                                            className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-[#DB2B30] via-[#B52227] to-[#8A1B1F] shadow-lg shadow-[#DB2B30]/30"
                                                         >
                                                             <FaBrain size={12} className="text-white" />
                                                         </span>
@@ -219,12 +219,13 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                                                     {note.visibility && (
                                                         <span
                                                             title={note.visibility === "private" ? "Only Me" : note.visibility === "public" ? "All (Anyone can edit)" : "Collaborate"}
-                                                            className={`text-xs px-2 py-0.5 rounded ${note.visibility === "private"
-                                                                ? "bg-gray-500 text-white"
-                                                                : note.visibility === "public"
-                                                                    ? "bg-blue-500 text-white"
-                                                                    : "bg-green-500 text-white"
-                                                                }`}
+                                                            className={`text-xs px-2 py-0.5 rounded ${
+                                                                note.visibility === "private"
+                                                                    ? "bg-[#8A1B1F] text-white"
+                                                                    : note.visibility === "public"
+                                                                        ? "bg-[#DB2B30] text-white"
+                                                                        : "bg-[#F04A4F] text-white"
+                                                            }`}
                                                         >
                                                             {note.visibility === "private" ? "Only Me" : note.visibility === "public" ? "All" : "Collaborate"}
                                                         </span>
@@ -283,7 +284,7 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem
                                                                 onClick={(e) => handleTrainClick(note.id, note.is_trained || false, e)}
-                                                                className={`cursor-pointer ${note.is_trained ? "text-cyan-600 focus:text-cyan-600" : ""} ${trainingNoteId === note.id && isTraining ? "opacity-50 cursor-not-allowed" : ""}`}
+                                                                className={`cursor-pointer ${note.is_trained ? "text-[#DB2B30] focus:text-[#DB2B30]" : ""} ${trainingNoteId === note.id && isTraining ? "opacity-50 cursor-not-allowed" : ""}`}
                                                                 disabled={trainingNoteId === note.id && isTraining}
                                                             >
                                                                 {trainingNoteId === note.id && isTraining ? (
@@ -317,7 +318,7 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                                                         <TooltipTrigger asChild>
                                                             <div className="flex items-center gap-2.5 cursor-pointer pointer-events-auto">
                                                                 <Avatar className="h-8 w-8 border-2 border-background shadow-md">
-                                                                    <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-semibold">
+                                                                    <AvatarFallback className="bg-gradient-to-br from-[#DB2B30] to-[#B52227] text-white text-xs font-semibold">
                                                                         {note.ownerInfo.initials}
                                                                     </AvatarFallback>
                                                                 </Avatar>

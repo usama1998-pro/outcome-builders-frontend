@@ -242,9 +242,9 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                                 href={`/dashboard/workspaces/${getWorkspaceUuid(note.workspaceId)}/collections/${note.collectionUuid ?? note.collectionId}/notes/${note.uuid ?? note.id}`}
                                 className="no-underline"
                             >
-                                {/* Gradient border wrapper for trained articles */}
-                                <div className={`rounded-xl transition-all duration-200 ${note.is_trained ? "p-[2px] bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500" : ""}`}>
-                                    <Card className={`w-[300px] h-[200px] flex flex-col justify-between border border-border hover:border-foreground/30 transition-colors duration-200 ${note.is_trained ? "rounded-[10px]" : ""}`}>
+                                {/* Card wrapper with red border to match collection article styling */}
+                                <div className="rounded-xl border border-[#DB2B30] bg-transparent transition-all duration-200 hover:border-[#FF3B3B]">
+                                    <Card className="w-[300px] h-[200px] flex flex-col justify-between bg-card border-0">
                                         <CardHeader>
                                             <div className="flex items-center gap-2">
                                                 <CardTitle className="truncate max-w-[180px]" title={note.title}>
@@ -253,22 +253,33 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                                                 {note.is_trained && (
                                                     <span
                                                         title="Trained"
-                                                        className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 shadow-lg shadow-purple-500/30"
+                                                        className="flex items-center justify-center w-6 h-6 rounded-full bg-[#DB2B30] shadow-lg shadow-red-500/30"
                                                     >
                                                         <FaBrain size={12} className="text-white" />
                                                     </span>
                                                 )}
                                                 {note.visibility && (
                                                     <span
-                                                        title={note.visibility === "private" ? "Only Me" : note.visibility === "public" ? "All (Anyone can edit)" : "Collaborate"}
-                                                        className={`text-xs px-2 py-0.5 rounded ${note.visibility === "private"
-                                                            ? "bg-gray-500 text-white"
-                                                            : note.visibility === "public"
-                                                                ? "bg-blue-500 text-white"
-                                                                : "bg-green-500 text-white"
-                                                            }`}
+                                                        title={
+                                                            note.visibility === "private"
+                                                                ? "Only Me"
+                                                                : note.visibility === "public"
+                                                                ? "All (Anyone can edit)"
+                                                                : "Collaborate"
+                                                        }
+                                                        className={`text-xs px-2 py-0.5 rounded text-white ${
+                                                            note.visibility === "private"
+                                                                ? "bg-[#DB2B30]"
+                                                                : note.visibility === "public"
+                                                                ? "bg-[#DB2B30]"
+                                                                : "bg-[#059669]"
+                                                        }`}
                                                     >
-                                                        {note.visibility === "private" ? "Only Me" : note.visibility === "public" ? "All" : "Collaborate"}
+                                                        {note.visibility === "private"
+                                                            ? "Only Me"
+                                                            : note.visibility === "public"
+                                                            ? "All"
+                                                            : "Collaborate"}
                                                     </span>
                                                 )}
                                             </div>
@@ -359,7 +370,7 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                                                     <TooltipTrigger asChild>
                                                         <div className="flex items-center gap-2.5 cursor-pointer pointer-events-auto">
                                                             <Avatar className="h-8 w-8 border-2 border-background shadow-md">
-                                                                <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-semibold">
+                                                                <AvatarFallback className="bg-[#DB2B30] text-white text-xs font-semibold">
                                                                     {note.ownerInfo.initials}
                                                                 </AvatarFallback>
                                                             </Avatar>
@@ -667,27 +678,27 @@ export default function AllNotesPage() {
                         <div className="flex flex-col items-center text-center max-w-lg">
                             <div className="relative mb-8">
                                 {/* Animated background gradient */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 rounded-full blur-3xl animate-pulse"></div>
+                                <div className="absolute inset-0 bg-gradient-to-br from-[#FF6B6B]/25 via-[#FF3B3B]/25 to-[#E10000]/25 rounded-full blur-3xl animate-pulse"></div>
                                 {/* Main icon container */}
-                                <div className="relative w-32 h-32 bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-red-500/10 dark:from-amber-900/30 dark:via-orange-900/30 dark:to-red-900/30 rounded-2xl flex items-center justify-center border border-amber-500/20 dark:border-amber-500/30 shadow-lg">
-                                    <FileText className="w-16 h-16 text-amber-500 dark:text-amber-400" />
+                                <div className="relative w-32 h-32 bg-gradient-to-br from-[#FF6B6B]/15 via-[#FF3B3B]/15 to-[#E10000]/15 dark:from-[#7F1D1D]/60 dark:via-[#991B1B]/60 dark:to-[#7F1D1D]/60 rounded-2xl flex items-center justify-center border border-[#DB2B30]/40 dark:border-[#DB2B30]/60 shadow-lg">
+                                    <FileText className="w-16 h-16 text-[#DB2B30] dark:text-[#FDEBEB]" />
                                 </div>
                                 {/* Decorative sparkles */}
                                 <div className="absolute -top-2 -right-2">
-                                    <Sparkles className="w-6 h-6 text-amber-400 animate-pulse" />
+                                    <Sparkles className="w-6 h-6 text-[#FFB3B3] animate-pulse" />
                                 </div>
                                 <div className="absolute -bottom-2 -left-2">
-                                    <Sparkles className="w-5 h-5 text-orange-400 animate-pulse delay-300" />
+                                    <Sparkles className="w-5 h-5 text-[#FF8A8A] animate-pulse delay-300" />
                                 </div>
                             </div>
 
                             <h3 className="text-2xl font-bold text-foreground mb-3">
-                                No Articles Yet
+                                No Resources Yet
                             </h3>
 
                             <p className="text-muted-foreground mb-8 text-base leading-relaxed">
-                                This collection is empty. Start documenting your knowledge by creating your first article.
-                                You can add content and train articles for your AI assistant.
+                                No resources have been created yet. Start documenting your knowledge by creating your first article.
+                                You can add content and train resources for your AI assistant.
                             </p>
 
                             {filteredCollections && filteredCollections.length > 0 && canCreateNote && (
@@ -701,7 +712,7 @@ export default function AllNotesPage() {
                                             router.push(`/dashboard/articles/new`);
                                         }
                                     }}
-                                    className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all"
+                                    className="bg-[#DB2B30] hover:bg-[#B52227] text-white shadow-lg hover:shadow-xl transition-all"
                                 >
                                     <Plus className="w-4 h-4 mr-2" />
                                     Create Your First Article

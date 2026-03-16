@@ -86,37 +86,37 @@ import routes from "@/src/lib/routes";
 import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
 import { useTenantWorkspaces, useUserWorkspaceAssignments, useUpdateWorkspaceAssignments } from "@/src/hooks/useWorkspace";
 
-// Category config with icons and colors
+// Category config with unified red branding
 const categoryConfig: Record<string, { icon: React.ReactNode; gradient: string; bg: string }> = {
     "Brainspace": {
         icon: <Brain className="h-4 w-4" />,
-        gradient: "from-purple-500 to-violet-500",
-        bg: "bg-purple-500/10 border-purple-500/20"
+        gradient: "from-[#DB2B30] to-red-700",
+        bg: "bg-[#DB2B30]/10 border-[#DB2B30]/30"
     },
     "Collection": {
         icon: <Layers className="h-4 w-4" />,
-        gradient: "from-blue-500 to-cyan-500",
-        bg: "bg-blue-500/10 border-blue-500/20"
+        gradient: "from-[#DB2B30] to-red-700",
+        bg: "bg-[#DB2B30]/10 border-[#DB2B30]/30"
     },
     "Note": {
         icon: <FileText className="h-4 w-4" />,
-        gradient: "from-emerald-500 to-teal-500",
-        bg: "bg-emerald-500/10 border-emerald-500/20"
+        gradient: "from-[#DB2B30] to-red-700",
+        bg: "bg-[#DB2B30]/10 border-[#DB2B30]/30"
     },
     "Administration": {
         icon: <Shield className="h-4 w-4" />,
-        gradient: "from-rose-500 to-pink-500",
-        bg: "bg-rose-500/10 border-rose-500/20"
+        gradient: "from-[#DB2B30] to-red-700",
+        bg: "bg-[#DB2B30]/10 border-[#DB2B30]/30"
     },
     "Analytics": {
         icon: <BarChart3 className="h-4 w-4" />,
-        gradient: "from-amber-500 to-orange-500",
-        bg: "bg-amber-500/10 border-amber-500/20"
+        gradient: "from-[#DB2B30] to-red-700",
+        bg: "bg-[#DB2B30]/10 border-[#DB2B30]/30"
     },
     "AI": {
         icon: <Bot className="h-4 w-4" />,
-        gradient: "from-indigo-500 to-blue-500",
-        bg: "bg-indigo-500/10 border-indigo-500/20"
+        gradient: "from-[#DB2B30] to-red-700",
+        bg: "bg-[#DB2B30]/10 border-[#DB2B30]/30"
     },
 };
 
@@ -551,12 +551,12 @@ export default function AdminsPage() {
                     <div className="flex items-center gap-4">
                         <Link href="/dashboard/organization">
                             <Button variant="outline" size="icon">
-                                <ArrowLeft className="h-4 w-4" />
+                                <ArrowLeft className="h-4 w-4 text-[#DB2B30]" />
                             </Button>
                         </Link>
                         <div>
                             <h1 className="text-3xl font-bold flex items-center gap-2">
-                                <Users className="h-8 w-8 text-emerald-500" />
+                                <Users className="h-8 w-8 text-[#DB2B30]" />
                                 Team Management
                             </h1>
                             <p className="text-muted-foreground">
@@ -567,20 +567,20 @@ export default function AdminsPage() {
                 </div>
 
                 <Tabs defaultValue="admins" className="w-full flex flex-col items-center">
-                    <TabsList className={`grid w-full max-w-2xl ${canManageRoles ? "grid-cols-3" : "grid-cols-2"}`}>
+                        <TabsList className={`grid w-full max-w-2xl ${canManageRoles ? "grid-cols-3" : "grid-cols-2"}`}>
                         <TabsTrigger value="admins" className="flex items-center gap-2">
-                            <Users className="h-4 w-4" />
+                            <Users className="h-4 w-4 text-[#DB2B30]" />
                             Team Members
                         </TabsTrigger>
                         {canInviteUsers && (
                             <TabsTrigger value="invitations" className="flex items-center gap-2">
-                                <Mail className="h-4 w-4" />
+                                <Mail className="h-4 w-4 text-[#DB2B30]" />
                                 Invitations
                             </TabsTrigger>
                         )}
                         {canManageRoles && (
                             <TabsTrigger value="roles" className="flex items-center gap-2">
-                                <Key className="h-4 w-4" />
+                                <Key className="h-4 w-4 text-[#DB2B30]" />
                                 Custom Roles
                             </TabsTrigger>
                         )}
@@ -593,7 +593,7 @@ export default function AdminsPage() {
                             {canInviteUsers && (
                                 <div className="flex justify-end">
                                     <Link href="/dashboard/admins/invite">
-                                        <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0">
+                                        <Button className="bg-gradient-to-r from-[#DB2B30] to-red-700 text-white border-0">
                                             <UserPlus className="mr-2 h-4 w-4" />
                                             Invite New Member
                                         </Button>
@@ -605,7 +605,7 @@ export default function AdminsPage() {
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
-                                        <Crown className="h-5 w-5 text-yellow-500" />
+                                        <Crown className="h-5 w-5 text-[#DB2B30]" />
                                         Owner
                                     </CardTitle>
                                     <CardDescription>
@@ -613,10 +613,10 @@ export default function AdminsPage() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-yellow-500/10 to-amber-500/10 rounded-lg border border-yellow-500/20">
+                                    <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-[#DB2B30]/10 to-[#DB2B30]/5 rounded-lg border border-[#DB2B30]/30">
                                         <Avatar className="h-12 w-12">
                                             <AvatarImage src="" alt={organization.owner_name || "Owner"} />
-                                            <AvatarFallback className="bg-yellow-500 text-white">
+                                            <AvatarFallback className="bg-[#DB2B30] text-white">
                                                 {organization.owner_name?.charAt(0).toUpperCase() || "O"}
                                             </AvatarFallback>
                                         </Avatar>
@@ -624,7 +624,7 @@ export default function AdminsPage() {
                                             <p className="font-semibold text-lg">{organization.owner_name || "Unknown"}</p>
                                             <p className="text-sm text-muted-foreground">{organization.owner_email || ""}</p>
                                         </div>
-                                        <Badge className="bg-yellow-500 text-white">Owner</Badge>
+                                        <Badge className="bg-[#DB2B30] text-white">Owner</Badge>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -633,7 +633,7 @@ export default function AdminsPage() {
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
-                                        <Users className="h-5 w-5 text-emerald-500" />
+                                        <Users className="h-5 w-5 text-[#DB2B30]" />
                                         Team Members ({organization.admins?.length || 0})
                                     </CardTitle>
                                     <CardDescription>
@@ -736,7 +736,7 @@ export default function AdminsPage() {
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="flex items-center gap-2">
-                                            <Mail className="h-5 w-5 text-blue-500" />
+                                            <Mail className="h-5 w-5 text-[#DB2B30]" />
                                             Invitations ({invitations?.length || 0})
                                         </CardTitle>
                                         <CardDescription>
@@ -875,7 +875,7 @@ export default function AdminsPage() {
                                             size="sm"
                                             onClick={startCreateRole}
                                             disabled={isEditingMode && !editingRole}
-                                            className="bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 text-white border-0"
+                                            className="bg-gradient-to-r from-[#DB2B30] to-red-700 text-white border-0"
                                         >
                                             <Plus className="h-4 w-4 mr-1" />
                                             New Role
@@ -898,7 +898,7 @@ export default function AdminsPage() {
                                                     onClick={() => startEditRole(role)}
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-10 w-10 rounded-lg bg-gradient-to-r from-violet-500 to-purple-500 flex items-center justify-center shrink-0">
+                                                        <div className="h-10 w-10 rounded-lg bg-gradient-to-r from-[#DB2B30] to-red-700 flex items-center justify-center shrink-0">
                                                             <Key className="h-5 w-5 text-white" />
                                                         </div>
                                                         <div className="flex-1 min-w-0">
@@ -941,12 +941,12 @@ export default function AdminsPage() {
                                                         <CardTitle className="flex items-center gap-2">
                                                             {editingRole ? (
                                                                 <>
-                                                                    <Pencil className="h-5 w-5 text-violet-500" />
+                                                                    <Pencil className="h-5 w-5 text-[#DB2B30]" />
                                                                     Edit Role
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <Plus className="h-5 w-5 text-violet-500" />
+                                                                    <Plus className="h-5 w-5 text-[#DB2B30]" />
                                                                     Create New Role
                                                                 </>
                                                             )}
@@ -1091,7 +1091,7 @@ export default function AdminsPage() {
                                                     <Button
                                                         onClick={handleSaveRole}
                                                         disabled={isCreatingRole || isUpdatingRole}
-                                                        className="bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 text-white border-0"
+                                                        className="bg-gradient-to-r from-[#DB2B30] to-red-700 text-white border-0"
                                                     >
                                                         <Save className="h-4 w-4 mr-2" />
                                                         {isCreatingRole || isUpdatingRole
@@ -1112,7 +1112,7 @@ export default function AdminsPage() {
                                                 </p>
                                                 <Button
                                                     onClick={startCreateRole}
-                                                    className="bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 text-white border-0"
+                                                    className="bg-gradient-to-r from-[#DB2B30] to-red-700 text-white border-0"
                                                 >
                                                     <Plus className="h-4 w-4 mr-2" />
                                                     Create New Role
@@ -1318,7 +1318,7 @@ export default function AdminsPage() {
                                                     <div
                                                         key={workspace.id}
                                                         className={`flex items-center space-x-3 p-2 rounded-md cursor-pointer transition-colors ${selectedWorkspaces.includes(workspace.id)
-                                                            ? "bg-blue-500/10 border border-blue-500/20"
+                                                            ? "bg-[#DB2B30]/10 border border-[#DB2B30]/30"
                                                             : "hover:bg-muted/50"
                                                             }`}
                                                         onClick={() => handleWorkspaceToggle(workspace.id)}
@@ -1328,7 +1328,7 @@ export default function AdminsPage() {
                                                             checked={selectedWorkspaces.includes(workspace.id)}
                                                             onCheckedChange={() => handleWorkspaceToggle(workspace.id)}
                                                         />
-                                                        <Brain className={`h-4 w-4 ${selectedWorkspaces.includes(workspace.id) ? "text-blue-500" : "text-muted-foreground"}`} />
+                                                        <Brain className={`h-4 w-4 ${selectedWorkspaces.includes(workspace.id) ? "text-[#DB2B30]" : "text-muted-foreground"}`} />
                                                         <label
                                                             htmlFor={`workspace-${workspace.id}`}
                                                             className="text-sm flex-1 cursor-pointer"
@@ -1336,7 +1336,7 @@ export default function AdminsPage() {
                                                             {workspace.name}
                                                         </label>
                                                         {selectedWorkspaces.includes(workspace.id) && (
-                                                            <Check className="h-4 w-4 text-blue-500" />
+                                                            <Check className="h-4 w-4 text-[#DB2B30]" />
                                                         )}
                                                     </div>
                                                 ))}

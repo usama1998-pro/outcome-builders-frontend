@@ -18,7 +18,7 @@ import {
     SidebarMenuAction
 } from "@/components/ui/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, FolderOpen, Layers, FileText, Wrench, Sparkles, Settings, Building, Briefcase, BarChart3, Stethoscope, Compass, Network, Palette, Package, Megaphone, HelpCircle, Plus, Move, MoreVertical, Search, MoreHorizontal, Loader2 } from "lucide-react";
+import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, FolderOpen, Layers, FileText, Wrench, Sparkles, Settings, Building, Briefcase, BarChart3, Stethoscope, Compass, Network, Palette, Package, Megaphone, HelpCircle, Plus, Move, MoreVertical, Search, MoreHorizontal, Loader2, Route } from "lucide-react";
 import { useSignOut, useUserTenants } from "@/src/hooks/useAuth";
 import { useOrganizationDetails } from "@/src/hooks/useOrganization";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -72,6 +72,7 @@ export default function SidePanel() {
     const router = useRouter();
     const signOut = useSignOut();
     const currentTenantId = useAuthStore((s) => s.tenantId);
+    const setTenantId = useAuthStore((s) => s.setTenantId);
     const hydrated = useAuthStore((state) => state.hydrated);
     const { data: tenants } = useUserTenants();
     const { data: organization } = useOrganizationDetails(currentTenantId || 0);
@@ -99,6 +100,22 @@ export default function SidePanel() {
     const canCreateBrainspace = !permissionsLoading && (
         hasPermission(PERMISSIONS.BRAINSPACE_CREATE) || isOwnerOrAdmin
     );
+
+    // Ensure a default tenant is selected
+    useEffect(() => {
+        if (!currentTenantId && tenants && tenants.length > 0) {
+            setTenantId(tenants[0].id);
+        }
+    }, [tenants, currentTenantId, setTenantId]);
+
+    const handleOrganizationChange = (value: string) => {
+        const newTenantId = Number(value);
+        if (newTenantId && newTenantId !== currentTenantId) {
+            setTenantId(newTenantId);
+            // Clear query cache to refetch data for the new organization
+            queryClient.clear();
+        }
+    };
 
     // Chat-specific state
     const [chatsOpen, setChatsOpen] = useState(true);
@@ -437,248 +454,46 @@ export default function SidePanel() {
         <>
         <Sidebar>
             <SidebarContent>
-                {/* Organization Logo */}
+                {/* Organization Switcher */}
                 <div className="px-4 py-4 border-b">
-                    <Link href="/dashboard/organization" className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                            <AvatarImage src={organization?.logo || ""} alt={organization?.company_name || "Organization"} />
-                            <AvatarFallback className="text-lg font-semibold bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300">
-                                {organization?.company_name?.charAt(0).toUpperCase() || "O"}
-                            </AvatarFallback>
-                        </Avatar>
-                        <span className="font-semibold text-sm truncate">
+                    {tenants && tenants.length > 0 ? (
+                        <Select
+                            value={currentTenantId ? String(currentTenantId) : undefined}
+                            onValueChange={handleOrganizationChange}
+                        >
+                            <SelectTrigger className="w-full h-9 px-3 bg-background/80 dark:bg-background/40 border border-border shadow-sm text-sm text-black dark:text-[#FFFFFF]">
+                                <div className="flex items-center gap-2 w-full">
+                                    <div className="h-6 w-6 flex items-center justify-center rounded-sm overflow-hidden">
+                                        <img
+                                            src="/assets/black-square-Icon.png"
+                                            alt="Organization"
+                                            className="block dark:hidden h-full w-full object-contain"
+                                        />
+                                        <img
+                                            src="/assets/white-square-Icon.png"
+                                            alt="Organization"
+                                            className="hidden dark:block h-full w-full object-contain"
+                                        />
+                                    </div>
+                                    <SelectValue placeholder={organization?.company_name || "Select organization"} />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                                {tenants.map((tenant) => (
+                                    <SelectItem key={tenant.id} value={String(tenant.id)}>
+                                        {tenant.company_name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <span className="font-semibold text-sm truncate text-black dark:text-[#FFFFFF]">
                             {organization?.company_name || "Organization"}
                         </span>
-                    </Link>
+                    )}
                 </div>
 
-                {/* Brain Space Selector */}
-                <SidebarGroup>
-                    <SidebarGroupContent>
-                        <div className="px-2 py-2">
-                            <Label className="text-xs text-muted-foreground mb-2 block">Brain Space</Label>
-                            <Select
-                                value={currentBrainSpaceId ? String(currentBrainSpaceId) : undefined}
-                                onValueChange={handleBrainSpaceChange}
-                            >
-                                <SelectTrigger className="w-full">
-                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                        <Brain className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
-                                        <SelectValue placeholder="Select a brain space">
-                                            {currentBrainSpace ? (
-                                                <span className="truncate">{truncateText(currentBrainSpace.title, 20)}</span>
-                                            ) : (
-                                                "Select a brain space"
-                                            )}
-                                        </SelectValue>
-                                    </div>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {workspaces && workspaces.length > 0 ? (
-                                        <>
-                                            {workspaces.map((workspace) => (
-                                                <SelectItem key={workspace.id} value={String(workspace.id)}>
-                                                    <div className="flex items-center gap-2">
-                                                        <Brain className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                                                        <span className="truncate">{workspace.title}</span>
-                                                        {currentBrainSpaceId === workspace.id && (
-                                                            <span className="ml-auto text-xs text-muted-foreground">(Current)</span>
-                                                        )}
-                                                    </div>
-                                                </SelectItem>
-                                            ))}
-                                            {canCreateBrainspace && (
-                                                <>
-                                                    <SelectItem value="create-new" className="text-primary">
-                                                        <div className="flex items-center gap-2">
-                                                            <Plus className="h-4 w-4" />
-                                                            <span>Create New Brain Space</span>
-                                                        </div>
-                                                    </SelectItem>
-                                                </>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                                            No brain spaces available
-                                        </div>
-                                    )}
-                                </SelectContent>
-                            </Select>
-
-                            {/* Create Brain Space Dialog */}
-                            {canCreateBrainspace && (
-                                <AlertDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Create a new brain space</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                Enter a name for your new brain space below.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <form
-                                            onSubmit={createForm.handleSubmit(onCreateBrainSpace)}
-                                            className="space-y-4"
-                                        >
-                                            <div>
-                                                <Label htmlFor="brainspace-name">
-                                                    Brainspace name
-                                                </Label>
-                                                <Input
-                                                    id="brainspace-name"
-                                                    placeholder="e.g. ai-brainspace"
-                                                    {...createForm.register("name")}
-                                                    aria-invalid={!!createForm.formState.errors.name}
-                                                />
-                                                {createForm.formState.errors.name && (
-                                                    <p className="text-sm !text-red-500 mt-1">
-                                                        {createForm.formState.errors.name.message}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel disabled={isCreatingWorkspace}>
-                                                    Cancel
-                                                </AlertDialogCancel>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={isCreatingWorkspace}
-                                                    className="ml-2"
-                                                >
-                                                    {isCreatingWorkspace ? "Creating..." : "Create"}
-                                                </Button>
-                                            </AlertDialogFooter>
-                                        </form>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            )}
-
-                            {/* Move Articles Dialog */}
-                            <AlertDialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen}>
-                                <AlertDialogContent className="max-w-2xl">
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Move Articles</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            Select articles to move and choose the target collection.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-
-                                    {sourceCollectionId && (
-                                        <div className="space-y-4">
-                                            {/* Source Collection Info */}
-                                            <div>
-                                                <Label>From Collection</Label>
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    {collections?.find(c => c.id === sourceCollectionId)?.title || "Unknown"}
-                                                </p>
-                                            </div>
-
-                                            {/* Articles List */}
-                                            <div>
-                                                <Label>Select Articles to Move</Label>
-                                                <div className="mt-2 max-h-60 overflow-y-auto border rounded-md p-2 space-y-2">
-                                                    {getCollectionNotes(sourceCollectionId).length === 0 ? (
-                                                        <p className="text-sm text-muted-foreground text-center py-4">
-                                                            No articles in this collection
-                                                        </p>
-                                                    ) : (
-                                                        getCollectionNotes(sourceCollectionId).map((note: { id: number; title: string }) => (
-                                                            <div key={note.id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    id={`note-${note.id}`}
-                                                                    checked={selectedNoteIds.includes(note.id)}
-                                                                    onChange={(e) => {
-                                                                        if (e.target.checked) {
-                                                                            setSelectedNoteIds([...selectedNoteIds, note.id]);
-                                                                        } else {
-                                                                            setSelectedNoteIds(selectedNoteIds.filter(id => id !== note.id));
-                                                                        }
-                                                                    }}
-                                                                    className="rounded"
-                                                                />
-                                                                <label
-                                                                    htmlFor={`note-${note.id}`}
-                                                                    className="flex-1 text-sm cursor-pointer"
-                                                                >
-                                                                    {note.title}
-                                                                </label>
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
-                                                {getCollectionNotes(sourceCollectionId).length > 0 && (
-                                                    <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                                                        <span>
-                                                            {selectedNoteIds.length} of {getCollectionNotes(sourceCollectionId).length} selected
-                                                        </span>
-                                                        <button
-                                                            onClick={() => {
-                                                                if (selectedNoteIds.length === getCollectionNotes(sourceCollectionId).length) {
-                                                                    setSelectedNoteIds([]);
-                                                                } else {
-                                                                    setSelectedNoteIds(
-                                                                        getCollectionNotes(sourceCollectionId).map(
-                                                                            (n: { id: number }) => n.id
-                                                                        )
-                                                                    );
-                                                                }
-                                                            }}
-                                                            className="text-primary hover:underline"
-                                                        >
-                                                            {selectedNoteIds.length === getCollectionNotes(sourceCollectionId).length ? "Deselect All" : "Select All"}
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Target Collection Select */}
-                                            <div>
-                                                <Label htmlFor="target-collection">To Collection *</Label>
-                                                <Select
-                                                    value={targetCollectionId}
-                                                    onValueChange={setTargetCollectionId}
-                                                >
-                                                    <SelectTrigger id="target-collection" className="w-full mt-2">
-                                                        <SelectValue placeholder="Select target collection" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {allCollections
-                                                            ?.filter(c => c.id !== sourceCollectionId)
-                                                            .map((collection) => (
-                                                                <SelectItem key={collection.id} value={String(collection.id)}>
-                                                                    <div className="flex flex-col">
-                                                                        <span className="font-medium">{collection.title}</span>
-                                                                        {collection.workspaceName && (
-                                                                            <span className="text-xs text-muted-foreground">
-                                                                                {collection.workspaceName}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </SelectItem>
-                                                            ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel disabled={isMovingNote}>
-                                            Cancel
-                                        </AlertDialogCancel>
-                                        <Button
-                                            onClick={handleMoveArticles}
-                                            disabled={isMovingNote || selectedNoteIds.length === 0 || !targetCollectionId}
-                                        >
-                                            {isMovingNote ? "Moving..." : `Move ${selectedNoteIds.length} Article(s)`}
-                                        </Button>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </div>
-                    </SidebarGroupContent>
-                </SidebarGroup>
+                {/* Brain Space Selector removed per design */}
 
                 {/* Main Navigation */}
                 <SidebarGroup>
@@ -691,7 +506,7 @@ export default function SidePanel() {
                                         className={`px-2 py-1 rounded ${pathname === "/dashboard" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                             }`}
                                     >
-                                        <LayoutDashboard className="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                        <LayoutDashboard className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                         Dashboard
                                     </Link>
                                 </SidebarMenuButton>
@@ -704,7 +519,7 @@ export default function SidePanel() {
                                         className={`px-2 py-1 rounded ${pathname === "/chat" || pathname === "/chat/new" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                             }`}
                                     >
-                                        <MessageSquare className="mr-2 h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
+                                        <MessageSquare className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                         New Chat
                                     </Link>
                                 </SidebarMenuButton>
@@ -717,7 +532,7 @@ export default function SidePanel() {
                                         className={`px-2 py-1 rounded ${pathname === "/chat/search" || pathname.startsWith("/chat/search/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                             }`}
                                     >
-                                        <Search className="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                        <Search className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                         Chat Search
                                     </Link>
                                 </SidebarMenuButton>
@@ -730,8 +545,25 @@ export default function SidePanel() {
                                         className={`px-2 py-1 rounded ${pathname === "/dashboard/clients" || pathname.startsWith("/dashboard/clients/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                             }`}
                                     >
-                                        <Briefcase className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                        <Briefcase className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                         Clients
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+
+                            <SidebarMenuItem>
+                                <SidebarMenuButton asChild>
+                                    <Link
+                                        href="/dashboard/roadmap"
+                                        className={`px-2 py-1 rounded ${
+                                            pathname === "/dashboard/roadmap" ||
+                                            pathname.startsWith("/dashboard/roadmap/")
+                                                ? "bg-gray-300 font-semibold"
+                                                : "hover:bg-gray-200"
+                                        }`}
+                                    >
+                                        <Route className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                        Roadmap
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -743,7 +575,7 @@ export default function SidePanel() {
                                         className={`px-2 py-1 rounded ${pathname === "/dashboard/analytics" || pathname.startsWith("/dashboard/analytics/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                             }`}
                                     >
-                                        <BarChart3 className="mr-2 h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                                        <BarChart3 className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                         Analytics
                                     </Link>
                                 </SidebarMenuButton>
@@ -755,10 +587,10 @@ export default function SidePanel() {
                 {/* Chat History */}
                 {true && (
                     <SidebarGroup>
-                        <SidebarGroupLabel>
+                        <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
                             <button
                                 onClick={() => setChatsOpen(!chatsOpen)}
-                                className="flex items-center gap-2 w-full text-left"
+                                className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
                             >
                                 {chatsOpen ? (
                                     <ChevronDown className="h-4 w-4" />
@@ -808,8 +640,8 @@ export default function SidePanel() {
                                                             </Link>
                                                         </SidebarMenuButton>
                                                         <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild disabled={isLoading}>
-                                                                <SidebarMenuAction disabled={isLoading}>
+                                                        <DropdownMenuTrigger asChild disabled={isLoading}>
+                                                            <SidebarMenuAction disabled={isLoading} className="text-[#FFFFFF]">
                                                                     {isLoading ? (
                                                                         <Loader2 className="h-4 w-4 animate-spin" />
                                                                     ) : (
@@ -818,7 +650,11 @@ export default function SidePanel() {
                                                                 </SidebarMenuAction>
                                                             </DropdownMenuTrigger>
                                                             {!isLoading && (
-                                                                <DropdownMenuContent side="right" align="start">
+                                                                <DropdownMenuContent
+                                                                    side="right"
+                                                                    align="start"
+                                                                    className="text-[#FFFFFF]"
+                                                                >
                                                                     <DropdownMenuItem
                                                                         onClick={(e) => {
                                                                             e.preventDefault();
@@ -857,10 +693,10 @@ export default function SidePanel() {
 
                 {/* Knowledge Bank - Collapsible */}
                 <SidebarGroup>
-                    <SidebarGroupLabel>
+                    <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
                         <button
                             onClick={() => toggleSection('knowledge-bank')}
-                            className="flex items-center gap-2 w-full text-left"
+                            className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
                         >
                             {expandedSections.has('knowledge-bank') ? (
                                 <ChevronDown className="h-4 w-4" />
@@ -880,7 +716,7 @@ export default function SidePanel() {
                                     >
                                         <Link href="/dashboard/workspaces" className="flex items-center justify-between w-full">
                                             <div className="flex items-center gap-2">
-                                                <Brain className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                                <Brain className="h-4 w-4 text-[#DB2B30] dark:text-white" />
                                                 <span>Brainspaces</span>
                                             </div>
                                             {!workspacesLoading && workspaces && (
@@ -899,7 +735,7 @@ export default function SidePanel() {
                                     >
                                         <Link href="/dashboard/collections" className="flex items-center justify-between w-full">
                                             <div className="flex items-center gap-2">
-                                                <Layers className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                                                <Layers className="h-4 w-4 text-[#DB2B30] dark:text-white" />
                                                 <span>Collections</span>
                                             </div>
                                             {!collectionsLoading && collections && (
@@ -918,8 +754,8 @@ export default function SidePanel() {
                                     >
                                         <Link href="/dashboard/notes" className="flex items-center justify-between w-full">
                                             <div className="flex items-center gap-2">
-                                                <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                                                <span>Articles</span>
+                                                <FileText className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                <span>Resources</span>
                                             </div>
                                             <span className="text-xs text-muted-foreground ml-auto">
                                                 ({totalNotesCount})
@@ -934,10 +770,10 @@ export default function SidePanel() {
 
                 {/* Strategy Tools - Collapsible */}
                 <SidebarGroup>
-                    <SidebarGroupLabel>
+                    <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
                         <button
                             onClick={() => toggleSection('strategy-tools')}
-                            className="flex items-center gap-2 w-full text-left"
+                            className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
                         >
                             {expandedSections.has('strategy-tools') ? (
                                 <ChevronDown className="h-4 w-4" />
@@ -957,7 +793,7 @@ export default function SidePanel() {
                                             className={`px-2 py-1 rounded ${pathname === "/dashboard/diagnosis" || pathname.startsWith("/dashboard/diagnosis/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                                 }`}
                                         >
-                                            <Stethoscope className="mr-2 h-4 w-4 text-red-600 dark:text-red-400" />
+                                            <Stethoscope className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                             Diagnosis
                                         </Link>
                                     </SidebarMenuButton>
@@ -970,7 +806,7 @@ export default function SidePanel() {
                                             className={`px-2 py-1 rounded ${pathname === "/dashboard/direction" || pathname.startsWith("/dashboard/direction/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                                 }`}
                                         >
-                                            <Compass className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                            <Compass className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                             Direction
                                         </Link>
                                     </SidebarMenuButton>
@@ -983,7 +819,7 @@ export default function SidePanel() {
                                             className={`px-2 py-1 rounded ${pathname === "/dashboard/architecture" || pathname.startsWith("/dashboard/architecture/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                                 }`}
                                         >
-                                            <Network className="mr-2 h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                            <Network className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                             Architecture
                                         </Link>
                                     </SidebarMenuButton>
@@ -995,10 +831,10 @@ export default function SidePanel() {
 
                 {/* Execution Tools - Collapsible */}
                 <SidebarGroup>
-                    <SidebarGroupLabel>
+                    <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
                         <button
                             onClick={() => toggleSection('execution-tools')}
-                            className="flex items-center gap-2 w-full text-left"
+                            className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
                         >
                             {expandedSections.has('execution-tools') ? (
                                 <ChevronDown className="h-4 w-4" />
@@ -1014,28 +850,11 @@ export default function SidePanel() {
                                 <SidebarMenuItem>
                                     <SidebarMenuButton asChild>
                                         <Link
-                                            href="/dashboard/roadmap"
-                                            className={`px-2 py-1 rounded ${
-                                                pathname === "/dashboard/roadmap" ||
-                                                pathname.startsWith("/dashboard/roadmap/")
-                                                    ? "bg-gray-300 font-semibold"
-                                                    : "hover:bg-gray-200"
-                                            }`}
-                                        >
-                                            <BarChart3 className="mr-2 h-4 w-4 text-sky-600 dark:text-sky-400" />
-                                            Roadmap
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton asChild>
-                                        <Link
                                             href="/dashboard/brand"
                                             className={`px-2 py-1 rounded ${pathname === "/dashboard/brand" || pathname.startsWith("/dashboard/brand/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                                 }`}
                                         >
-                                            <Palette className="mr-2 h-4 w-4 text-pink-600 dark:text-pink-400" />
+                                            <Palette className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                             Brand
                                         </Link>
                                     </SidebarMenuButton>
@@ -1048,7 +867,7 @@ export default function SidePanel() {
                                             className={`px-2 py-1 rounded ${pathname === "/dashboard/product" || pathname.startsWith("/dashboard/product/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                                 }`}
                                         >
-                                            <Package className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
+                                            <Package className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                             Product
                                         </Link>
                                     </SidebarMenuButton>
@@ -1061,7 +880,7 @@ export default function SidePanel() {
                                             className={`px-2 py-1 rounded ${pathname === "/dashboard/marketing" || pathname.startsWith("/dashboard/marketing/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
                                                 }`}
                                         >
-                                            <Megaphone className="mr-2 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                            <Megaphone className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                             Marketing
                                         </Link>
                                     </SidebarMenuButton>
@@ -1071,188 +890,6 @@ export default function SidePanel() {
                     )}
                 </SidebarGroup>
 
-                {/* My Brainspaces - Tree Structure */}
-                {workspaces && workspaces.length > 0 && Object.keys(groupedWorkspaces).length > 0 && (
-                    <SidebarGroup>
-                        <SidebarGroupLabel>My Brainspaces</SidebarGroupLabel>
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                {Object.values(groupedWorkspaces).map((orgGroup) => {
-                                    const isExpanded = expandedOrgs.has(orgGroup.id);
-                                    const isActive = orgGroup.workspaces.some(
-                                        ws => pathname.startsWith(`/dashboard/workspaces/${ws.uuid ?? ws.id}`)
-                                    );
-
-                                    return (
-                                        <SidebarMenuItem key={orgGroup.id}>
-                                            <SidebarMenuButton
-                                                onClick={() => {
-                                                    toggleOrg(orgGroup.id);
-                                                }}
-                                                isActive={isActive}
-                                                className="w-full cursor-pointer"
-                                                type="button"
-                                            >
-                                                <div className="flex items-center justify-between w-full">
-                                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                        {isExpanded ? (
-                                                            <ChevronDown className="h-4 w-4 shrink-0" />
-                                                        ) : (
-                                                            <ChevronUp className="h-4 w-4 shrink-0 rotate-[-90deg]" />
-                                                        )}
-                                                        <Building2 className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
-                                                        <span className="truncate flex-1">
-                                                            {truncateText(orgGroup.name, 20)}
-                                                        </span>
-                                                        <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                                                            ({orgGroup.workspaces.length})
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </SidebarMenuButton>
-                                            {isExpanded && (
-                                                <SidebarMenuSub>
-                                                    {orgGroup.workspaces.map((workspace) => {
-                                                        const isWorkspaceActive = pathname.startsWith(
-                                                            `/dashboard/workspaces/${workspace.uuid ?? workspace.id}`
-                                                        );
-                                                        const isWorkspaceExpanded = expandedWorkspaces.has(workspace.id);
-                                                        const workspaceCollections = getWorkspaceCollections(workspace.id);
-                                                        const hasCollections = workspaceCollections.length > 0;
-
-                                                        return (
-                                                            <SidebarMenuSubItem key={workspace.id}>
-                                                                <div className="w-full">
-                                                                    <SidebarMenuSubButton
-                                                                        asChild={!hasCollections}
-                                                                        isActive={isWorkspaceActive}
-                                                                        onClick={hasCollections ? (e) => toggleWorkspace(workspace.id, e) : undefined}
-                                                                        className={hasCollections ? "cursor-pointer" : ""}
-                                                                    >
-                                                                        {hasCollections ? (
-                                                                            <div className="flex items-center justify-between w-full">
-                                                                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                                                    {isWorkspaceExpanded ? (
-                                                                                        <ChevronDown className="h-3 w-3 shrink-0" />
-                                                                                    ) : (
-                                                                                        <ChevronUp className="h-3 w-3 shrink-0 rotate-[-90deg]" />
-                                                                                    )}
-                                                                                    <FolderOpen className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                                                                                    <span className="truncate flex-1">
-                                                                                        {truncateText(workspace.title, 25)}
-                                                                                    </span>
-                                                                                    <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                                                                                        ({workspaceCollections.length})
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <Link
-                                                                                href={`/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections`}
-                                                                                title={workspace.title}
-                                                                                onClick={() => {
-                                                                                    // Close the dropdown when a workspace is clicked
-                                                                                    setExpandedOrgs(prev => {
-                                                                                        const newSet = new Set(prev);
-                                                                                        newSet.delete(orgGroup.id);
-                                                                                        return newSet;
-                                                                                    });
-                                                                                }}
-                                                                            >
-                                                                                <FolderOpen className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                                                                <span className="truncate">
-                                                                                    {truncateText(workspace.title, 25)}
-                                                                                </span>
-                                                                            </Link>
-                                                                        )}
-                                                                    </SidebarMenuSubButton>
-                                                                    {hasCollections && isWorkspaceExpanded && (
-                                                                        <div className="ml-6 mt-1 space-y-1 relative z-0">
-                                                                            {workspaceCollections.map((collection, index) => {
-                                                                                const isLast = index === workspaceCollections.length - 1;
-                                                                                const collectionSegment = collection.uuid ?? collection.id;
-                                                                                const isCollectionActive = pathname.startsWith(
-                                                                                    `/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections/${collectionSegment}`
-                                                                                );
-                                                                                // Get article count for this collection (use allCollections and allNoteQueries)
-                                                                                const collectionIndex = allCollections?.findIndex(c => c.id === collection.id) ?? -1;
-                                                                                // Prefer query data if available, otherwise use collection.members as fallback
-                                                                                let articleCount = 0;
-                                                                                if (collectionIndex >= 0 && collectionIndex < allNoteQueries.length) {
-                                                                                    const query = allNoteQueries[collectionIndex];
-                                                                                    if (query?.data) {
-                                                                                        articleCount = query.data.length;
-                                                                                    } else {
-                                                                                        // Use fallback while loading or if query failed
-                                                                                        articleCount = collection.members || 0;
-                                                                                    }
-                                                                                } else {
-                                                                                    articleCount = collection.members || 0;
-                                                                                }
-
-                                                                                const collectionNotes = getCollectionNotes(collection.id);
-
-                                                                                return (
-                                                                                    <div key={collection.id} className={`flex items-center group relative z-0 ${isLast ? 'rounded-b-md overflow-hidden' : ''}`}>
-                                                                                        <SidebarMenuSubButton
-                                                                                            asChild
-                                                                                            isActive={isCollectionActive}
-                                                                                            className={`pl-4 flex-1 relative z-0 ${isLast ? 'rounded-b-md' : ''}`}
-                                                                                        >
-                                                                                            <Link
-                                                                                                href={`/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections/${collection.uuid ?? collection.id}/notes`}
-                                                                                                title={collection.title}
-                                                                                            >
-                                                                                                <Layers className="h-3 w-3 text-cyan-600 dark:text-cyan-400 shrink-0" />
-                                                                                                <span className="truncate flex-1">
-                                                                                                    {truncateText(collection.title, 20)}
-                                                                                                </span>
-                                                                                                <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                                                                                                    ({articleCount})
-                                                                                                </span>
-                                                                                            </Link>
-                                                                                        </SidebarMenuSubButton>
-                                                                                        {articleCount > 0 && (
-                                                                                            <DropdownMenu>
-                                                                                                <DropdownMenuTrigger asChild>
-                                                                                                    <button
-                                                                                                        onClick={(e) => e.stopPropagation()}
-                                                                                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded transition-opacity mr-1"
-                                                                                                        title="Move articles"
-                                                                                                    >
-                                                                                                        <MoreVertical className="h-3 w-3 text-muted-foreground" />
-                                                                                                    </button>
-                                                                                                </DropdownMenuTrigger>
-                                                                                                <DropdownMenuContent align="end">
-                                                                                                    <DropdownMenuItem
-                                                                                                        onClick={(e) => handleMoveArticleClick(collection.id, e)}
-                                                                                                    >
-                                                                                                        <Move className="mr-2 h-4 w-4" />
-                                                                                                        Move Articles
-                                                                                                    </DropdownMenuItem>
-                                                                                                </DropdownMenuContent>
-                                                                                            </DropdownMenu>
-                                                                                        )}
-                                                                                    </div>
-                                                                                );
-                                                                            })}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </SidebarMenuSubItem>
-                                                        );
-                                                    })}
-                                                </SidebarMenuSub>
-                                            )}
-                                        </SidebarMenuItem>
-                                    );
-                                })}
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    </SidebarGroup>
-                )}
-
-
             </SidebarContent>
 
             <SidebarFooter>
@@ -1260,8 +897,8 @@ export default function SidePanel() {
                     <SidebarMenuItem>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <SidebarMenuButton className="w-full">
-                                    <User2 className="shrink-0" />
+                                <SidebarMenuButton className="w-full text-black dark:text-[#FFFFFF] hover:text-black dark:hover:text-[#FFFFFF]">
+                                    <User2 className="shrink-0 text-[#DB2B30] dark:text-white" />
                                     <span className="truncate flex-1 text-left" title={userProfile?.data?.full_name || userProfile?.data?.email}>
                                         {getDisplayName()}
                                     </span>
@@ -1270,18 +907,18 @@ export default function SidePanel() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
                                 side="top"
-                                className="w-[--radix-popper-anchor-width]"
+                                className="w-[--radix-popper-anchor-width] text-black dark:text-[#FFFFFF]"
                             >
                                 <DropdownMenuItem asChild>
                                     <Link href="/dashboard/profile">
-                                        <User2 className="mr-2 h-4 w-4" />
+                                        <User2 className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                         Profile
                                     </Link>
                                 </DropdownMenuItem>
                                 {tenants && tenants.length > 0 && (
                                     <DropdownMenuItem asChild>
                                         <Link href="/dashboard/organization">
-                                            <Building className="mr-2 h-4 w-4" />
+                                        <Building className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                             Organization
                                         </Link>
                                     </DropdownMenuItem>
@@ -1289,20 +926,20 @@ export default function SidePanel() {
                                 {canViewTeam && (
                                     <DropdownMenuItem asChild>
                                         <Link href="/dashboard/admins">
-                                            <Users className="mr-2 h-4 w-4" />
+                                        <Users className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                             Team
                                         </Link>
                                     </DropdownMenuItem>
                                 )}
                                 <DropdownMenuItem asChild>
                                     <Link href="/dashboard/faq">
-                                        <HelpCircle className="mr-2 h-4 w-4" />
+                                        <HelpCircle className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                         FAQ
                                     </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
                                     <Link href="/dashboard/settings">
-                                        <Settings className="mr-2 h-4 w-4" />
+                                        <Settings className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
                                         Settings
                                     </Link>
                                 </DropdownMenuItem>

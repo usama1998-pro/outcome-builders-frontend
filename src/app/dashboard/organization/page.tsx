@@ -60,7 +60,7 @@ export default function OrganizationPage() {
                 {/* Header */}
                 <div className="w-full border-b-2 border-dashed pb-4">
                     <h1 className="text-3xl font-bold flex items-center gap-2">
-                        <Building2 className="h-8 w-8" />
+                        <Building2 className="h-8 w-8 text-[#DB2B30]" />
                         Organization Details
                     </h1>
                 </div>
@@ -70,7 +70,7 @@ export default function OrganizationPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <Building2 className="h-5 w-5" />
+                                <Building2 className="h-5 w-5 text-[#DB2B30]" />
                                 Organization Information
                             </CardTitle>
                         </CardHeader>
@@ -113,7 +113,7 @@ export default function OrganizationPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <Users className="h-5 w-5" />
+                                <Users className="h-5 w-5 text-[#DB2B30]" />
                                 Members & Roles
                             </CardTitle>
                         </CardHeader>
@@ -121,7 +121,7 @@ export default function OrganizationPage() {
                             {/* Total Users */}
                             <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                                 <div className="flex items-center gap-2">
-                                    <Users className="h-5 w-5 text-muted-foreground" />
+                                    <Users className="h-5 w-5 text-[#DB2B30]" />
                                     <span className="font-medium">Total Users</span>
                                 </div>
                                 <span className="text-2xl font-bold">{organization.total_users || 0}</span>
@@ -130,7 +130,7 @@ export default function OrganizationPage() {
                             {/* Owner */}
                             <div>
                                 <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
-                                    <Crown className="h-4 w-4 text-yellow-500" />
+                                    <Crown className="h-4 w-4 text-[#DB2B30]" />
                                     Owner
                                 </p>
                                 <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
@@ -151,12 +151,16 @@ export default function OrganizationPage() {
                             <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-sm text-muted-foreground flex items-center gap-2">
-                                        <Users className="h-4 w-4 text-emerald-500" />
+                                        <Users className="h-4 w-4 text-[#DB2B30]" />
                                         Team Members ({organization.admins?.length || 0})
                                     </p>
                                     {canManageUsers && (
                                         <Link href="/dashboard/admins">
-                                            <Button variant="outline" size="sm" className="text-xs">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-xs border-[#DB2B30] text-[#DB2B30] hover:bg-[#DB2B30]/10"
+                                            >
                                                 <Settings className="h-3 w-3 mr-1" />
                                                 Manage
                                             </Button>

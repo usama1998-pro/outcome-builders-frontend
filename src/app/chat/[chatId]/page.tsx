@@ -2,16 +2,19 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Send, Bot, User, Sparkles, Copy, Check, Square, Loader2, Brain, MessageSquare, ChevronDown, Star, RefreshCw, X, FileText, Plus, Upload, Image as ImageIcon, PenTool, AtSign, SlidersHorizontal, Paperclip, ChevronUp } from "lucide-react";
+import { Send, Bot, User, Copy, Check, Square, Loader2, Brain, MessageSquare, ChevronDown, Star, RefreshCw, X, FileText, Plus, Upload, Image as ImageIcon, PenTool, AtSign, SlidersHorizontal, Paperclip, ChevronUp, Globe, MessageCircle, Settings as SettingsIcon } from "lucide-react";
+import Image from "next/image";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { ChatMessage, ChatTab } from "../../../types/chat";
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { streamChat, getChatHistory, getChatTabs, updateChatTabName } from "../../../api/chat";
-import { searchKnowledgeBase } from "../../../api/knowledgeBase";
 import { useBrainSpaceStore } from "../../../store/useBrainSpace";
 import { useUserWorkspaces } from "../../../hooks/useWorkspace";
 import { useUserCollections } from "../../../hooks/useCollection";
@@ -19,6 +22,8 @@ import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../../../store/useAuth";
 import { useUserProfile } from "../../../hooks/useProfile";
+import { useGetUserSettings, useUpdateUserSettings } from "../../../hooks/useUserSettings";
+import { ModelSelector } from "../../../components/chat/ModelSelector";
 import ChatLandingPage from "../page";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -53,7 +58,6 @@ interface MessageBubbleProps {
 
 // Context separator for parsing stored questions
 const CONTEXT_SEPARATOR = '\n\n---CONTEXT---\n\n';
-
 // Track cumulative text offset per message to handle ReactMarkdown fragments
 const messageTextOffsets = new Map<string, number>();
 
@@ -155,19 +159,32 @@ function HighlightText({
             {parts.map((part, index) => {
                 if (part.isMatch) {
                     const isActive = part.matchIndex === currentMatchIndex;
+                    const matchClass = isUserMessage
+                        ? isActive
+                            ? 'bg-white/30 text-white font-semibold px-0.5 rounded-sm ring-2 ring-white/70 search-match-active'
+                            : 'bg-white/20 text-white px-0.5 rounded-sm search-match'
+                        : isActive
+                            ? 'bg-orange-400 dark:bg-orange-500 text-black dark:text-black font-semibold px-0.5 rounded-sm ring-2 ring-orange-500 dark:ring-orange-400 search-match-active'
+                            : 'bg-yellow-200 dark:bg-yellow-300/80 text-black dark:text-black px-0.5 rounded-sm search-match';
+
                     return (
                         <mark
                             key={index}
                             data-match-index={part.matchIndex}
-                            className={isActive
-                                ? 'bg-orange-400 dark:bg-orange-500 text-black dark:text-black font-semibold px-0.5 rounded-sm ring-2 ring-orange-500 dark:ring-orange-400 search-match-active'
-                                : 'bg-yellow-200 dark:bg-yellow-300/80 text-black dark:text-black px-0.5 rounded-sm search-match'}
+                            className={matchClass}
                         >
                             {part.text}
                         </mark>
                     );
                 }
-                return <span key={index}>{part.text}</span>;
+                return (
+                    <span
+                        key={index}
+                        className={isUserMessage ? 'text-white' : undefined}
+                    >
+                        {part.text}
+                    </span>
+                );
             })}
         </>
     );
@@ -386,26 +403,42 @@ function MessageBubble({
             className={`flex flex-col gap-2 group ${isUser ? "items-end" : "items-start"}`}
         >
             <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
-                {/* Bot Avatar with Sparkles */}
+                {/* Bot Avatar with brand square icon */}
                 {!isUser && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-lg">
-                        <Sparkles className="w-4 h-4 text-white drop-shadow-sm" />
+                    <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-[#DB2B30] via-[#B52227] to-[#8A1B1F] flex items-center justify-center shadow-lg">
+                        <Image
+                            src="/assets/white-square-Icon.png"
+                            alt="AI"
+                            width={18}
+                            height={18}
+                            className="dark:hidden"
+                        />
+                        <Image
+                            src="/assets/black-square-Icon.png"
+                            alt="AI"
+                            width={18}
+                            height={18}
+                            className="hidden dark:block"
+                        />
                     </div>
                 )}
 
                 {/* User Avatar */}
                 {isUser && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center shadow-lg">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-[#DB2B30] via-[#B52227] to-[#8A1B1F] flex items-center justify-center shadow-lg">
                         <User className="w-4 h-4 text-white" />
                     </div>
                 )}
 
                 {/* Message Content */}
                 <div
-                    className={`relative max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl rounded-2xl px-4 py-3 ${isUser
-                        ? "bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 dark:from-violet-500 dark:via-purple-500 dark:to-indigo-500 shadow-lg shadow-violet-500/20"
-                        : `bg-card border shadow-sm ${!isUser && isSelectedForArticle ? "border-violet-500 ring-1 ring-violet-300/60" : ""}`
-                        }`}
+                    className={`relative max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl rounded-2xl px-4 py-3 ${
+                        isUser
+                            ? "bg-[#FFE5E6] dark:bg-[#5E0E12] border border-[#DB2B30] dark:border-[#8A1B1F] text-[#1A1A1A] dark:text-[#FDEBEB] shadow-sm"
+                            : `bg-card border shadow-sm ${
+                                  !isUser && isSelectedForArticle ? "border-[#DB2B30] ring-1 ring-[#DB2B30]/60" : ""
+                              }`
+                    }`}
                 >
                     {/* Subtle shine effect for user messages */}
                     {isUser && (
@@ -417,7 +450,7 @@ function MessageBubble({
                             // Show status message instead of 3-dot loader
                             <div className="relative z-10 py-2">
                                 <div className="flex items-center gap-2">
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-500" />
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#DB2B30]" />
                                     <span className="text-xs text-muted-foreground">{currentStatus}</span>
                                 </div>
                             </div>
@@ -428,7 +461,7 @@ function MessageBubble({
                                     {[0, 1, 2].map((i) => (
                                         <motion.div
                                             key={i}
-                                            className="w-2 h-2 bg-violet-500 rounded-full"
+                                            className="w-2 h-2 bg-[#DB2B30] rounded-full"
                                             animate={{ y: [0, -5, 0] }}
                                             transition={{
                                                 duration: 0.6,
@@ -441,11 +474,14 @@ function MessageBubble({
                             </div>
                         )
                     ) : (
-                        <div className={`relative z-10 text-sm sm:text-base leading-relaxed ${isUser ? "!text-white" : "text-foreground"}`}>
+                        <div
+                            className={`relative z-10 text-sm sm:text-base leading-relaxed ${isUser ? "!text-white" : "text-foreground"}`}
+                            style={isUser ? { color: "#FFFFFF" } : undefined}
+                        >
                             {isUser ? (
                                 <div className="space-y-2">
                                     {contextText ? (
-                                        <>
+                                <>
                                             <blockquote className="border-l-3 border-white/40 pl-3 italic text-white/90 text-sm bg-white/10 rounded-r py-2 mb-2">
                                                 <span className="text-xs font-semibold text-white/70 mb-1 block uppercase tracking-wide">Context</span>
                                                 <HighlightText
@@ -457,7 +493,7 @@ function MessageBubble({
                                                     isUserMessage={true}
                                                 />
                                             </blockquote>
-                                            <p className="mt-1">
+                                            <p className="mt-1 text-white">
                                                 <HighlightText
                                                     text={displayQuestion}
                                                     searchQuery={searchQuery}
@@ -469,7 +505,7 @@ function MessageBubble({
                                             </p>
                                         </>
                                     ) : (
-                                        <p>
+                                        <p className="text-white">
                                             <HighlightText
                                                 text={displayQuestion}
                                                 searchQuery={searchQuery}
@@ -783,7 +819,7 @@ function MessageBubble({
                     >
                         {copied ? (
                             <>
-                                <Check className="h-3 w-3 mr-1 text-emerald-500" />
+                                <Check className="h-3 w-3 mr-1 text-[#DB2B30]" />
                                 Copied
                             </>
                         ) : (
@@ -801,7 +837,11 @@ function MessageBubble({
                         }}
                         size="sm"
                         variant={isSelectedForArticle ? "default" : "ghost"}
-                        className={`h-7 px-2 text-xs flex items-center gap-1 ${isSelectedForArticle ? "bg-violet-600 text-white hover:bg-violet-700" : "text-muted-foreground hover:text-foreground"}`}
+                        className={`h-7 px-2 text-xs flex items-center gap-1 ${
+                            isSelectedForArticle
+                                ? "bg-[#DB2B30] text-white hover:bg-[#B52227]"
+                                : "text-muted-foreground hover:text-foreground"
+                        }`}
                         title={isSelectedForArticle ? "Remove from article selection" : "Add/remove this response in article selection"}
                     >
                         {isSelectedForArticle ? (
@@ -856,7 +896,7 @@ function MessageBubble({
                         }}
                         size="sm"
                         variant="default"
-                        className="h-7 px-2.5 text-xs bg-violet-600 hover:bg-violet-700 text-white"
+                        className="h-7 px-2.5 text-xs bg-[#DB2B30] hover:bg-[#B52227] text-white"
                     >
                         <Plus className="h-3 w-3 mr-1.5" />
                         Add as Context
@@ -875,7 +915,7 @@ function TypingIndicator() {
             exit={{ opacity: 0, y: -10 }}
             className="flex gap-3 justify-start"
         >
-            <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-lg">
+            <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-[#DB2B30] via-[#B52227] to-[#8A1B1F] flex items-center justify-center shadow-lg">
                 <Bot className="w-4 h-4 text-white" />
             </div>
             <div className="bg-card border rounded-2xl px-4 py-3 shadow-sm">
@@ -883,7 +923,7 @@ function TypingIndicator() {
                     {[0, 1, 2].map((i) => (
                         <motion.div
                             key={i}
-                            className="w-2 h-2 bg-violet-500 rounded-full"
+                            className="w-2 h-2 bg-[#DB2B30] rounded-full"
                             animate={{ y: [0, -5, 0] }}
                             transition={{
                                 duration: 0.6,
@@ -918,6 +958,10 @@ export default function Chat() {
     const streamingMessageIdRef = useRef<number | null>(null);
     const [currentChatTabId, setCurrentChatTabId] = useState<string | null>(null); // UUID as string
     const [agentMode, setAgentMode] = useState(false);
+    const [selectedModel, setSelectedModel] = useState<string>("default");
+    const [settingsSheetOpen, setSettingsSheetOpen] = useState(false);
+    const [enabledTones, setEnabledTones] = useState<string[]>([]);
+    const [customInstructions, setCustomInstructions] = useState("");
     const [currentStatus, setCurrentStatus] = useState<string | null>(null);
     const [selectedContext, setSelectedContext] = useState<{
         type: 'text' | null;
@@ -926,11 +970,95 @@ export default function Chat() {
         text?: string | null;
     }>({ type: null, id: null, name: null, text: null });
     const { data: userProfile } = useUserProfile();
+    const { data: settingsData, isLoading: settingsLoading } = useGetUserSettings();
+    const updateUserSettings = useUpdateUserSettings();
+    const hasInitializedModelRef = useRef(false);
+
+    useEffect(() => {
+        if (hasInitializedModelRef.current || !settingsData?.data) return;
+        hasInitializedModelRef.current = true;
+        const pref = settingsData.data.preferred_chat_model;
+        if (pref != null && pref !== "") setSelectedModel(pref);
+    }, [settingsData]);
+
+    useEffect(() => {
+        if (!settingsData?.data) return;
+        if (settingsData.data.enabled_tones != null) {
+            setEnabledTones(settingsData.data.enabled_tones);
+        }
+        if (settingsData.data.custom_instructions != null) {
+            setCustomInstructions(settingsData.data.custom_instructions);
+        }
+    }, [settingsData?.data]);
+
+    const handleToneToggle = useCallback(
+        (slug: string, checked: boolean) => {
+            // Only one tone at a time: selecting one clears any previous selection
+            const next = checked ? [slug] : [];
+            setEnabledTones(next);
+            updateUserSettings.mutate({ enabled_tones: next.length ? next : null });
+        },
+        [updateUserSettings]
+    );
+
+    const toneOptions: { slug: string; label: string; description: string }[] = [
+        {
+            slug: "informal",
+            label: "Informal",
+            description: "Loose, conversational wording that sounds like a real-time chat with a colleague, using everyday language and contractions.",
+        },
+        {
+            slug: "professional",
+            label: "Professional",
+            description: "Polished, confident language that feels business-ready without being stiff, with clear structure and measured wording.",
+        },
+        {
+            slug: "concise",
+            label: "Concise",
+            description: "Short, efficient sentences that strip away filler and focus on the essential points so readers can scan quickly.",
+        },
+        {
+            slug: "friendly",
+            label: "Friendly",
+            description: "Warm, welcoming language that feels supportive and encouraging, with soft edges and inclusive phrasing.",
+        },
+        {
+            slug: "formal",
+            label: "Formal",
+            description: "Structured, respectful language that avoids slang and contractions, similar to a report or official communication.",
+        },
+        {
+            slug: "technical",
+            label: "Technical",
+            description: "Precise terminology and domain-specific language that focuses on how things work, assuming some subject familiarity.",
+        },
+        {
+            slug: "empathetic",
+            label: "Empathetic",
+            description: "Gentle, validating language that acknowledges emotions first and then moves into guidance or solutions.",
+        },
+        {
+            slug: "direct",
+            label: "Direct",
+            description: "Straight-to-the-point language that says what needs to be said clearly, with minimal softening or extra context.",
+        },
+    ];
+
+    const handleModelChange = useCallback(
+        (slug: string) => {
+            setSelectedModel(slug);
+            updateUserSettings.mutate({ preferred_chat_model: slug });
+        },
+        [updateUserSettings]
+    );
 
     const getGreeting = () => {
         const hour = new Date().getHours();
-        if (hour < 12) return "morning";
-        if (hour < 18) return "afternoon";
+        // 5:00–11:59 → morning
+        // 12:00–17:59 → afternoon
+        // 18:00–4:59 → evening (covers late night / very early hours)
+        if (hour >= 5 && hour < 12) return "morning";
+        if (hour >= 12 && hour < 18) return "afternoon";
         return "evening";
     };
 
@@ -1543,6 +1671,7 @@ export default function Chat() {
                                     setCurrentStatus(status);
                                 },
                                 onComplete: () => {
+                                    const completedMessageId = streamingMessageIdRef.current;
                                     setIsStreaming(false);
                                     setStreamingMessageId(null);
                                     setCurrentStatus(null);
@@ -1587,7 +1716,8 @@ export default function Chat() {
                                     setSelectedContext({ type: null, id: null, name: null, text: null });
                                     toast.error(`Error: ${error}`);
                                 },
-                            }
+                            },
+                            selectedModel
                         );
 
                         abortControllerRef.current = controller;
@@ -1602,7 +1732,7 @@ export default function Chat() {
                 }
             }
         }
-    }, [chatId, isStreaming, router, queryClient, refetchHistory]);
+    }, [chatId, isStreaming, router, queryClient, refetchHistory, selectedModel]);
 
     // Update messages when history loads (only on initial load or when chatId changes)
     useEffect(() => {
@@ -1894,82 +2024,16 @@ export default function Chat() {
         const originalQuestion = inputValue.trim();
         setInputValue("");
 
-        // Status message "Checking experts Knowledge" will be sent from backend
+        // Backend handles routing and KB search: only runs vector search when category is "kb"
         setIsStreaming(true);
 
-        // Get current workspace and collection UUIDs for filtering
-        const currentWorkspace = currentBrainSpaceId
-            ? workspaces?.find((w) => w.id === currentBrainSpaceId)
-            : null;
-        const workspaceUuid = currentWorkspace?.uuid || null;
-
-        // Get collection UUID if we have a current workspace
-        const currentCollection = workspaceUuid && collections
-            ? collections.find((c) => c.workspaceId === currentBrainSpaceId)
-            : null;
-        const collectionUuid = currentCollection?.uuid || null;
-
-        // Get user UUID for access control
-        // Backend will automatically extract user_uuid from current_user if not provided
-        const userUuid = undefined;
-
-        // Log filter parameters
-        console.log("[KB Search] Filters:", {
-            workspace_uuid: workspaceUuid,
-            collection_uuid: collectionUuid,
-            user_uuid: userUuid,
-            currentBrainSpaceId,
-            query: originalQuestion
-        });
-
-        // Search knowledge base for relevant context with filters (silently, no loader)
-        let knowledgeBaseContext = "";
-        try {
-            const searchResults = await searchKnowledgeBase(
-                originalQuestion,
-                10,  // Get top 10 chunks (filtered by score threshold 0.45)
-                {
-                    workspace_uuid: workspaceUuid || undefined,
-                    collection_uuid: collectionUuid || undefined,
-                    user_uuid: userUuid || undefined,
-                }
-            );
-
-            // Extract context silently (don't log details to avoid exposing to user)
-            if (searchResults.results && searchResults.results.length > 0) {
-                // Combine all relevant content chunks
-                const contextChunks = searchResults.results
-                    .map((result) => result.properties.content)
-                    .filter((content): content is string => !!content);
-                knowledgeBaseContext = contextChunks.join("\n\n");
-            }
-        } catch (error) {
-            console.error("[KB Search] Error searching knowledge base:", error);
-            // Continue without knowledge base context if search fails
-        }
-
-        // Prepare context for backend
-        // Combine knowledge base context with selected context
+        // Send only user-selected context (e.g. pasted/selected text). No frontend KB search.
         const contextToSend = selectedContext.type === 'text' && selectedContext.text
             ? selectedContext.text
             : null;
-
-        let allContextText = "";
-        if (knowledgeBaseContext && contextToSend) {
-            allContextText = `${knowledgeBaseContext}\n\n${contextToSend}`;
-        } else if (knowledgeBaseContext) {
-            allContextText = knowledgeBaseContext;
-        } else if (contextToSend) {
-            allContextText = contextToSend;
-        }
-
-        // Store question without context (context is hidden from user)
-        // Context will be sent separately to backend but not shown in UI
         const storedQuestion = originalQuestion;
-
-        // Prepare context object for backend API (separate from question)
-        const contextForBackend = allContextText
-            ? { type: 'text' as const, text: allContextText }
+        const contextForBackend = contextToSend
+            ? { type: 'text' as const, text: contextToSend }
             : undefined;
 
         // Use original question without concatenation - context will be passed separately
@@ -2129,6 +2193,7 @@ export default function Chat() {
                         setCurrentStatus(status);
                     },
                     onComplete: () => {
+                        const completedMessageId = streamingMessageIdRef.current;
                         setIsStreaming(false);
                         setStreamingMessageId(null);
                         setCurrentStatus(null);
@@ -2171,7 +2236,8 @@ export default function Chat() {
                         abortControllerRef.current = null;
                         toast.error(`Error: ${error}`);
                     },
-                }
+                },
+                selectedModel
             );
 
             abortControllerRef.current = controller;
@@ -2237,6 +2303,23 @@ export default function Chat() {
         );
     }
 
+    // For existing chats with cleared history, show the same full landing layout (no underlying chat UI)
+    if (
+        !isLoadingChatTabs &&
+        !isLoadingHistory &&
+        !isFetchingHistory &&
+        chatHistory !== undefined &&
+        messages.length === 0 &&
+        !isStreaming &&
+        chatId !== "new"
+    ) {
+        return (
+            <div className="flex flex-col h-full w-full">
+                <ChatLandingPage />
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col h-full w-full">
             {/* Chat Messages */}
@@ -2250,47 +2333,13 @@ export default function Chat() {
                             <p className="text-sm text-muted-foreground mt-4">Loading chat history...</p>
                         </div>
                     )}
-                    {/* Empty State - Only show when not loading tabs, not loading history, not fetching, and we have loaded history (or confirmed empty) */}
-                    {!isLoadingChatTabs && !isLoadingHistory && !isFetchingHistory && chatHistory !== undefined && messages.length === 0 && !isStreaming && chatId !== "new" && (
-                        <div className="w-full flex flex-col items-center justify-center py-16 min-h-[400px]">
-                            {/* Greeting */}
-                            <div className="flex items-center gap-3 mb-8">
-                                <FourPointedStar className="w-6 h-6 text-[#2D4739] dark:text-emerald-400" />
-                                <h1 className="text-3xl sm:text-4xl font-semibold text-neutral-900 dark:text-white tracking-tight">
-                                    {firstName ? `Good ${timeOfDay}, ${firstName}` : `Good ${timeOfDay}`}
-                                </h1>
-                            </div>
-
-                            {/* Quick Actions */}
-                            <div className="flex flex-wrap justify-center gap-2.5">
-                                {[
-                                    { label: "Build Workspace", href: "/dashboard/workspaces" },
-                                    { label: "Plan & Work", href: "/chat/new" },
-                                    { label: "Research", href: "/chat/new" },
-                                    { label: "Organize Files", href: "/dashboard/collections" },
-                                    { label: "Create Prompt", href: "/chat/new" },
-                                ].map((action) => (
-                                    <Button
-                                        key={action.label}
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => router.push(action.href)}
-                                        className="rounded-full text-sm px-4 py-2 h-auto border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white shadow-sm"
-                                    >
-                                        {action.label}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                     <AnimatePresence mode="popLayout">
                         {messages.map((msg, index) => (
                             <MessageBubble
                                 key={`${msg.id}-${index}-${searchQuery}-${currentMatchIndex}`}
                                 message={msg}
                                 index={index}
-                                isStreaming={isStreaming && streamingMessageId === msg.id && chatCreatedRef.current}
+                                isStreaming={isStreaming && streamingMessageId === msg.id}
                                 onAddContext={handleAddTextContext}
                                 onCreateArticle={handleCreateArticle}
                                 isSelectedForArticle={selectedArticleMessageIds.includes(msg.id)}
@@ -2316,9 +2365,9 @@ export default function Chat() {
             {selectedArticleMessageIds.length > 0 && (
                 <div className="flex-shrink-0 px-4 sm:px-6 pb-2">
                     <div className="max-w-4xl mx-auto">
-                        <div className="mb-2 px-3 py-2 rounded-lg border bg-muted/60 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-violet-600" />
+                        <div className="mb-2 px-3 py-2 rounded-lg border bg-white/80 dark:bg-muted/60 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-black dark:text-muted-foreground">
+                                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#DB2B30]" />
                                 <span>
                                     {selectedArticleMessageIds.length}{" "}
                                     {selectedArticleMessageIds.length === 1 ? "response selected" : "responses selected"}{" "}
@@ -2338,7 +2387,7 @@ export default function Chat() {
                                 <Button
                                     type="button"
                                     size="sm"
-                                    className="h-7 px-3 text-xs bg-violet-600 hover:bg-violet-700 text-white"
+                                    className="h-7 px-3 text-xs bg-[#DB2B30] hover:bg-[#B52227] text-white"
                                     onClick={handleCreateArticleFromSelection}
                                 >
                                     <PenTool className="h-3 w-3 mr-1" />
@@ -2357,7 +2406,7 @@ export default function Chat() {
                     {selectedContext.type === 'text' && selectedContext.name && (
                         <div className="mb-3 px-3 py-2 bg-muted/50 border rounded-lg flex items-center justify-between">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                <FileText className="h-4 w-4 text-[#DB2B30] flex-shrink-0" />
                                 <div className="flex-1 min-w-0">
                                     <span className="text-sm font-medium block truncate">{selectedContext.name}</span>
                                     <span className="text-xs text-muted-foreground">
@@ -2443,6 +2492,15 @@ export default function Chat() {
                                         type="button"
                                         disabled={isStreaming}
                                         className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                        title="Web search"
+                                    >
+                                        <Globe className="w-[18px] h-[18px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSettingsSheetOpen(true)}
+                                        disabled={isStreaming}
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
                                         title="Settings"
                                     >
                                         <SlidersHorizontal className="w-[18px] h-[18px]" />
@@ -2451,6 +2509,11 @@ export default function Chat() {
 
                                 {/* Right controls */}
                                 <div className="flex items-center gap-2">
+                                    <ModelSelector
+                                        value={selectedModel}
+                                        onChange={handleModelChange}
+                                        disabled={isStreaming}
+                                    />
                                     {/* Agent/Chat Mode Toggle */}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -2480,17 +2543,17 @@ export default function Chat() {
                                                 onClick={() => setAgentMode(false)}
                                                 className="flex items-center gap-2 cursor-pointer"
                                             >
-                                                <MessageSquare className="w-3.5 h-3.5" />
+                                                <MessageSquare className="w-3.5 h-3.5 text-[#DB2B30]" />
                                                 <span>Chat Mode</span>
-                                                {!agentMode && <Check className="w-3 h-3 ml-auto text-emerald-500" />}
+                                                {!agentMode && <Check className="w-3 h-3 ml-auto text-[#DB2B30]" />}
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onClick={() => setAgentMode(true)}
                                                 className="flex items-center gap-2 cursor-pointer"
                                             >
-                                                <RefreshCw className="w-3.5 h-3.5" />
+                                                <RefreshCw className="w-3.5 h-3.5 text-[#DB2B30]" />
                                                 <span>Agent Mode</span>
-                                                {agentMode && <Check className="w-3 h-3 ml-auto text-emerald-500" />}
+                                                {agentMode && <Check className="w-3 h-3 ml-auto text-[#DB2B30]" />}
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -2510,7 +2573,7 @@ export default function Chat() {
                                             type="submit"
                                             size="icon"
                                             disabled={!inputValue.trim()}
-                                            className="h-9 w-9 rounded-full bg-[#2D4739] hover:bg-[#243B2E] dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white disabled:opacity-30 disabled:bg-neutral-200 dark:disabled:bg-neutral-700 disabled:text-neutral-400 dark:disabled:text-neutral-500 transition-all flex-shrink-0"
+                                            className="h-9 w-9 rounded-full bg-[#DB2B30] hover:bg-[#B52227] dark:bg-[#DB2B30] dark:hover:bg-[#B52227] text-white disabled:opacity-30 disabled:bg-neutral-200 dark:disabled:bg-neutral-700 disabled:text-neutral-400 dark:disabled:text-neutral-500 transition-all flex-shrink-0"
                                         >
                                             <Send className="h-4 w-4" />
                                         </Button>
@@ -2521,6 +2584,77 @@ export default function Chat() {
                     </form>
                 </div>
             </div>
+
+            {/* Settings sheet - tone toggles (chat interface) */}
+            <Sheet open={settingsSheetOpen} onOpenChange={setSettingsSheetOpen}>
+                <SheetContent side="right" className="w-full sm:max-w-md">
+                    <SheetHeader>
+                        <SheetTitle className="flex items-center gap-2">
+                            <SettingsIcon className="h-5 w-5" />
+                            Tone response
+                        </SheetTitle>
+                        <SheetDescription>
+                            Set how you want your answers to sound. Think about the style, mood, and level of formality that feels right for your brand.
+                        </SheetDescription>
+                    </SheetHeader>
+                    <div className="px-4 pb-4 space-y-6 overflow-y-auto">
+                        <div className="space-y-3">
+                            <Label htmlFor="chat-custom-instructions" className="text-sm font-medium">
+                                Custom instructions
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                Tell the assistant how to respond in this chat. This will be included with your messages.
+                            </p>
+                            <textarea
+                                id="chat-custom-instructions"
+                                value={customInstructions}
+                                onChange={(e) => setCustomInstructions(e.target.value)}
+                                rows={4}
+                                maxLength={2000}
+                                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-[#DB2B30] focus:border-transparent resize-none"
+                                disabled={settingsLoading || updateUserSettings.isPending}
+                            />
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>{2000 - customInstructions.length} characters remaining</span>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={settingsLoading || updateUserSettings.isPending}
+                                    onClick={() =>
+                                        updateUserSettings.mutate({
+                                            custom_instructions: customInstructions.trim() || null,
+                                        })
+                                    }
+                                >
+                                    Save instructions
+                                </Button>
+                            </div>
+                        </div>
+                        <div>
+                            <div className="space-y-4">
+                                {toneOptions.map(({ slug, label, description }) => (
+                                    <div key={slug} className="flex items-center justify-between gap-4">
+                                        <div className="flex-1 space-y-0.5">
+                                            <Label htmlFor={`chat-tone-${slug}`} className="text-sm font-medium cursor-pointer">
+                                                {label}
+                                            </Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                {description}
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            id={`chat-tone-${slug}`}
+                                            checked={enabledTones.includes(slug)}
+                                            onCheckedChange={(checked) => handleToneToggle(slug, checked)}
+                                            disabled={settingsLoading || updateUserSettings.isPending}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }

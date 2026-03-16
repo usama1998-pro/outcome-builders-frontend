@@ -92,16 +92,26 @@ export default function DashboardProfile() {
         <RequireAuth>
             <div className="w-full h-full flex flex-col items-center justify-center p-6 gap-3">
                 <div className="w-full border-b-2 border-dashed pb-4 mb-4 flex justify-between items-center">
-                    <p className="text-3xl font-bold">Profile</p>
+                    <p className="text-3xl font-bold flex items-center gap-2">
+                        <User className="h-8 w-8 text-[#DB2B30]" />
+                        Profile
+                    </p>
                     <div className="flex gap-2 items-center">
                         {!isEditing ? (
-                            <Button onClick={() => setIsEditing(true)}>
+                            <Button
+                                onClick={() => setIsEditing(true)}
+                                className="bg-gradient-to-r from-[#DB2B30] to-red-700 text-white border-0"
+                            >
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Profile
                             </Button>
                         ) : (
                             <>
-                                <Button onClick={handleSave} disabled={isPending}>
+                                <Button
+                                    onClick={handleSave}
+                                    disabled={isPending}
+                                    className="bg-gradient-to-r from-[#DB2B30] to-red-700 text-white border-0"
+                                >
                                     <Save className="h-4 w-4 mr-2" />
                                     {isPending ? "Saving..." : "Save"}
                                 </Button>
@@ -132,7 +142,7 @@ export default function DashboardProfile() {
                                     <h1 className="font-bold">{data?.data.full_name || "No name set"}</h1>
                                 )}
                                 <p>{data?.data.email}</p>
-                                <p className="text-emerald-700">Premium</p>
+                                <p className="text-[#DB2B30]">Premium</p>
                             </div>
 
                             <div className="w-full flex flex-col items-center justify-center">
@@ -249,26 +259,26 @@ export default function DashboardProfile() {
                         ) : (
                             <div className="w-full flex flex-wrap gap-4">
                                 {formData.linkedin && (
-                                    <a
-                                        href={formData.linkedin}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                    >
-                                        <FaLinkedin className="h-5 w-5" />
-                                        <span>LinkedIn</span>
-                                    </a>
+                                <a
+                                    href={formData.linkedin}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 px-4 py-2 bg-[#0A66C2] text-white rounded-lg hover:bg-[#004182] transition-colors"
+                                >
+                                    <FaLinkedin className="h-5 w-5" />
+                                    <span>LinkedIn</span>
+                                </a>
                                 )}
                                 {formData.twitter && (
-                                    <a
-                                        href={formData.twitter}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-2 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors"
-                                    >
-                                        <FaTwitter className="h-5 w-5" />
-                                        <span>Twitter</span>
-                                    </a>
+                                <a
+                                    href={formData.twitter}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 px-4 py-2 bg-[#1DA1F2] text-white rounded-lg hover:bg-[#0d8ae5] transition-colors"
+                                >
+                                    <FaTwitter className="h-5 w-5" />
+                                    <span>Twitter</span>
+                                </a>
                                 )}
                                 {formData.instagram && (
                                     <a

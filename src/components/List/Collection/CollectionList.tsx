@@ -174,24 +174,24 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
         setCurrentPage(1);
     }, [searchQuery]);
 
-    // Get visibility icon and color
+    // Get visibility icon and color (red-accented)
     const getVisibilityConfig = (visibility?: string) => {
         switch (visibility) {
             case "public":
-                return { icon: Globe, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Public" };
+                return { icon: Globe, color: "text-[#DB2B30]", bg: "bg-[#DB2B30]/10", label: "Public" };
             case "shared":
-                return { icon: Users, color: "text-blue-500", bg: "bg-blue-500/10", label: "Shared" };
+                return { icon: Users, color: "text-[#B52227]", bg: "bg-[#B52227]/10", label: "Shared" };
             default:
-                return { icon: Lock, color: "text-amber-500", bg: "bg-amber-500/10", label: "Private" };
+                return { icon: Lock, color: "text-[#8A1B1F]", bg: "bg-[#8A1B1F]/10", label: "Private" };
         }
     };
 
-    // Color accents for collection cards - using teal/cyan scheme
+    // Color accents for collection cards - red shades
     const accents = [
-        { border: "hover:border-teal-500/50", icon: "from-teal-500 to-cyan-500", glow: "hover:shadow-teal-500/10" },
-        { border: "hover:border-cyan-500/50", icon: "from-cyan-500 to-blue-500", glow: "hover:shadow-cyan-500/10" },
-        { border: "hover:border-emerald-500/50", icon: "from-emerald-500 to-teal-500", glow: "hover:shadow-emerald-500/10" },
-        { border: "hover:border-sky-500/50", icon: "from-sky-500 to-indigo-500", glow: "hover:shadow-sky-500/10" },
+        { border: "hover:border-[#DB2B30]/50", icon: "from-[#DB2B30] to-[#B52227]", glow: "hover:shadow-[#DB2B30]/10" },
+        { border: "hover:border-[#B52227]/50", icon: "from-[#B52227] to-[#8A1B1F]", glow: "hover:shadow-[#B52227]/10" },
+        { border: "hover:border-[#F04A4F]/50", icon: "from-[#F04A4F] to-[#DB2B30]", glow: "hover:shadow-[#F04A4F]/10" },
+        { border: "hover:border-[#C7393E]/50", icon: "from-[#C7393E] to-[#8A1B1F]", glow: "hover:shadow-[#C7393E]/10" },
     ];
 
     const getAccent = (index: number) => accents[index % accents.length];
@@ -351,8 +351,11 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
                 {/* Empty search results */}
                 {filteredCollections.length === 0 && searchQuery.trim() && (
                     <div className="flex flex-col items-center justify-center py-16">
-                        <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
-                            <Layers className="w-8 h-8 text-muted-foreground" />
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 bg-gradient-to-br from-[#DB2B30]/20 via-[#B52227]/20 to-[#8A1B1F]/20 rounded-full blur-3xl animate-pulse" />
+                            <div className="relative w-20 h-20 bg-gradient-to-br from-[#DB2B30]/10 to-[#8A1B1F]/10 rounded-full flex items-center justify-center border border-[#DB2B30]/30 shadow-lg">
+                                <Layers className="w-10 h-10 text-[#DB2B30]" />
+                            </div>
                         </div>
                         <h3 className="text-lg font-semibold text-foreground mb-2">No Results Found</h3>
                         <p className="text-muted-foreground text-center">
@@ -397,7 +400,7 @@ export function CollectionList({ collections, workspace, onDelete, searchQuery =
                                                     <div className="min-w-0 flex-1">
                                                         {/* Title Row */}
                                                         <div className="flex items-center gap-3 mb-2">
-                                                            <h3 className="font-semibold text-lg text-foreground truncate group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors" title={collection.title}>
+                                                            <h3 className="font-semibold text-lg text-foreground truncate group-hover:text-[#DB2B30] dark:group-hover:text-[#DB2B30] transition-colors" title={collection.title}>
                                                                 {collection.title}
                                                             </h3>
                                                             {/* Visibility Badge */}

@@ -206,7 +206,7 @@ function NewArticlePageContent() {
                 return;
             }
 
-            const collectionName = title.trim() || "My Articles";
+            const collectionName = title.trim() || "My Resources";
             
             createCollection(
                 {

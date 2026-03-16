@@ -59,13 +59,13 @@ const STATUS_CONFIG: Record<
 > = {
     completed: {
         label: "Completed",
-        color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/30",
-        icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+        color: "bg-[#DB2B30]/10 text-[#DB2B30] dark:text-[#FDEBEB] border-[#DB2B30]/40",
+        icon: <CheckCircle2 className="h-4 w-4 text-[#DB2B30]" />,
     },
     in_progress: {
         label: "In Progress",
-        color: "bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/30",
-        icon: <PlayCircle className="h-4 w-4 text-amber-500" />,
+        color: "bg-[#FF6B6B]/15 text-[#FF6B6B] dark:text-[#FFB3B3] border-[#FF6B6B]/40",
+        icon: <PlayCircle className="h-4 w-4 text-[#FF6B6B]" />,
     },
     not_started: {
         label: "Not Started",
@@ -78,7 +78,7 @@ export default function RoadmapPage() {
     const overall = getOverallProgress(ROADMAP_TASKS);
 
     return (
-        <div className="flex flex-col w-full h-screen bg-background overflow-hidden">
+        <div className="flex flex-col w-full min-h-full bg-background">
             <div className="px-8 pt-6 pb-4 border-b flex-shrink-0 bg-background/80 backdrop-blur-sm">
                 <div className="flex items-center justify-between gap-4">
                     <div>
@@ -95,7 +95,7 @@ export default function RoadmapPage() {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-8 py-6">
+            <div className="flex-1 px-8 py-6">
                 <div className="max-w-5xl mx-auto space-y-6">
                     {/* Overall Progress */}
                     <Card className="border border-border/60 shadow-sm">
@@ -113,7 +113,7 @@ export default function RoadmapPage() {
                         <CardContent className="pt-0 pb-4">
                             <div className="h-3 rounded-full bg-muted overflow-hidden">
                                 <div
-                                    className="h-full bg-gradient-to-r from-emerald-500 via-lime-400 to-amber-400 transition-all"
+                                    className="h-full bg-gradient-to-r from-[#FF6B6B] via-[#FF3B3B] to-[#E10000] transition-all"
                                     style={{ width: `${overall}%` }}
                                 />
                             </div>
@@ -177,7 +177,11 @@ export default function RoadmapPage() {
                                                 <Button
                                                     size="sm"
                                                     variant={task.status === "completed" ? "outline" : "default"}
-                                                    className="h-6 text-[11px] px-2"
+                                                    className={`h-6 text-[11px] px-2 ${
+                                                        task.status === "completed"
+                                                            ? ""
+                                                            : "bg-[#DB2B30] hover:bg-[#B52227]"
+                                                    }`}
                                                 >
                                                     {task.status === "completed" ? "Review" : "Start Here →"}
                                                 </Button>

@@ -4,35 +4,17 @@ import React from "react";
 import SidePanel from "@/src/components/SidePanel/SidePanel";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ToggleThemeButton } from "@/components/ToggleThemeButton";
-import { useUserTenants } from "@/src/hooks/useAuth";
-import { useAuthStore } from "@/src/store/useAuth";
 import RequireAuth from "@/src/components/auth/requireAuth";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Building, Search, X, ChevronUp, ChevronDown } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useOrganizationDetails } from "@/src/hooks/useOrganization";
+import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
-    const { data: tenants, isLoading: tenantsLoading } = useUserTenants();
-    const currentTenantId = useAuthStore((s) => s.tenantId);
-    const setTenantId = useAuthStore((s) => s.setTenantId);
-    const queryClient = useQueryClient();
-    const { data: organization } = useOrganizationDetails(currentTenantId || 0);
     const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     const [searchQuery, setSearchQuery] = React.useState("");
     const [searchMatchCount, setSearchMatchCount] = React.useState(0);
     const [currentMatchIndex, setCurrentMatchIndex] = React.useState(-1);
     const searchInputRef = React.useRef<HTMLInputElement>(null);
-
-    const currentTenant = tenants?.find((t) => t.id === currentTenantId);
 
     // Listen for keyboard shortcut
     React.useEffect(() => {
@@ -68,22 +50,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     }, [searchQuery]);
 
 
-    // Set default tenant if none is selected and user has tenants
-    React.useEffect(() => {
-        if (!currentTenantId && tenants && tenants.length > 0) {
-            setTenantId(tenants[0].id);
-        }
-    }, [tenants, currentTenantId, setTenantId]);
-
-    const handleOrganizationChange = (value: string) => {
-        const newTenantId = Number(value);
-        if (newTenantId && newTenantId !== currentTenantId) {
-            setTenantId(newTenantId);
-            // Clear query cache to refetch data for the new organization
-            queryClient.clear();
-        }
-    };
-
     return (
         <RequireAuth>
             <SidebarProvider>
@@ -104,31 +70,12 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                     {/* Main content area */}
                     <div className="flex flex-col flex-1 relative">
 
-                        {/* Organization Switcher - Above chat content only */}
+                        {/* Search bar - Above chat content */}
                         <div className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-sm">
                             <div className="grid grid-cols-3 items-center px-4 py-3 relative z-10 gap-4">
-                                {/* Left side: Sidebar Trigger and Organization Switcher */}
+                                {/* Left side: Sidebar Trigger */}
                                 <div className="flex items-center gap-3 justify-start">
                                     <SidebarTrigger className="bg-background/80 backdrop-blur-sm border shadow-sm rounded-lg p-2 hover:bg-accent transition-colors" />
-                                    {tenants && tenants.length > 0 && (
-                                        <Select
-                                            value={currentTenantId ? String(currentTenantId) : undefined}
-                                            onValueChange={handleOrganizationChange}
-                                            disabled={tenantsLoading || tenants.length === 0}
-                                        >
-                                            <SelectTrigger className="w-[200px] sm:w-[240px] bg-background/80 backdrop-blur-sm border shadow-sm">
-                                                <Building className="h-4 w-4 text-muted-foreground mr-2" />
-                                                <SelectValue placeholder="Select organization" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {tenants.map((tenant) => (
-                                                    <SelectItem key={tenant.id} value={String(tenant.id)}>
-                                                        {tenant.company_name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    )}
                                 </div>
 
                                 {/* Middle: Search - Button or Input (centered) */}

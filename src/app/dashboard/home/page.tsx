@@ -11,6 +11,7 @@ import {
     TrendingUp,
     ArrowRight
 } from "lucide-react";
+import Image from "next/image";
 
 interface StatCardProps {
     title: string;
@@ -65,38 +66,40 @@ function StatCardSkeleton() {
 export default function DashboardHome() {
     const { data: analytics, isLoading, isError } = useAnalytics();
 
-    const stats = analytics ? [
-        {
-            title: "Workspaces",
-            value: analytics.total_workspaces,
-            icon: <Layers className="w-5 h-5 text-white" />,
-            gradient: "bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500",
-        },
-        {
-            title: "Collections",
-            value: analytics.total_collections,
-            icon: <FolderOpen className="w-5 h-5 text-white" />,
-            gradient: "bg-gradient-to-br from-cyan-500 via-teal-500 to-emerald-500",
-        },
-        {
-            title: "Articles",
-            value: analytics.total_notes,
-            icon: <FileText className="w-5 h-5 text-white" />,
-            gradient: "bg-gradient-to-br from-amber-500 via-orange-500 to-red-500",
-        },
-        {
-            title: "Members",
-            value: analytics.total_members,
-            icon: <Users className="w-5 h-5 text-white" />,
-            gradient: "bg-gradient-to-br from-rose-500 via-pink-500 to-fuchsia-500",
-        },
-        {
-            title: "Trained Articles",
-            value: analytics.total_trained_notes,
-            icon: <Brain className="w-5 h-5 text-white" />,
-            gradient: "bg-gradient-to-br from-indigo-500 via-blue-500 to-cyan-500",
-        },
-    ] : [];
+    const stats = analytics
+        ? [
+              {
+                  title: "Workspaces",
+                  value: analytics.total_workspaces,
+                  icon: <Layers className="w-5 h-5 text-white" />,
+                  gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+              },
+              {
+                  title: "Collections",
+                  value: analytics.total_collections,
+                  icon: <FolderOpen className="w-5 h-5 text-white" />,
+                  gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+              },
+              {
+                  title: "Resources",
+                  value: analytics.total_notes,
+                  icon: <FileText className="w-5 h-5 text-white" />,
+                  gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+              },
+              {
+                  title: "Members",
+                  value: analytics.total_members,
+                  icon: <Users className="w-5 h-5 text-white" />,
+                  gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+              },
+              {
+                  title: "Trained Resources",
+                  value: analytics.total_trained_notes,
+                  icon: <Brain className="w-5 h-5 text-white" />,
+                  gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+              },
+          ]
+        : [];
 
     return (
         <RequireAuth>
@@ -166,15 +169,28 @@ export default function DashboardHome() {
 
                         <a
                             href="/chat"
-                            className="group flex items-center justify-between p-4 rounded-xl bg-card border hover:border-blue-500/50 hover:bg-blue-500/5 transition-all"
+                            className="group flex items-center justify-between p-4 rounded-xl bg-card border hover:border-red-500/50 hover:bg-red-500/5 transition-all"
                         >
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
-                                    <Brain className="w-5 h-5 text-blue-500" />
+                                <div className="p-2 rounded-lg bg-red-500/10 group-hover:bg-red-500/20 transition-colors flex items-center justify-center">
+                                    <Image
+                                        src="/assets/black-square-Icon.png"
+                                        alt="AI Chat"
+                                        width={20}
+                                        height={20}
+                                        className="block dark:hidden"
+                                    />
+                                    <Image
+                                        src="/assets/white-square-Icon.png"
+                                        alt="AI Chat"
+                                        width={20}
+                                        height={20}
+                                        className="hidden dark:block"
+                                    />
                                 </div>
                                 <span className="font-medium">AI Chat</span>
                             </div>
-                            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+                            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-red-500 group-hover:translate-x-1 transition-all" />
                         </a>
 
                         <a
@@ -243,7 +259,7 @@ export default function DashboardHome() {
                                     <FileText className="w-6 h-6 text-amber-500" />
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold mb-1">Capture in Articles</h3>
+                                    <h3 className="font-semibold mb-1">Capture in Resources</h3>
                                     <p className="text-sm text-muted-foreground">
                                         Document insights, ideas, and information in articles with file attachments.
                                     </p>

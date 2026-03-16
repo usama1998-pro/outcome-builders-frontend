@@ -90,14 +90,14 @@ export default function WorkSpacesList({ filter, currentTenantId, searchQuery, o
         setCurrentPage(1);
     }, [filter, searchQuery]);
 
-    // Color gradients for workspace cards
+    // Color gradients for workspace cards (red shades only)
     const gradients = [
-        "from-violet-500 to-purple-600",
-        "from-blue-500 to-cyan-500",
-        "from-emerald-500 to-teal-500",
-        "from-orange-500 to-amber-500",
-        "from-pink-500 to-rose-500",
-        "from-indigo-500 to-blue-500",
+        "from-[#DB2B30] to-[#B52227]",
+        "from-[#B52227] to-[#8A1B1F]",
+        "from-[#F04A4F] to-[#DB2B30]",
+        "from-[#FF6B6F] to-[#DB2B30]",
+        "from-[#C7393E] to-[#8A1B1F]",
+        "from-[#DB2B30] to-[#F04A4F]",
     ];
 
     const getGradient = (index: number) => gradients[index % gradients.length];
@@ -158,25 +158,25 @@ export default function WorkSpacesList({ filter, currentTenantId, searchQuery, o
                 )}
 
                 {filteredWorkspaces.length === 0 && !isLoading && !isError && (
-                    <div className="flex flex-col items-center justify-center py-20">
+                        <div className="flex flex-col items-center justify-center py-20">
                         <div className="relative mb-8">
                             {/* Animated background gradient */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/20 via-purple-500/20 to-fuchsia-500/20 rounded-full blur-3xl animate-pulse"></div>
+                            <div className="absolute inset-0 bg-gradient-to-br from-[#DB2B30]/20 via-[#B52227]/20 to-[#8A1B1F]/20 rounded-full blur-3xl animate-pulse"></div>
                             
                             {/* Main icon container */}
-                            <div className="relative w-24 h-24 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center border border-violet-500/20 dark:border-violet-500/30 shadow-lg animate-pulse">
-                                <Brain className="w-12 h-12 text-violet-500 dark:text-violet-400" />
+                            <div className="relative w-24 h-24 bg-gradient-to-br from-[#DB2B30]/10 to-[#8A1B1F]/10 dark:from-[#DB2B30]/20 dark:to-[#8A1B1F]/20 rounded-full flex items-center justify-center border border-[#DB2B30]/30 shadow-lg animate-pulse">
+                                <Brain className="w-12 h-12 text-[#DB2B30]" />
                             </div>
                             
                             {/* Decorative sparkles */}
                             <div className="absolute -top-2 -right-2">
-                                <Sparkles className="w-5 h-5 text-violet-400 animate-pulse" style={{ animationDelay: '0s' }} />
+                                <Sparkles className="w-5 h-5 text-[#DB2B30] animate-pulse" style={{ animationDelay: '0s' }} />
                             </div>
                             <div className="absolute -bottom-2 -left-2">
-                                <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" style={{ animationDelay: '0.5s' }} />
+                                <Sparkles className="w-4 h-4 text-[#B52227] animate-pulse" style={{ animationDelay: '0.5s' }} />
                             </div>
                             <div className="absolute top-1/2 -left-3">
-                                <Sparkles className="w-3 h-3 text-fuchsia-400 animate-pulse" style={{ animationDelay: '1s' }} />
+                                <Sparkles className="w-3 h-3 text-[#8A1B1F] animate-pulse" style={{ animationDelay: '1s' }} />
                             </div>
                         </div>
                         
@@ -193,7 +193,7 @@ export default function WorkSpacesList({ filter, currentTenantId, searchQuery, o
                         {!searchQuery.trim() && canCreate && onCreateClick && (
                             <Button
                                 onClick={onCreateClick}
-                                className="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                                className="bg-gradient-to-r from-[#DB2B30] to-[#B52227] hover:from-[#B52227] hover:to-[#8A1B1F] text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
                             >
                                 <Plus className="w-4 h-4 mr-2" />
                                 Create Your First Brainspace
@@ -204,7 +204,7 @@ export default function WorkSpacesList({ filter, currentTenantId, searchQuery, o
                             <Button
                                 onClick={onClearSearch}
                                 variant="outline"
-                                className="border-violet-500/50 hover:bg-violet-500/10 hover:border-violet-500 transition-all"
+                                className="border-[#DB2B30]/50 hover:bg-[#DB2B30]/10 hover:border-[#DB2B30] transition-all"
                             >
                                 Clear Search
                             </Button>
@@ -221,7 +221,7 @@ export default function WorkSpacesList({ filter, currentTenantId, searchQuery, o
                                 href={`/dashboard/workspaces/${workspace.uuid ?? workspace.id}/collections`}
                                 className="group block"
                             >
-                                <div className="relative bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/10 hover:border-violet-500/30 hover:-translate-y-1">
+                                <div className="relative bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-[#DB2B30]/15 hover:border-[#DB2B30]/40 hover:-translate-y-1">
                                     {/* Gradient Header */}
                                     <div className={`h-24 bg-gradient-to-br ${getGradient(index)} relative overflow-hidden`}>
                                         {/* Pattern overlay */}
@@ -266,7 +266,7 @@ export default function WorkSpacesList({ filter, currentTenantId, searchQuery, o
                                     <div className="p-5">
                                         {/* Title & Organization */}
                                         <div className="mb-3">
-                                            <h3 className="font-semibold text-lg text-foreground truncate group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors" title={workspace.title}>
+                                            <h3 className="font-semibold text-lg text-foreground truncate group-hover:text-[#DB2B30] dark:group-hover:text-[#DB2B30] transition-colors" title={workspace.title}>
                                                 {workspace.title}
                                             </h3>
                                             <div className="flex items-center gap-1.5 mt-1">
@@ -294,7 +294,7 @@ export default function WorkSpacesList({ filter, currentTenantId, searchQuery, o
                                                     <span className="text-sm">{formatDateTime(workspace.createdAt)}</span>
                                                 </div>
                                             </div>
-                                            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-violet-500 group-hover:translate-x-1 transition-all" />
+                                            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-[#DB2B30] group-hover:translate-x-1 transition-all" />
                                         </div>
                                     </div>
                                 </div>
@@ -324,7 +324,7 @@ export default function WorkSpacesList({ filter, currentTenantId, searchQuery, o
                                     variant={currentPage === page ? "default" : "outline"}
                                     size="sm"
                                     onClick={() => setCurrentPage(page)}
-                                    className={`w-9 h-9 p-0 ${currentPage === page ? "bg-violet-500 hover:bg-violet-600" : ""}`}
+                                    className={`w-9 h-9 p-0 ${currentPage === page ? "bg-[#DB2B30] hover:bg-[#B52227]" : ""}`}
                                 >
                                     {page}
                                 </Button>
