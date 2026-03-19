@@ -22,9 +22,9 @@ const FAQS: FaqItem[] = [
   },
   {
     id: "brainspaces-vs-collections",
-    question: "What’s the difference between Brainspaces, Collections, and Resources?",
+    question: "What’s the difference between Brainspaces, Collections, and Content?",
     answer:
-      "Brainspaces are high-level areas of work. Collections help group related information. Resources are individual pieces of content within Collections/Brainspaces.",
+      "Brainspaces are high-level areas of work. Collections help group related information. Content are individual pieces (notes/articles) within Collections/Brainspaces.",
   },
   {
     id: "how-to-start-chat",

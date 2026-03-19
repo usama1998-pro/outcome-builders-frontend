@@ -86,7 +86,7 @@ export default function Dashboard() {
             gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
         },
         {
-            title: "Resources",
+            title: "Content",
             value: analytics?.total_notes ?? 0,
             icon: <FileText className="w-5 h-5 text-white" />,
             gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
@@ -98,7 +98,7 @@ export default function Dashboard() {
             gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
         },
         {
-            title: "Trained Resources",
+            title: "Trained Content",
             value: analytics?.total_trained_notes ?? 0,
             icon: <Brain className="w-5 h-5 text-white" />,
             gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",

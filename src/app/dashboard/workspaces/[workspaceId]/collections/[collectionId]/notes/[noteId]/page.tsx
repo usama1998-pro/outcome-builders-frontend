@@ -416,7 +416,7 @@ export default function NoteViewPage() {
                         variant="outline"
                         onClick={() => router.push(`/dashboard/workspaces/${workspaceId}/collections/${collectionIdParam}/notes`)}
                     >
-                        <FaArrowLeft className="mr-2" /> Back to Resources
+                        <FaArrowLeft className="mr-2" /> Back to Content
                     </Button>
 
                     <div className="flex gap-2">

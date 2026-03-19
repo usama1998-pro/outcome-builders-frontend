@@ -18,7 +18,7 @@ import {
     SidebarMenuAction
 } from "@/components/ui/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, FolderOpen, Layers, FileText, Wrench, Sparkles, Settings, Building, Briefcase, BarChart3, Stethoscope, Compass, Network, Palette, Package, Megaphone, HelpCircle, Plus, Move, MoreVertical, Search, MoreHorizontal, Loader2, Route } from "lucide-react";
+import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, FolderOpen, Layers, FileText, Wrench, Sparkles, Settings, Building, Briefcase, BarChart3, Stethoscope, Compass, Network, Palette, Package, Megaphone, HelpCircle, Plus, Move, MoreVertical, Search, MoreHorizontal, Loader2, Route, Database, FileAudio, FileVideo } from "lucide-react";
 import { useSignOut, useUserTenants } from "@/src/hooks/useAuth";
 import { useOrganizationDetails } from "@/src/hooks/useOrganization";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -66,6 +66,38 @@ const createBrainSpaceSchema = z.object({
 });
 
 type CreateBrainSpaceFormValues = z.infer<typeof createBrainSpaceSchema>;
+
+/** Explicit red active state for every sidebar link (avoids theme/Slot merge issues with nested icons). */
+const SIDEBAR_ACTIVE_CLASS =
+    "bg-[#DB2B30] text-white font-semibold shadow-sm [&_svg]:!text-white [&_.text-muted-foreground]:!text-white/90";
+const SIDEBAR_HOVER_CLASS = "hover:bg-muted/70 dark:hover:bg-white/10";
+
+function isMainDashboardRoute(pathname: string) {
+    return pathname === "/dashboard" || pathname === "/dashboard/home";
+}
+
+function isBrainspacesPathActive(pathname: string) {
+    return pathname === "/dashboard/workspaces" || pathname.startsWith("/dashboard/workspaces/");
+}
+
+function isCollectionsPathActive(pathname: string) {
+    if (pathname === "/dashboard/collections" || pathname.startsWith("/dashboard/collections/")) return true;
+    return pathname.includes("/dashboard/workspaces/") && pathname.includes("/collections");
+}
+
+function isContentNotesPathActive(pathname: string) {
+    if (pathname === "/dashboard/notes" || pathname.startsWith("/dashboard/notes/")) return true;
+    if (!pathname.startsWith("/dashboard")) return false;
+    return pathname.includes("/notes");
+}
+
+function isDataContextPathActive(
+    pathname: string,
+    segment: "customer-context" | "supplier-context" | "process-context"
+) {
+    const base = `/dashboard/data-sources/${segment}`;
+    return pathname === base || pathname.startsWith(`${base}/`);
+}
 
 export default function SidePanel() {
     const pathname = usePathname();
@@ -452,600 +484,683 @@ export default function SidePanel() {
 
     return (
         <>
-        <Sidebar>
-            <SidebarContent>
-                {/* Organization Switcher */}
-                <div className="px-4 py-4 border-b">
-                    {tenants && tenants.length > 0 ? (
-                        <Select
-                            value={currentTenantId ? String(currentTenantId) : undefined}
-                            onValueChange={handleOrganizationChange}
-                        >
-                            <SelectTrigger className="w-full h-9 px-3 bg-background/80 dark:bg-background/40 border border-border shadow-sm text-sm text-black dark:text-[#FFFFFF]">
-                                <div className="flex items-center gap-2 w-full">
-                                    <div className="h-6 w-6 flex items-center justify-center rounded-sm overflow-hidden">
-                                        <img
-                                            src="/assets/black-square-Icon.png"
-                                            alt="Organization"
-                                            className="block dark:hidden h-full w-full object-contain"
-                                        />
-                                        <img
-                                            src="/assets/white-square-Icon.png"
-                                            alt="Organization"
-                                            className="hidden dark:block h-full w-full object-contain"
-                                        />
-                                    </div>
-                                    <SelectValue placeholder={organization?.company_name || "Select organization"} />
+            <Sidebar>
+                <SidebarContent>
+                    {/* Organization Switcher */}
+                    <div className="px-4 py-4 border-b">
+                        {tenants && tenants.length > 0 ? (
+                            <div className="flex items-center gap-2 w-full">
+                                {/* Platform icon (outside dropdown) */}
+                                <div className="h-8 w-8 flex items-center justify-center shrink-0">
+                                    <img
+                                        src="/assets/OB-Logo-Black.png"
+                                        alt="Outcome Builders"
+                                        className="block dark:hidden h-6 w-6 object-contain"
+                                    />
+                                    <img
+                                        src="/assets/OB-Logo-White.png"
+                                        alt="Outcome Builders"
+                                        className="hidden dark:block h-6 w-6 object-contain"
+                                    />
                                 </div>
-                            </SelectTrigger>
-                            <SelectContent>
-                                {tenants.map((tenant) => (
-                                    <SelectItem key={tenant.id} value={String(tenant.id)}>
-                                        {tenant.company_name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    ) : (
-                        <span className="font-semibold text-sm truncate text-black dark:text-[#FFFFFF]">
-                            {organization?.company_name || "Organization"}
-                        </span>
+
+                                <span className="text-muted-foreground shrink-0">|</span>
+
+                                {/* Client dropdown (only this area is clickable) */}
+                                <Select
+                                    value={currentTenantId ? String(currentTenantId) : undefined}
+                                    onValueChange={handleOrganizationChange}
+                                >
+                                    <SelectTrigger className="flex-1 h-8 px-3 bg-background/80 dark:bg-background/40 border border-border shadow-sm text-sm text-black dark:text-[#FFFFFF] min-w-0">
+                                        <div className="flex items-center gap-2 w-full min-w-0">
+                                            <Avatar className="h-6 w-6 shrink-0 rounded-sm">
+                                                <AvatarImage src={organization?.logo || ""} alt={organization?.company_name || "Organization"} />
+                                                <AvatarFallback className="rounded-sm text-[10px]">
+                                                    {(organization?.company_name || "Org")
+                                                        .split(" ")
+                                                        .filter(Boolean)
+                                                        .slice(0, 2)
+                                                        .map((w) => w[0]?.toUpperCase())
+                                                        .join("")}
+                                                </AvatarFallback>
+                                            </Avatar>
+
+                                            <span className="truncate">
+                                                {organization?.company_name || "Select organization"}
+                                            </span>
+
+                                            {/* Keep SelectValue for internal select state/ARIA */}
+                                            <span className="sr-only">
+                                                <SelectValue placeholder={organization?.company_name || "Select organization"} />
+                                            </span>
+                                        </div>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {tenants.map((tenant) => (
+                                            <SelectItem key={tenant.id} value={String(tenant.id)}>
+                                                {tenant.company_name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        ) : (
+                            <span className="font-semibold text-sm truncate text-black dark:text-[#FFFFFF]">
+                                {organization?.company_name || "Organization"}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Brain Space Selector removed per design */}
+
+                    {/* Main Navigation */}
+                    <SidebarGroup>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard"
+                                            className={`px-2 py-1 rounded ${isMainDashboardRoute(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                                }`}
+                                        >
+                                            <LayoutDashboard className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                            Dashboard
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/chat"
+                                            className={`px-2 py-1 rounded ${pathname === "/chat" || pathname === "/chat/new" ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                                }`}
+                                        >
+                                            <MessageSquare className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                            New Chat
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/chat/search"
+                                            className={`px-2 py-1 rounded ${pathname === "/chat/search" || pathname.startsWith("/chat/search/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                                }`}
+                                        >
+                                            <Search className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                            Chat Search
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/clients"
+                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/clients" || pathname.startsWith("/dashboard/clients/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                                }`}
+                                        >
+                                            <Briefcase className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                            Clients
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/roadmap"
+                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/roadmap" ||
+                                                    pathname.startsWith("/dashboard/roadmap/")
+                                                    ? SIDEBAR_ACTIVE_CLASS
+                                                    : SIDEBAR_HOVER_CLASS
+                                                }`}
+                                        >
+                                            <Route className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                            Roadmap
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild>
+                                        <Link
+                                            href="/dashboard/analytics"
+                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/analytics" || pathname.startsWith("/dashboard/analytics/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                                }`}
+                                        >
+                                            <BarChart3 className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                            Analytics
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+
+                    {/* Chat History */}
+                    {true && (
+                        <SidebarGroup>
+                            <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
+                                <button
+                                    onClick={() => setChatsOpen(!chatsOpen)}
+                                    className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
+                                >
+                                    {chatsOpen ? (
+                                        <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                        <ChevronUp className="h-4 w-4 -rotate-90" />
+                                    )}
+                                    Chat History
+                                </button>
+                            </SidebarGroupLabel>
+                            {chatsOpen && (
+                                <SidebarGroupContent>
+                                    <div className="max-h-[400px] overflow-y-auto pr-1">
+                                        {isLoadingChatTabs ? (
+                                            <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                                                <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                                                Loading chats...
+                                            </div>
+                                        ) : chatTabs.length === 0 ? (
+                                            <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                                                No chats yet. Start a new conversation!
+                                            </div>
+                                        ) : (
+                                            <SidebarMenu>
+                                                {chatTabs.map((chat) => {
+                                                    const isLoading = loadingChatId === chat.id;
+                                                    return (
+                                                        <SidebarMenuItem key={chat.id}>
+                                                            <SidebarMenuButton asChild disabled={isLoading}>
+                                                                <Link
+                                                                    href={`/chat/${chat.id}`}
+                                                                    className={`flex flex-col items-start px-2 py-2 rounded ${pathname === `/chat/${chat.id}`
+                                                                        ? SIDEBAR_ACTIVE_CLASS
+                                                                        : SIDEBAR_HOVER_CLASS
+                                                                        } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                                                                >
+                                                                    <div className="flex items-center gap-2 w-full">
+                                                                        {isLoading ? (
+                                                                            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                                                                        ) : null}
+                                                                        <span className="flex-1">{chat.name}</span>
+                                                                    </div>
+                                                                    {!isLoading && (
+                                                                        <span
+                                                                            className={`text-xs truncate ${pathname === `/chat/${chat.id}` ? "text-white/80" : "text-muted-foreground"}`}
+                                                                        >
+                                                                            {getLastMessage(chat)}
+                                                                        </span>
+                                                                    )}
+                                                                </Link>
+                                                            </SidebarMenuButton>
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild disabled={isLoading}>
+                                                                    <SidebarMenuAction disabled={isLoading} className="text-[#FFFFFF]">
+                                                                        {isLoading ? (
+                                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                                        ) : (
+                                                                            <MoreHorizontal className="h-4 w-4" />
+                                                                        )}
+                                                                    </SidebarMenuAction>
+                                                                </DropdownMenuTrigger>
+                                                                {!isLoading && (
+                                                                    <DropdownMenuContent
+                                                                        side="right"
+                                                                        align="start"
+                                                                        className="text-[#FFFFFF]"
+                                                                    >
+                                                                        <DropdownMenuItem
+                                                                            onClick={(e) => {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                                setSelectedChatId(chat.id);
+                                                                                setClearDialogOpen(true);
+                                                                            }}
+                                                                        >
+                                                                            <span>Clear</span>
+                                                                        </DropdownMenuItem>
+                                                                        <DropdownMenuSeparator />
+                                                                        <DropdownMenuItem
+                                                                            onClick={(e) => {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                                setSelectedChatId(chat.id);
+                                                                                setDeleteDialogOpen(true);
+                                                                            }}
+                                                                            className="text-destructive focus:text-destructive"
+                                                                        >
+                                                                            <span>Delete</span>
+                                                                        </DropdownMenuItem>
+                                                                    </DropdownMenuContent>
+                                                                )}
+                                                            </DropdownMenu>
+                                                        </SidebarMenuItem>
+                                                    );
+                                                })}
+                                            </SidebarMenu>
+                                        )}
+                                    </div>
+                                </SidebarGroupContent>
+                            )}
+                        </SidebarGroup>
                     )}
-                </div>
 
-                {/* Brain Space Selector removed per design */}
-
-                {/* Main Navigation */}
-                <SidebarGroup>
-                    <SidebarGroupContent>
-                        <SidebarMenu>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton asChild>
-                                    <Link
-                                        href="/dashboard"
-                                        className={`px-2 py-1 rounded ${pathname === "/dashboard" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                            }`}
-                                    >
-                                        <LayoutDashboard className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                        Dashboard
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-
-                            <SidebarMenuItem>
-                                <SidebarMenuButton asChild>
-                                    <Link
-                                        href="/chat"
-                                        className={`px-2 py-1 rounded ${pathname === "/chat" || pathname === "/chat/new" ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                            }`}
-                                    >
-                                        <MessageSquare className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                        New Chat
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-
-                            <SidebarMenuItem>
-                                <SidebarMenuButton asChild>
-                                    <Link
-                                        href="/chat/search"
-                                        className={`px-2 py-1 rounded ${pathname === "/chat/search" || pathname.startsWith("/chat/search/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                            }`}
-                                    >
-                                        <Search className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                        Chat Search
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-
-                            <SidebarMenuItem>
-                                <SidebarMenuButton asChild>
-                                    <Link
-                                        href="/dashboard/clients"
-                                        className={`px-2 py-1 rounded ${pathname === "/dashboard/clients" || pathname.startsWith("/dashboard/clients/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                            }`}
-                                    >
-                                        <Briefcase className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                        Clients
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-
-                            <SidebarMenuItem>
-                                <SidebarMenuButton asChild>
-                                    <Link
-                                        href="/dashboard/roadmap"
-                                        className={`px-2 py-1 rounded ${
-                                            pathname === "/dashboard/roadmap" ||
-                                            pathname.startsWith("/dashboard/roadmap/")
-                                                ? "bg-gray-300 font-semibold"
-                                                : "hover:bg-gray-200"
-                                        }`}
-                                    >
-                                        <Route className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                        Roadmap
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-
-                            <SidebarMenuItem>
-                                <SidebarMenuButton asChild>
-                                    <Link
-                                        href="/dashboard/analytics"
-                                        className={`px-2 py-1 rounded ${pathname === "/dashboard/analytics" || pathname.startsWith("/dashboard/analytics/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                            }`}
-                                    >
-                                        <BarChart3 className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                        Analytics
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
-
-                {/* Chat History */}
-                {true && (
+                    {/* Knowledge Bank - Collapsible */}
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
                             <button
-                                onClick={() => setChatsOpen(!chatsOpen)}
+                                onClick={() => toggleSection('knowledge-bank')}
                                 className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
                             >
-                                {chatsOpen ? (
+                                {expandedSections.has('knowledge-bank') ? (
                                     <ChevronDown className="h-4 w-4" />
                                 ) : (
-                                    <ChevronUp className="h-4 w-4 rotate-[-90deg]" />
+                                    <ChevronUp className="h-4 w-4 -rotate-90" />
                                 )}
-                                Chat History
+                                Knowledge Bank
                             </button>
                         </SidebarGroupLabel>
-                        {chatsOpen && (
+                        {expandedSections.has('knowledge-bank') && (
                             <SidebarGroupContent>
-                                <div className="max-h-[400px] overflow-y-auto pr-1">
-                                    {isLoadingChatTabs ? (
-                                        <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                                            <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-                                            Loading chats...
-                                        </div>
-                                    ) : chatTabs.length === 0 ? (
-                                        <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                                            No chats yet. Start a new conversation!
-                                        </div>
-                                    ) : (
-                                        <SidebarMenu>
-                                            {chatTabs.map((chat) => {
-                                                const isLoading = loadingChatId === chat.id;
-                                                return (
-                                                    <SidebarMenuItem key={chat.id}>
-                                                        <SidebarMenuButton asChild disabled={isLoading}>
-                                                            <Link
-                                                                href={`/chat/${chat.id}`}
-                                                                className={`flex flex-col items-start px-2 py-2 rounded ${pathname === `/chat/${chat.id}`
-                                                                    ? "bg-gray-300 font-semibold"
-                                                                    : "hover:bg-gray-200"
-                                                                    } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-                                                            >
-                                                                <div className="flex items-center gap-2 w-full">
-                                                                    {isLoading ? (
-                                                                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                                                                    ) : null}
-                                                                    <span className="flex-1">{chat.name}</span>
-                                                                </div>
-                                                                {!isLoading && (
-                                                                    <span className="text-xs text-gray-500 truncate">
-                                                                        {getLastMessage(chat)}
-                                                                    </span>
-                                                                )}
-                                                            </Link>
-                                                        </SidebarMenuButton>
-                                                        <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild disabled={isLoading}>
-                                                            <SidebarMenuAction disabled={isLoading} className="text-[#FFFFFF]">
-                                                                    {isLoading ? (
-                                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                                    ) : (
-                                                                        <MoreHorizontal className="h-4 w-4" />
-                                                                    )}
-                                                                </SidebarMenuAction>
-                                                            </DropdownMenuTrigger>
-                                                            {!isLoading && (
-                                                                <DropdownMenuContent
-                                                                    side="right"
-                                                                    align="start"
-                                                                    className="text-[#FFFFFF]"
-                                                                >
-                                                                    <DropdownMenuItem
-                                                                        onClick={(e) => {
-                                                                            e.preventDefault();
-                                                                            e.stopPropagation();
-                                                                            setSelectedChatId(chat.id);
-                                                                            setClearDialogOpen(true);
-                                                                        }}
-                                                                    >
-                                                                        <span>Clear</span>
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem
-                                                                        onClick={(e) => {
-                                                                            e.preventDefault();
-                                                                            e.stopPropagation();
-                                                                            setSelectedChatId(chat.id);
-                                                                            setDeleteDialogOpen(true);
-                                                                        }}
-                                                                        className="text-destructive focus:text-destructive"
-                                                                    >
-                                                                        <span>Delete</span>
-                                                                    </DropdownMenuItem>
-                                                                </DropdownMenuContent>
-                                                            )}
-                                                        </DropdownMenu>
-                                                    </SidebarMenuItem>
-                                                );
-                                            })}
-                                        </SidebarMenu>
-                                    )}
-                                </div>
+                                <SidebarMenu>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/workspaces"
+                                                className={`flex items-center justify-between w-full rounded-md px-2 py-2 ${isBrainspacesPathActive(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <Brain className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                    <span>Brainspaces</span>
+                                                </div>
+                                                {!workspacesLoading && workspaces && (
+                                                    <span className="text-xs text-muted-foreground ml-auto">
+                                                        ({workspaces.length})
+                                                    </span>
+                                                )}
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/collections"
+                                                className={`flex items-center justify-between w-full rounded-md px-2 py-2 ${isCollectionsPathActive(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <Layers className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                    <span>Collections</span>
+                                                </div>
+                                                {!collectionsLoading && collections && (
+                                                    <span className="text-xs text-muted-foreground ml-auto">
+                                                        ({collections.length})
+                                                    </span>
+                                                )}
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/notes"
+                                                className={`flex items-center justify-between w-full rounded-md px-2 py-2 ${isContentNotesPathActive(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <FileText className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                    <span>Content</span>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground ml-auto">
+                                                    ({totalNotesCount})
+                                                </span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                </SidebarMenu>
                             </SidebarGroupContent>
                         )}
                     </SidebarGroup>
-                )}
 
-                {/* Knowledge Bank - Collapsible */}
-                <SidebarGroup>
-                    <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
-                        <button
-                            onClick={() => toggleSection('knowledge-bank')}
-                            className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
-                        >
-                            {expandedSections.has('knowledge-bank') ? (
-                                <ChevronDown className="h-4 w-4" />
-                            ) : (
-                                <ChevronUp className="h-4 w-4 rotate-[-90deg]" />
-                            )}
-                            Knowledge Bank
-                        </button>
-                    </SidebarGroupLabel>
-                    {expandedSections.has('knowledge-bank') && (
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton
-                                        asChild
-                                        isActive={pathname === '/dashboard/workspaces' || pathname.startsWith('/dashboard/workspaces/')}
-                                    >
-                                        <Link href="/dashboard/workspaces" className="flex items-center justify-between w-full">
-                                            <div className="flex items-center gap-2">
-                                                <Brain className="h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                                <span>Brainspaces</span>
-                                            </div>
-                                            {!workspacesLoading && workspaces && (
-                                                <span className="text-xs text-muted-foreground ml-auto">
-                                                    ({workspaces.length})
-                                                </span>
-                                            )}
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton
-                                        asChild
-                                        isActive={pathname === '/dashboard/collections'}
-                                    >
-                                        <Link href="/dashboard/collections" className="flex items-center justify-between w-full">
-                                            <div className="flex items-center gap-2">
-                                                <Layers className="h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                                <span>Collections</span>
-                                            </div>
-                                            {!collectionsLoading && collections && (
-                                                <span className="text-xs text-muted-foreground ml-auto">
-                                                    ({collections.length})
-                                                </span>
-                                            )}
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton
-                                        asChild
-                                        isActive={pathname === '/dashboard/notes'}
-                                    >
-                                        <Link href="/dashboard/notes" className="flex items-center justify-between w-full">
-                                            <div className="flex items-center gap-2">
-                                                <FileText className="h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                                <span>Resources</span>
-                                            </div>
-                                            <span className="text-xs text-muted-foreground ml-auto">
-                                                ({totalNotesCount})
-                                            </span>
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    )}
-                </SidebarGroup>
-
-                {/* Strategy Tools - Collapsible */}
-                <SidebarGroup>
-                    <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
-                        <button
-                            onClick={() => toggleSection('strategy-tools')}
-                            className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
-                        >
-                            {expandedSections.has('strategy-tools') ? (
-                                <ChevronDown className="h-4 w-4" />
-                            ) : (
-                                <ChevronUp className="h-4 w-4 rotate-[-90deg]" />
-                            )}
-                            Strategy Tools
-                        </button>
-                    </SidebarGroupLabel>
-                    {expandedSections.has('strategy-tools') && (
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton asChild>
-                                        <Link
-                                            href="/dashboard/diagnosis"
-                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/diagnosis" || pathname.startsWith("/dashboard/diagnosis/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                                }`}
-                                        >
-                                            <Stethoscope className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                            Diagnosis
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton asChild>
-                                        <Link
-                                            href="/dashboard/direction"
-                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/direction" || pathname.startsWith("/dashboard/direction/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                                }`}
-                                        >
-                                            <Compass className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                            Direction
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton asChild>
-                                        <Link
-                                            href="/dashboard/architecture"
-                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/architecture" || pathname.startsWith("/dashboard/architecture/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                                }`}
-                                        >
-                                            <Network className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                            Architecture
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    )}
-                </SidebarGroup>
-
-                {/* Execution Tools - Collapsible */}
-                <SidebarGroup>
-                    <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
-                        <button
-                            onClick={() => toggleSection('execution-tools')}
-                            className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
-                        >
-                            {expandedSections.has('execution-tools') ? (
-                                <ChevronDown className="h-4 w-4" />
-                            ) : (
-                                <ChevronUp className="h-4 w-4 rotate-[-90deg]" />
-                            )}
-                            Execution Tools
-                        </button>
-                    </SidebarGroupLabel>
-                    {expandedSections.has('execution-tools') && (
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton asChild>
-                                        <Link
-                                            href="/dashboard/brand"
-                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/brand" || pathname.startsWith("/dashboard/brand/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                                }`}
-                                        >
-                                            <Palette className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                            Brand
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton asChild>
-                                        <Link
-                                            href="/dashboard/product"
-                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/product" || pathname.startsWith("/dashboard/product/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                                }`}
-                                        >
-                                            <Package className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                            Product
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton asChild>
-                                        <Link
-                                            href="/dashboard/marketing"
-                                            className={`px-2 py-1 rounded ${pathname === "/dashboard/marketing" || pathname.startsWith("/dashboard/marketing/") ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
-                                                }`}
-                                        >
-                                            <Megaphone className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                            Marketing
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    )}
-                </SidebarGroup>
-
-            </SidebarContent>
-
-            <SidebarFooter>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <SidebarMenuButton className="w-full text-black dark:text-[#FFFFFF] hover:text-black dark:hover:text-[#FFFFFF]">
-                                    <User2 className="shrink-0 text-[#DB2B30] dark:text-white" />
-                                    <span className="truncate flex-1 text-left" title={userProfile?.data?.full_name || userProfile?.data?.email}>
-                                        {getDisplayName()}
-                                    </span>
-                                    <ChevronUp className="ml-auto shrink-0" />
-                                </SidebarMenuButton>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                                side="top"
-                                className="w-[--radix-popper-anchor-width] text-black dark:text-[#FFFFFF]"
+                    {/* Strategy Tools - Collapsible */}
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
+                            <button
+                                onClick={() => toggleSection('strategy-tools')}
+                                className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
                             >
-                                <DropdownMenuItem asChild>
-                                    <Link href="/dashboard/profile">
-                                        <User2 className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                        Profile
-                                    </Link>
-                                </DropdownMenuItem>
-                                {tenants && tenants.length > 0 && (
+                                {expandedSections.has('strategy-tools') ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                    <ChevronUp className="h-4 w-4 -rotate-90" />
+                                )}
+                                Strategy Tools
+                            </button>
+                        </SidebarGroupLabel>
+                        {expandedSections.has('strategy-tools') && (
+                            <SidebarGroupContent>
+                                <SidebarMenu>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/diagnosis"
+                                                className={`px-2 py-1 rounded ${pathname === "/dashboard/diagnosis" || pathname.startsWith("/dashboard/diagnosis/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                                    }`}
+                                            >
+                                                <Stethoscope className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Diagnosis
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/direction"
+                                                className={`px-2 py-1 rounded ${pathname === "/dashboard/direction" || pathname.startsWith("/dashboard/direction/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                                    }`}
+                                            >
+                                                <Compass className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Direction
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/architecture"
+                                                className={`px-2 py-1 rounded ${pathname === "/dashboard/architecture" || pathname.startsWith("/dashboard/architecture/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                                    }`}
+                                            >
+                                                <Network className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Architecture
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        )}
+                    </SidebarGroup>
+
+                    {/* Execution Tools - Collapsible */}
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
+                            <button
+                                onClick={() => toggleSection('execution-tools')}
+                                className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
+                            >
+                                {expandedSections.has('execution-tools') ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                    <ChevronUp className="h-4 w-4 -rotate-90" />
+                                )}
+                                Execution Tools
+                            </button>
+                        </SidebarGroupLabel>
+                        {expandedSections.has('execution-tools') && (
+                            <SidebarGroupContent>
+                                <SidebarMenu>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/brand"
+                                                className={`px-2 py-1 rounded ${pathname === "/dashboard/brand" || pathname.startsWith("/dashboard/brand/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                                    }`}
+                                            >
+                                                <Palette className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Brand
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/product"
+                                                className={`px-2 py-1 rounded ${pathname === "/dashboard/product" || pathname.startsWith("/dashboard/product/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                                    }`}
+                                            >
+                                                <Package className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Product
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/marketing"
+                                                className={`px-2 py-1 rounded ${pathname === "/dashboard/marketing" || pathname.startsWith("/dashboard/marketing/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                                    }`}
+                                            >
+                                                <Megaphone className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Marketing
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        )}
+                    </SidebarGroup>
+
+                    {/* Data Resources - Three primary categories */}
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
+                            <button
+                                onClick={() => toggleSection('data-sources')}
+                                className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
+                            >
+                                {expandedSections.has('data-sources') ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                    <ChevronUp className="h-4 w-4 -rotate-90" />
+                                )}
+                                Data Resources
+                            </button>
+                        </SidebarGroupLabel>
+                        {expandedSections.has('data-sources') && (
+                            <SidebarGroupContent>
+                                <SidebarMenu>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/data-sources/customer-context"
+                                                className={`flex items-center gap-2 w-full rounded-md px-2 py-2 ${isDataContextPathActive(pathname, "customer-context") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <Database className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                <span>Customer Context</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/data-sources/supplier-context"
+                                                className={`flex items-center gap-2 w-full rounded-md px-2 py-2 ${isDataContextPathActive(pathname, "supplier-context") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <Database className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                <span>Supplier Context</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/data-sources/process-context"
+                                                className={`flex items-center gap-2 w-full rounded-md px-2 py-2 ${isDataContextPathActive(pathname, "process-context") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <Database className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                <span>Process Context</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        )}
+                    </SidebarGroup>
+
+                </SidebarContent>
+
+                <SidebarFooter>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <SidebarMenuButton className="w-full text-black dark:text-[#FFFFFF] hover:text-black dark:hover:text-[#FFFFFF]">
+                                        <User2 className="shrink-0 text-[#DB2B30] dark:text-white" />
+                                        <span className="truncate flex-1 text-left" title={userProfile?.data?.full_name || userProfile?.data?.email}>
+                                            {getDisplayName()}
+                                        </span>
+                                        <ChevronUp className="ml-auto shrink-0" />
+                                    </SidebarMenuButton>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                    side="top"
+                                    className="w-[--radix-popper-anchor-width] text-black dark:text-[#FFFFFF]"
+                                >
                                     <DropdownMenuItem asChild>
-                                        <Link href="/dashboard/organization">
-                                        <Building className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                            Organization
+                                        <Link href="/dashboard/profile">
+                                            <User2 className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                            Profile
                                         </Link>
                                     </DropdownMenuItem>
-                                )}
-                                {canViewTeam && (
+                                    {tenants && tenants.length > 0 && (
+                                        <DropdownMenuItem asChild>
+                                            <Link href="/dashboard/organization">
+                                                <Building className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Organization
+                                            </Link>
+                                        </DropdownMenuItem>
+                                    )}
+                                    {canViewTeam && (
+                                        <DropdownMenuItem asChild>
+                                            <Link href="/dashboard/admins">
+                                                <Users className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Team
+                                            </Link>
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem asChild>
-                                        <Link href="/dashboard/admins">
-                                        <Users className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                            Team
+                                        <Link href="/dashboard/faq">
+                                            <HelpCircle className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                            FAQ
                                         </Link>
                                     </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem asChild>
-                                    <Link href="/dashboard/faq">
-                                        <HelpCircle className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                        FAQ
-                                    </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                    <Link href="/dashboard/settings">
-                                        <Settings className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                        Settings
-                                    </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={signOut}>
-                                    <span>Sign out</span>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarFooter>
-        </Sidebar>
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/dashboard/settings">
+                                            <Settings className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                            Settings
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={signOut}>
+                                        <span>Sign out</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarFooter>
+            </Sidebar>
 
-        {/* Clear Chat Confirmation Dialog */}
-        <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Clear Chat</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to clear all messages from this chat? This action cannot be undone.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                        onClick={async () => {
-                            if (selectedChatId) {
-                                const chatIdToClear = selectedChatId;
-                                // Close dialog immediately
-                                setClearDialogOpen(false);
-                                setSelectedChatId(null);
-                                setLoadingChatId(chatIdToClear);
-                                try {
-                                    await clearChatTab(chatIdToClear);
-                                    toast.success("Chat cleared successfully");
-                                    // Invalidate chat history for this specific chat so it reloads with empty messages
-                                    queryClient.invalidateQueries({
-                                        predicate: (query) => {
-                                            const key = query.queryKey;
-                                            return Array.isArray(key) &&
-                                                key.length >= 2 &&
-                                                key[0] === "chatHistory" &&
-                                                String(key[1]) === String(chatIdToClear);
-                                        }
-                                    });
-                                } catch (error: any) {
-                                    toast.error(`Failed to clear chat: ${error.message || "Unknown error"}`);
-                                } finally {
-                                    setLoadingChatId(null);
-                                }
-                            }
-                        }}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                        Clear
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Delete Chat Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Chat</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to delete this chat? This will permanently delete the chat and all its messages. This action cannot be undone.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                        onClick={async () => {
-                            if (selectedChatId) {
-                                const chatIdToDelete = selectedChatId;
-                                // Close dialog immediately
-                                setDeleteDialogOpen(false);
-                                setSelectedChatId(null);
-                                setLoadingChatId(chatIdToDelete);
-                                try {
-                                    await deleteChatTab(chatIdToDelete);
-                                    toast.success("Chat deleted successfully");
-                                    // Immediately refetch chat tabs to update the list
-                                    await refetchChatTabs();
-                                    // Invalidate chat history for this specific chat (UUID string)
-                                    queryClient.invalidateQueries({ queryKey: ["chatHistory", chatIdToDelete] });
-                                    // If we're on this chat page, redirect to landing page
-                                    if (pathname === `/chat/${chatIdToDelete}`) {
-                                        router.push("/chat");
+            {/* Clear Chat Confirmation Dialog */}
+            <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Clear Chat</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to clear all messages from this chat? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={async () => {
+                                if (selectedChatId) {
+                                    const chatIdToClear = selectedChatId;
+                                    // Close dialog immediately
+                                    setClearDialogOpen(false);
+                                    setSelectedChatId(null);
+                                    setLoadingChatId(chatIdToClear);
+                                    try {
+                                        await clearChatTab(chatIdToClear);
+                                        toast.success("Chat cleared successfully");
+                                        // Invalidate chat history for this specific chat so it reloads with empty messages
+                                        queryClient.invalidateQueries({
+                                            predicate: (query) => {
+                                                const key = query.queryKey;
+                                                return Array.isArray(key) &&
+                                                    key.length >= 2 &&
+                                                    key[0] === "chatHistory" &&
+                                                    String(key[1]) === String(chatIdToClear);
+                                            }
+                                        });
+                                    } catch (error: any) {
+                                        toast.error(`Failed to clear chat: ${error.message || "Unknown error"}`);
+                                    } finally {
+                                        setLoadingChatId(null);
                                     }
-                                } catch (error: any) {
-                                    toast.error(`Failed to delete chat: ${error.message || "Unknown error"}`);
-                                } finally {
-                                    setLoadingChatId(null);
                                 }
-                            }
-                        }}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                        Delete
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    </>
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Clear
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Delete Chat Confirmation Dialog */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this chat? This will permanently delete the chat and all its messages. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={async () => {
+                                if (selectedChatId) {
+                                    const chatIdToDelete = selectedChatId;
+                                    // Close dialog immediately
+                                    setDeleteDialogOpen(false);
+                                    setSelectedChatId(null);
+                                    setLoadingChatId(chatIdToDelete);
+                                    try {
+                                        await deleteChatTab(chatIdToDelete);
+                                        toast.success("Chat deleted successfully");
+                                        // Immediately refetch chat tabs to update the list
+                                        await refetchChatTabs();
+                                        // Invalidate chat history for this specific chat (UUID string)
+                                        queryClient.invalidateQueries({ queryKey: ["chatHistory", chatIdToDelete] });
+                                        // If we're on this chat page, redirect to landing page
+                                        if (pathname === `/chat/${chatIdToDelete}`) {
+                                            router.push("/chat");
+                                        }
+                                    } catch (error: any) {
+                                        toast.error(`Failed to delete chat: ${error.message || "Unknown error"}`);
+                                    } finally {
+                                        setLoadingChatId(null);
+                                    }
+                                }
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 
 
@@ -1060,7 +1175,7 @@ export default function SidePanel() {
     //                 <Link
     //                     key={link.href}
     //                     href={link.href}
-    //                     className={`px-2 py-1 rounded ${pathname === link.href ? "bg-gray-300 font-semibold" : "hover:bg-gray-200"
+    //                     className={`px-2 py-1 rounded ${pathname === link.href ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
     //                         }`}
     //                 >
     //                     {link.label}

@@ -102,7 +102,10 @@ export default function OrganizationPage() {
                             {/* Status */}
                             <div>
                                 <p className="text-sm text-muted-foreground">Status</p>
-                                <Badge variant={organization.is_active ? "default" : "secondary"}>
+                                <Badge
+                                    variant={organization.is_active ? "default" : "secondary"}
+                                    className={organization.is_active ? "bg-[#DB2B30] text-white hover:bg-[#DB2B30] border-0" : ""}
+                                >
                                     {organization.is_active ? "Active" : "Inactive"}
                                 </Badge>
                             </div>
@@ -159,7 +162,7 @@ export default function OrganizationPage() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="text-xs border-[#DB2B30] text-[#DB2B30] hover:bg-[#DB2B30]/10"
+                                                className="text-xs border-[#DB2B30] bg-[#DB2B30] text-white hover:bg-[#B52227] hover:text-white"
                                             >
                                                 <Settings className="h-3 w-3 mr-1" />
                                                 Manage

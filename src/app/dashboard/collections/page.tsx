@@ -524,7 +524,7 @@ export default function AllCollectionsPage() {
                             <p className="text-muted-foreground mb-6">
                                 {currentBrainSpaceId
                                     ? "This brain space doesn't have any collections yet. Create your first collection to get started!"
-                                    : "Collections help you organize your articles and resources. Select a brain space from the sidebar or create your first collection to get started!"
+                                    : "Collections help you organize your articles and content. Select a brain space from the sidebar or create your first collection to get started!"
                                 }
                             </p>
 

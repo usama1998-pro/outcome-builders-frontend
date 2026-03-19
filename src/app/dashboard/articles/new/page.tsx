@@ -151,10 +151,10 @@ function NewArticlePageContent() {
         return html || `<p>${markdown.trim()}</p>`;
     };
 
-    // Load pending article content from sessionStorage (from chat)
+    // Load pending content from sessionStorage (from chat)
     useEffect(() => {
         if (editor && !existingNote) {
-            const pendingContent = sessionStorage.getItem("pendingArticleContent");
+            const pendingContent = sessionStorage.getItem("pendingContent");
             if (pendingContent) {
                 // Convert markdown to HTML
                 let htmlContent = pendingContent;
@@ -166,7 +166,7 @@ function NewArticlePageContent() {
                 
                 editor.commands.setContent(htmlContent);
                 // Clear the pending content after loading
-                sessionStorage.removeItem("pendingArticleContent");
+                sessionStorage.removeItem("pendingContent");
                 setHasUnsavedChanges(true);
             }
         }
@@ -206,7 +206,7 @@ function NewArticlePageContent() {
                 return;
             }
 
-            const collectionName = title.trim() || "My Resources";
+            const collectionName = title.trim() || "My Content";
             
             createCollection(
                 {

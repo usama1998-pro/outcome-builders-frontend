@@ -47,8 +47,8 @@ interface MessageBubbleProps {
     index: number;
     isStreaming?: boolean;
     onAddContext?: (text: string) => void;
-    onCreateArticle?: (content: string, messageId?: number) => void;
-    isSelectedForArticle?: boolean;
+    onCreateContent?: (content: string, messageId?: number) => void;
+    isSelectedForContent?: boolean;
     currentStatus?: string | null;
     messageRef?: (node: HTMLDivElement | null) => void;
     searchQuery?: string;
@@ -195,8 +195,8 @@ function MessageBubble({
     index,
     isStreaming = false,
     onAddContext,
-    onCreateArticle,
-    isSelectedForArticle,
+    onCreateContent,
+    isSelectedForContent,
     currentStatus,
     messageRef: externalMessageRef,
     searchQuery = "",
@@ -434,9 +434,9 @@ function MessageBubble({
                 <div
                     className={`relative max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl rounded-2xl px-4 py-3 ${
                         isUser
-                            ? "bg-[#FFE5E6] dark:bg-[#5E0E12] border border-[#DB2B30] dark:border-[#8A1B1F] text-[#1A1A1A] dark:text-[#FDEBEB] shadow-sm"
+                            ? "bg-[#DB2B30] !text-white shadow-sm **:!text-white"
                             : `bg-card border shadow-sm ${
-                                  !isUser && isSelectedForArticle ? "border-[#DB2B30] ring-1 ring-[#DB2B30]/60" : ""
+                                  !isUser && isSelectedForContent ? "border-[#DB2B30] ring-1 ring-[#DB2B30]/60" : ""
                               }`
                     }`}
                 >
@@ -475,8 +475,7 @@ function MessageBubble({
                         )
                     ) : (
                         <div
-                            className={`relative z-10 text-sm sm:text-base leading-relaxed ${isUser ? "!text-white" : "text-foreground"}`}
-                            style={isUser ? { color: "#FFFFFF" } : undefined}
+                            className={`relative z-10 text-sm sm:text-base leading-relaxed ${isUser ? "text-white" : "text-foreground"}`}
                         >
                             {isUser ? (
                                 <div className="space-y-2">
@@ -807,7 +806,7 @@ function MessageBubble({
                 </div>
             </div>
 
-            {/* Copy / Article actions for bot messages - appears below bubble on hover */}
+            {/* Copy / Content actions for bot messages - appears below bubble on hover */}
             {!isUser && displayContent && (
                 <div className={`opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-wrap gap-1 ${isUser ? "mr-11" : "ml-11"}`}>
                     <Button
@@ -831,20 +830,20 @@ function MessageBubble({
                     </Button>
                     <Button
                         onClick={() => {
-                            if (onCreateArticle && displayContent) {
-                                onCreateArticle(displayContent, message.id);
+                            if (onCreateContent && displayContent) {
+                                onCreateContent(displayContent, message.id);
                             }
                         }}
                         size="sm"
-                        variant={isSelectedForArticle ? "default" : "ghost"}
+                        variant={isSelectedForContent ? "default" : "ghost"}
                         className={`h-7 px-2 text-xs flex items-center gap-1 ${
-                            isSelectedForArticle
+                            isSelectedForContent
                                 ? "bg-[#DB2B30] text-white hover:bg-[#B52227]"
                                 : "text-muted-foreground hover:text-foreground"
                         }`}
-                        title={isSelectedForArticle ? "Remove from article selection" : "Add/remove this response in article selection"}
+                        title={isSelectedForContent ? "Remove from content selection" : "Add/remove this response in content selection"}
                     >
-                        {isSelectedForArticle ? (
+                        {isSelectedForContent ? (
                             <>
                                 <Check className="h-3 w-3" />
                                 Selected
@@ -852,7 +851,7 @@ function MessageBubble({
                         ) : (
                             <>
                                 <PenTool className="h-3 w-3" />
-                                Select for Article
+                                Select for Content
                             </>
                         )}
                     </Button>
@@ -1087,23 +1086,23 @@ export default function Chat() {
         }, 0);
     };
 
-    const [selectedArticleMessageIds, setSelectedArticleMessageIds] = useState<number[]>([]);
+    const [selectedContentMessageIds, setSelectedContentMessageIds] = useState<number[]>([]);
 
-    // Clicking "Select for Article" on a message now toggles it in the multi-select list.
-    // The actual article is created from the bottom selection bar.
-    const handleCreateArticle = (_content: string, messageId?: number) => {
+    // Clicking "Select for Content" on a message now toggles it in the multi-select list.
+    // The actual content is created from the bottom selection bar.
+    const handleCreateContent = (_content: string, messageId?: number) => {
         if (typeof messageId !== "number") return;
 
-        setSelectedArticleMessageIds((prev) =>
+        setSelectedContentMessageIds((prev) =>
             prev.includes(messageId)
                 ? prev.filter((id) => id !== messageId)
                 : [...prev, messageId]
         );
     };
 
-    const handleCreateArticleFromSelection = () => {
+    const handleCreateContentFromSelection = () => {
         const selectedMessagesInOrder = messages.filter(
-            (msg) => msg.answer && !msg.question && selectedArticleMessageIds.includes(msg.id)
+            (msg) => msg.answer && !msg.question && (selectedContentMessageIds ?? []).includes(msg.id)
         );
 
         const combinedContent = selectedMessagesInOrder
@@ -1112,12 +1111,12 @@ export default function Chat() {
             .join("\n\n");
 
         if (!combinedContent.trim()) {
-            toast.error("Please select at least one AI response to create an article.");
+            toast.error("Please select at least one AI response to create content.");
             return;
         }
 
-        sessionStorage.setItem("pendingArticleContent", combinedContent);
-        setSelectedArticleMessageIds([]);
+        sessionStorage.setItem("pendingContent", combinedContent);
+        setSelectedContentMessageIds([]);
         router.push("/dashboard/articles/new");
     };
 
@@ -2341,8 +2340,8 @@ export default function Chat() {
                                 index={index}
                                 isStreaming={isStreaming && streamingMessageId === msg.id}
                                 onAddContext={handleAddTextContext}
-                                onCreateArticle={handleCreateArticle}
-                                isSelectedForArticle={selectedArticleMessageIds.includes(msg.id)}
+                                onCreateContent={handleCreateContent}
+                                isSelectedForContent={(selectedContentMessageIds ?? []).includes(msg.id)}
                                 currentStatus={currentStatus}
                                 messageRef={(node) => {
                                     if (node) {
@@ -2361,17 +2360,17 @@ export default function Chat() {
                 </div>
             </div>
 
-            {/* Article selection bar */}
-            {selectedArticleMessageIds.length > 0 && (
+            {/* Content selection bar */}
+            {(selectedContentMessageIds ?? []).length > 0 && (
                 <div className="flex-shrink-0 px-4 sm:px-6 pb-2">
                     <div className="max-w-4xl mx-auto">
                         <div className="mb-2 px-3 py-2 rounded-lg border bg-white/80 dark:bg-muted/60 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2 text-xs sm:text-sm text-black dark:text-muted-foreground">
                                 <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#DB2B30]" />
                                 <span>
-                                    {selectedArticleMessageIds.length}{" "}
-                                    {selectedArticleMessageIds.length === 1 ? "response selected" : "responses selected"}{" "}
-                                    for article
+                                    {(selectedContentMessageIds ?? []).length}{" "}
+                                    {(selectedContentMessageIds ?? []).length === 1 ? "response selected" : "responses selected"}{" "}
+                                    for content
                                 </span>
                             </div>
                             <div className="flex items-center gap-2">
@@ -2380,7 +2379,7 @@ export default function Chat() {
                                     variant="ghost"
                                     size="sm"
                                     className="h-7 px-2 text-xs"
-                                    onClick={() => setSelectedArticleMessageIds([])}
+                                    onClick={() => setSelectedContentMessageIds([])}
                                 >
                                     Clear
                                 </Button>
@@ -2388,10 +2387,10 @@ export default function Chat() {
                                     type="button"
                                     size="sm"
                                     className="h-7 px-3 text-xs bg-[#DB2B30] hover:bg-[#B52227] text-white"
-                                    onClick={handleCreateArticleFromSelection}
+                                    onClick={handleCreateContentFromSelection}
                                 >
                                     <PenTool className="h-3 w-3 mr-1" />
-                                    Select for Article
+                                    Select for Content
                                 </Button>
                             </div>
                         </div>

@@ -3,7 +3,6 @@
 import React from "react";
 import SidePanel from "@/src/components/SidePanel/SidePanel";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { ToggleThemeButton } from "@/components/ToggleThemeButton";
 import RequireAuth from "@/src/components/auth/requireAuth";
 import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -57,11 +56,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                 <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-muted/30 -z-10" />
                 <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-violet-500/8 via-transparent to-transparent pointer-events-none -z-10" />
                 <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-indigo-500/5 via-transparent to-transparent pointer-events-none -z-10" />
-
-                {/* Theme Toggle */}
-                <div className="fixed top-4 right-4 z-50">
-                    <ToggleThemeButton />
-                </div>
 
                 <div className="flex flex-row w-screen h-screen p-0 m-0">
                     {/* Sidebar */}

@@ -149,7 +149,7 @@ export default function AnalyticsPage() {
         const trained = analytics?.total_trained_notes ?? 0;
         return {
             values: [workspaces, collections, notes, trained],
-            labels: ["Workspaces", "Collections", "Resources", "Trained resources"],
+            labels: ["Workspaces", "Collections", "Content", "Trained content"],
             max: Math.max(workspaces, collections, notes, trained, 1),
         };
     }, [analytics]);
@@ -196,7 +196,7 @@ export default function AnalyticsPage() {
                             color="bg-cyan-500"
                         />
                         <StatCard
-                            title="Resources"
+                            title="Content"
                             value={analytics?.total_notes ?? 0}
                             icon={FileText}
                             color="bg-amber-500"

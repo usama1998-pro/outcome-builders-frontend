@@ -81,7 +81,7 @@ export default function DashboardHome() {
                   gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
               },
               {
-                  title: "Resources",
+                  title: "Content",
                   value: analytics.total_notes,
                   icon: <FileText className="w-5 h-5 text-white" />,
                   gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
@@ -93,7 +93,7 @@ export default function DashboardHome() {
                   gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
               },
               {
-                  title: "Trained Resources",
+                  title: "Trained Content",
                   value: analytics.total_trained_notes,
                   icon: <Brain className="w-5 h-5 text-white" />,
                   gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
@@ -259,7 +259,7 @@ export default function DashboardHome() {
                                     <FileText className="w-6 h-6 text-amber-500" />
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold mb-1">Capture in Resources</h3>
+                                    <h3 className="font-semibold mb-1">Capture in Content</h3>
                                     <p className="text-sm text-muted-foreground">
                                         Document insights, ideas, and information in articles with file attachments.
                                     </p>

@@ -137,12 +137,12 @@ export default function NotesPage() {
                             </div>
 
                             <h3 className="text-2xl font-bold text-foreground mb-3">
-                                No Resources Yet
+                                No Content Yet
                             </h3>
 
                             <p className="text-muted-foreground mb-8 text-base leading-relaxed">
-                                No resources have been created in this collection yet. Start documenting your knowledge by creating your first article.
-                                You can add content and train resources for your AI assistant.
+                                No content has been created in this collection yet. Start documenting your knowledge by creating your first article.
+                                You can add content and train it for your AI assistant.
                             </p>
 
                             {canCreateNote && (
