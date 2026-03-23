@@ -1,6 +1,14 @@
 import api from "../lib/axios";
 import routes from "../lib/routes";
-import { ChatTab, ChatMessage, ChatHistory } from "../types/chat";
+import {
+  ChatTab,
+  ChatMessage,
+  ChatHistory,
+  ChatResourceLink,
+  CHAT_TAB_NAME_MIN_LENGTH,
+  CHAT_TAB_NAME_MAX_LENGTH,
+  isValidChatTabName,
+} from "../types/chat";
 
 // Request/Response types
 interface CreateChatTabRequest {
@@ -20,14 +28,23 @@ interface StreamChatOptions {
   onComplete?: () => void;
   onError?: (error: string) => void;
   onStop?: () => void;
-  onStatus?: (status: string, step?: string) => void;
+  /** step / node: LangGraph node id in agent mode (e.g. route, retrieve_kb, merge_context, generate). */
+  onStatus?: (status: string, step?: string, node?: string) => void;
+  /** When the agent creates a brainspace, collection, or article (dashboard link). */
+  onResourceCreated?: (link: ChatResourceLink) => void;
 }
 
 /**
  * Create a new chat tab
  */
 export async function createChatTab(name: string): Promise<ChatTab> {
-  const { data } = await api.post(routes.chat.createTab, { name });
+  const trimmed = name.trim();
+  if (!isValidChatTabName(trimmed)) {
+    throw new Error(
+      `Name must be ${CHAT_TAB_NAME_MIN_LENGTH}–${CHAT_TAB_NAME_MAX_LENGTH} characters, letters, numbers, dashes, and spaces only`,
+    );
+  }
+  const { data } = await api.post(routes.chat.createTab, { name: trimmed });
   return data.data.chat_tab;
 }
 
@@ -59,9 +76,18 @@ export async function getChatHistory(
   const { data } = await api.get(routes.chat.history(chatTabId), {
     params: { limit },
   });
+  const raw = (data.data.messages || []) as Array<
+    ChatMessage & { resource_links?: ChatResourceLink[] }
+  >;
   return {
     chat_tab: data.data.chat_tab || null,
-    messages: data.data.messages || [],
+    messages: raw.map((m) => {
+      const { resource_links, ...rest } = m;
+      return {
+        ...rest,
+        resourceLinks: resource_links ?? m.resourceLinks,
+      };
+    }),
   };
 }
 
@@ -118,22 +144,32 @@ export function streamChat(
       // routes.chat.stream is "/chat/stream", so full URL is baseURL + route
       const fullUrl = `${cleanBaseURL}${routes.chat.stream}`;
 
+      const trimmedTabId =
+        typeof chatTabId === "string" && chatTabId.trim().length > 0
+          ? chatTabId.trim()
+          : undefined;
+      const body: Record<string, unknown> = {
+        question,
+        agent_mode: agentMode,
+      };
+      if (trimmedTabId) {
+        body.chat_tab_id = trimmedTabId;
+      }
+      if (model) {
+        body.model = model;
+      }
+      if (context) {
+        body.context = {
+          type: context.type,
+          id: context.id,
+          text: context.text,
+        };
+      }
+
       const response = await fetch(fullUrl, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          question,
-          chat_tab_id: chatTabId,
-          agent_mode: agentMode,
-          model: model ?? undefined,
-          context: context
-            ? {
-                type: context.type,
-                id: context.id,
-                text: context.text,
-              }
-            : undefined,
-        }),
+        body: JSON.stringify(body),
         signal: abortController.signal,
       });
 
@@ -216,7 +252,33 @@ export function streamChat(
 
                 case "status":
                   if (options?.onStatus && event.status) {
-                    options.onStatus(event.status, event.step);
+                    options.onStatus(
+                      event.status,
+                      event.step,
+                      event.node ?? event.step,
+                    );
+                  }
+                  break;
+
+                case "resource_created":
+                  if (
+                    options?.onResourceCreated &&
+                    event.kind &&
+                    event.href &&
+                    typeof event.title === "string"
+                  ) {
+                    const k = event.kind as ChatResourceLink["kind"];
+                    if (
+                      k === "brainspace" ||
+                      k === "collection" ||
+                      k === "article"
+                    ) {
+                      options.onResourceCreated({
+                        kind: k,
+                        title: event.title,
+                        href: event.href,
+                      });
+                    }
                   }
                   break;
 
@@ -278,21 +340,20 @@ export async function deleteChatTab(chatTabId: string): Promise<void> {
 }
 
 /**
- * Clear all messages from a chat tab (but keep the tab)
- */
-export async function clearChatTab(chatTabId: string): Promise<void> {
-  // UUID as string
-  await api.post(routes.chat.clear(chatTabId));
-}
-
-/**
  * Update the name of a chat tab
  */
 export async function updateChatTabName(
   chatTabId: string,
   name: string,
 ): Promise<ChatTab> {
-  // UUID as string
-  const { data } = await api.patch(routes.chat.updateTab(chatTabId), { name });
+  const trimmed = name.trim();
+  if (!isValidChatTabName(trimmed)) {
+    throw new Error(
+      `Name must be ${CHAT_TAB_NAME_MIN_LENGTH}–${CHAT_TAB_NAME_MAX_LENGTH} characters, letters, numbers, dashes, and spaces only`,
+    );
+  }
+  const { data } = await api.patch(routes.chat.updateTab(chatTabId), {
+    name: trimmed,
+  });
   return data.data.chat_tab;
 }

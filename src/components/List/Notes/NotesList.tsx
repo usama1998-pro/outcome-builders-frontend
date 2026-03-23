@@ -91,9 +91,13 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
         );
     }, [notesWithOwnerInfo, searchQuery]);
 
-    const handleDeleteClick = (noteId: number, e: React.MouseEvent) => {
+    const handleDeleteClick = (noteId: number, isTrained: boolean, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        if (isTrained) {
+            toast.error("Trained articles cannot be deleted. Untrain the article first.");
+            return;
+        }
         setNoteToDelete(noteId);
         setDeleteDialogOpen(true);
     };
@@ -163,6 +167,13 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
 
     const confirmDelete = () => {
         if (noteToDelete) {
+            const target = filteredNotes.find((n) => n.id === noteToDelete);
+            if (target?.is_trained) {
+                toast.error("Trained articles cannot be deleted. Untrain the article first.");
+                setDeleteDialogOpen(false);
+                setNoteToDelete(null);
+                return;
+            }
             deleteNote({ note_id: noteToDelete }, {
                 onSuccess: (res) => {
                     if (res?.status) {
@@ -302,8 +313,20 @@ export function NotesList({ workspace, collection, notes, searchQuery = "" }: No
                                                                 Move to
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem
-                                                                onClick={(e) => handleDeleteClick(note.id, e)}
-                                                                className="text-red-600 focus:text-red-600 cursor-pointer"
+                                                                onClick={(e) =>
+                                                                    handleDeleteClick(note.id, !!note.is_trained, e)
+                                                                }
+                                                                disabled={!!note.is_trained}
+                                                                title={
+                                                                    note.is_trained
+                                                                        ? "Untrain this article before deleting."
+                                                                        : undefined
+                                                                }
+                                                                className={
+                                                                    note.is_trained
+                                                                        ? "opacity-50 cursor-not-allowed"
+                                                                        : "text-red-600 focus:text-red-600 cursor-pointer"
+                                                                }
                                                             >
                                                                 <FaTrash className="mr-2" />
                                                                 Delete Article

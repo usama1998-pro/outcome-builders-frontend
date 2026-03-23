@@ -116,9 +116,24 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
         });
     }, [notes]);
 
-    const handleDeleteClick = (noteId: number, e: React.MouseEvent) => {
+    const filteredNotes = useMemo(() => {
+        if (!searchQuery.trim()) return notesWithOwnerInfo;
+
+        const query = searchQuery.toLowerCase().trim();
+        return notesWithOwnerInfo.filter(
+            (note) =>
+                note.title.toLowerCase().includes(query) ||
+                note.ownerInfo.name.toLowerCase().includes(query),
+        );
+    }, [notesWithOwnerInfo, searchQuery]);
+
+    const handleDeleteClick = (noteId: number, isTrained: boolean, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        if (isTrained) {
+            toast.error("Trained articles cannot be deleted. Untrain the article first.");
+            return;
+        }
         setNoteToDelete(noteId);
         setDeleteDialogOpen(true);
     };
@@ -190,6 +205,13 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
 
     const confirmDelete = () => {
         if (noteToDelete) {
+            const target = filteredNotes.find((n) => n.id === noteToDelete);
+            if (target?.is_trained) {
+                toast.error("Trained articles cannot be deleted. Untrain the article first.");
+                setDeleteDialogOpen(false);
+                setNoteToDelete(null);
+                return;
+            }
             deleteNote({ note_id: noteToDelete }, {
                 onSuccess: (res) => {
                     if (res?.status) {
@@ -207,17 +229,6 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
             });
         }
     };
-
-    // Filter notes based on search query (matching NotesList behavior)
-    const filteredNotes = useMemo(() => {
-        if (!searchQuery.trim()) return notesWithOwnerInfo;
-
-        const query = searchQuery.toLowerCase().trim();
-        return notesWithOwnerInfo.filter(note =>
-            note.title.toLowerCase().includes(query) ||
-            note.ownerInfo.name.toLowerCase().includes(query)
-        );
-    }, [notesWithOwnerInfo, searchQuery]);
 
     return (
         <>
@@ -354,8 +365,20 @@ function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]
                                                             Move to
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
-                                                            onClick={(e) => handleDeleteClick(note.id, e)}
-                                                            className="text-red-600 focus:text-red-600 cursor-pointer"
+                                                            onClick={(e) =>
+                                                                handleDeleteClick(note.id, !!note.is_trained, e)
+                                                            }
+                                                            disabled={!!note.is_trained}
+                                                            title={
+                                                                note.is_trained
+                                                                    ? "Untrain this article before deleting."
+                                                                    : undefined
+                                                            }
+                                                            className={
+                                                                note.is_trained
+                                                                    ? "opacity-50 cursor-not-allowed"
+                                                                    : "text-red-600 focus:text-red-600 cursor-pointer"
+                                                            }
                                                         >
                                                             <FaTrash className="mr-2" />
                                                             Delete Article

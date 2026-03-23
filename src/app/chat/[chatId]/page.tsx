@@ -2,19 +2,33 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Send, Bot, User, Copy, Check, Square, Loader2, Brain, MessageSquare, ChevronDown, Star, RefreshCw, X, FileText, Plus, Upload, Image as ImageIcon, PenTool, AtSign, SlidersHorizontal, Paperclip, ChevronUp, Globe, MessageCircle, Settings as SettingsIcon } from "lucide-react";
+import { Send, Bot, User, Copy, Check, Square, Loader2, Brain, Star, X, FileText, Plus, Upload, Image as ImageIcon, PenTool, AtSign, SlidersHorizontal, Paperclip, ChevronUp, Globe, MessageCircle, Settings as SettingsIcon, AlertCircle, FolderOpen, ExternalLink } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import BlocksLoader from "@/src/components/Loaders/BlocksLoader/BlocksLoader";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { ChatMessage, ChatTab } from "../../../types/chat";
-import { useRef, useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { streamChat, getChatHistory, getChatTabs, updateChatTabName } from "../../../api/chat";
+import {
+    ChatMessage,
+    ChatTab,
+    ChatResourceLink,
+    CHAT_TAB_NAME_MIN_LENGTH,
+    deriveAutomaticChatTabTitle,
+    isPlaceholderChatTabName,
+    DEFAULT_CHAT_TAB_DISPLAY_NAME,
+} from "../../../types/chat";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import { useParams, usePathname, useRouter } from "next/navigation";
+import {
+    streamChat,
+    getChatHistory,
+    getChatTabs,
+    updateChatTabName,
+    createChatTab,
+} from "../../../api/chat";
 import { useBrainSpaceStore } from "../../../store/useBrainSpace";
 import { useUserWorkspaces } from "../../../hooks/useWorkspace";
 import { useUserCollections } from "../../../hooks/useCollection";
@@ -24,6 +38,18 @@ import { useAuthStore } from "../../../store/useAuth";
 import { useUserProfile } from "../../../hooks/useProfile";
 import { useGetUserSettings, useUpdateUserSettings } from "../../../hooks/useUserSettings";
 import { ModelSelector } from "../../../components/chat/ModelSelector";
+import {
+    getStoredAssistantMode,
+    setStoredAssistantMode,
+    type ChatAssistantMode,
+} from "@/src/lib/chatAgentModePreference";
+import {
+    ACTIVE_CHAT_TAB_STORAGE_KEY,
+    CHAT_TAB_DELETED_EVENT,
+    type ChatTabDeletedDetail,
+} from "@/src/lib/activeChatTabStorage";
+import { CHAT_ENTRY_PATH, CHAT_NEW_SESSION_PATH } from "@/src/lib/chatRoutes";
+import { ChatAssistantModeDropdown } from "@/src/components/chat/ChatAssistantModeDropdown";
 import ChatLandingPage from "../page";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -49,7 +75,12 @@ interface MessageBubbleProps {
     onAddContext?: (text: string) => void;
     onCreateContent?: (content: string, messageId?: number) => void;
     isSelectedForContent?: boolean;
+    /** Latest status line (legacy; also set when using statusSteps) */
     currentStatus?: string | null;
+    /** Cumulative agent / pipeline steps for this streaming reply */
+    statusSteps?: string[];
+    /** Open-in-dashboard links for resources created in this assistant turn */
+    resourceLinks?: ChatResourceLink[];
     messageRef?: (node: HTMLDivElement | null) => void;
     searchQuery?: string;
     currentMatchIndex?: number;
@@ -198,6 +229,8 @@ function MessageBubble({
     onCreateContent,
     isSelectedForContent,
     currentStatus,
+    statusSteps,
+    resourceLinks = [],
     messageRef: externalMessageRef,
     searchQuery = "",
     currentMatchIndex = -1,
@@ -432,13 +465,11 @@ function MessageBubble({
 
                 {/* Message Content */}
                 <div
-                    className={`relative max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl rounded-2xl px-4 py-3 ${
-                        isUser
+                    className={`relative max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl rounded-2xl px-4 py-3 ${isUser
                             ? "bg-[#DB2B30] !text-white shadow-sm **:!text-white"
-                            : `bg-card border shadow-sm ${
-                                  !isUser && isSelectedForContent ? "border-[#DB2B30] ring-1 ring-[#DB2B30]/60" : ""
-                              }`
-                    }`}
+                            : `bg-card border shadow-sm ${!isUser && isSelectedForContent ? "border-[#DB2B30] ring-1 ring-[#DB2B30]/60" : ""
+                            }`
+                        }`}
                 >
                     {/* Subtle shine effect for user messages */}
                     {isUser && (
@@ -446,7 +477,32 @@ function MessageBubble({
                     )}
 
                     {!isUser && isStreaming && (!displayContent || displayContent === "") ? (
-                        currentStatus ? (
+                        statusSteps && statusSteps.length > 0 ? (
+                            <div className="relative z-10 py-2 space-y-2 max-w-md">
+                                {statusSteps.map((line, i) => {
+                                    const isLast = i === statusSteps.length - 1;
+                                    const looksLikeError =
+                                        /try again|Couldn’t finish|Couldn't finish|didn’t finish|didn't finish/i.test(
+                                            line,
+                                        );
+                                    return (
+                                        <div
+                                            key={`${i}-${line.slice(0, 24)}`}
+                                            className="flex items-start gap-2 text-xs text-muted-foreground"
+                                        >
+                                            {!isLast ? (
+                                                <Check className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-500" />
+                                            ) : looksLikeError ? (
+                                                <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-500" />
+                                            ) : (
+                                                <Loader2 className="w-3.5 h-3.5 mt-0.5 shrink-0 animate-spin text-[#DB2B30]" />
+                                            )}
+                                            <span className="leading-snug">{line}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : currentStatus ? (
                             // Show status message instead of 3-dot loader
                             <div className="relative z-10 py-2">
                                 <div className="flex items-center gap-2">
@@ -480,7 +536,7 @@ function MessageBubble({
                             {isUser ? (
                                 <div className="space-y-2">
                                     {contextText ? (
-                                <>
+                                        <>
                                             <blockquote className="border-l-3 border-white/40 pl-3 italic text-white/90 text-sm bg-white/10 rounded-r py-2 mb-2">
                                                 <span className="text-xs font-semibold text-white/70 mb-1 block uppercase tracking-wide">Context</span>
                                                 <HighlightText
@@ -797,6 +853,43 @@ function MessageBubble({
                         </div>
                     )}
 
+                    {!isUser && resourceLinks.length > 0 && (
+                        <div className="relative z-10 mt-3 space-y-2">
+                            {resourceLinks.map((rl, idx) => {
+                                const kindLabel =
+                                    rl.kind === "brainspace"
+                                        ? "Brainspace"
+                                        : rl.kind === "collection"
+                                            ? "Collection"
+                                            : "Content";
+                                const Icon =
+                                    rl.kind === "brainspace"
+                                        ? Brain
+                                        : rl.kind === "collection"
+                                            ? FolderOpen
+                                            : FileText;
+                                return (
+                                    <Link
+                                        key={`${rl.href}-${idx}`}
+                                        href={rl.href}
+                                        className="flex items-center gap-3 rounded-lg border border-[#DB2B30]/25 bg-[#DB2B30]/5 px-3 py-2.5 text-sm transition-colors hover:bg-[#DB2B30]/10 dark:bg-[#DB2B30]/10 dark:hover:bg-[#DB2B30]/20"
+                                    >
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#DB2B30]/15 text-[#DB2B30]">
+                                            <Icon className="h-4 w-4" />
+                                        </div>
+                                        <div className="min-w-0 flex-1 text-left">
+                                            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#DB2B30]">
+                                                {kindLabel}
+                                            </p>
+                                            <p className="truncate font-medium text-foreground">{rl.title}</p>
+                                        </div>
+                                        <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    )}
+
                     {/* Timestamp - inside bubble at bottom */}
                     {timestamp && (
                         <p className={`relative z-10 text-[10px] mt-2 pt-1 border-t ${isUser ? "border-white/20 text-white/70" : "border-border text-muted-foreground"}`}>
@@ -836,11 +929,10 @@ function MessageBubble({
                         }}
                         size="sm"
                         variant={isSelectedForContent ? "default" : "ghost"}
-                        className={`h-7 px-2 text-xs flex items-center gap-1 ${
-                            isSelectedForContent
+                        className={`h-7 px-2 text-xs flex items-center gap-1 ${isSelectedForContent
                                 ? "bg-[#DB2B30] text-white hover:bg-[#B52227]"
                                 : "text-muted-foreground hover:text-foreground"
-                        }`}
+                            }`}
                         title={isSelectedForContent ? "Remove from content selection" : "Add/remove this response in content selection"}
                     >
                         {isSelectedForContent ? (
@@ -937,11 +1029,32 @@ function TypingIndicator() {
     );
 }
 
+/** UUID segment after /chat/ — uses the real URL, not useParams (can desync after clear or transitions). */
+function parseChatTabUuidFromPath(path: string): string | undefined {
+    const m = path.match(/\/chat\/([^/?#]+)/);
+    const seg = m?.[1]?.trim();
+    if (!seg || seg === "new") return undefined;
+    return seg;
+}
+
 export default function Chat() {
     const params = useParams();
     const router = useRouter();
+    const pathname = usePathname();
     const queryClient = useQueryClient();
     const chatId = params.chatId as string;
+    /** UUID segment from URL — params can be briefly undefined in App Router; pathname stays correct. */
+    const stableRouteChatId = useMemo(() => {
+        const raw = typeof chatId === "string" ? chatId.trim() : "";
+        if (raw && raw !== "new") return raw;
+        if (pathname) {
+            const fromPath = parseChatTabUuidFromPath(pathname);
+            if (fromPath) return fromPath;
+        }
+        return null;
+    }, [chatId, pathname]);
+    /** Last known tab id on this page (survives param flicker after clear / refetch). */
+    const routeChatTabPersistRef = useRef<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -956,12 +1069,120 @@ export default function Chat() {
     const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
     const streamingMessageIdRef = useRef<number | null>(null);
     const [currentChatTabId, setCurrentChatTabId] = useState<string | null>(null); // UUID as string
-    const [agentMode, setAgentMode] = useState(false);
+    /** Mirrors `currentChatTabId` for use inside stream callbacks without stale closures. */
+    const currentChatTabIdRef = useRef<string | null>(null);
+    /** Tab id for API + message rows: stable route UUID wins so clear-chat still targets the same tab. */
+    const resolvedChatTabId = useMemo(() => {
+        if (stableRouteChatId) return stableRouteChatId;
+        if (chatId && chatId !== "new") return chatId;
+        return currentChatTabId ?? "";
+    }, [stableRouteChatId, chatId, currentChatTabId]);
+
+    useEffect(() => {
+        currentChatTabIdRef.current = currentChatTabId;
+    }, [currentChatTabId]);
+
+    /** When navigating from an existing chat to `/chat/new`, drop the old tab id so the next send creates a fresh tab (not reuse). */
+    const prevChatIdForNewResetRef = useRef<string | undefined>(undefined);
+    useEffect(() => {
+        if (
+            chatId === "new" &&
+            prevChatIdForNewResetRef.current != null &&
+            prevChatIdForNewResetRef.current !== "new"
+        ) {
+            setCurrentChatTabId(null);
+        }
+        prevChatIdForNewResetRef.current = chatId;
+    }, [chatId]);
+
+    useEffect(() => {
+        // Only clear persisted tab when the *URL path* is actually /chat/new — not when
+        // useParams() briefly reports chatId === "new" during refetch/clear (URL can stay /chat/{uuid}).
+        const pathLooksNew =
+            pathname === CHAT_NEW_SESSION_PATH ||
+            pathname?.endsWith(CHAT_NEW_SESSION_PATH);
+        if (pathLooksNew) {
+            routeChatTabPersistRef.current = null;
+        } else if (stableRouteChatId) {
+            routeChatTabPersistRef.current = stableRouteChatId;
+            setCurrentChatTabId(stableRouteChatId);
+        }
+    }, [pathname, stableRouteChatId]);
+
+    useEffect(() => {
+        const pathLooksNew =
+            pathname === CHAT_NEW_SESSION_PATH ||
+            pathname?.endsWith(CHAT_NEW_SESSION_PATH);
+        try {
+            if (stableRouteChatId) {
+                sessionStorage.setItem(
+                    ACTIVE_CHAT_TAB_STORAGE_KEY,
+                    stableRouteChatId,
+                );
+            } else if (pathLooksNew && currentChatTabId) {
+                sessionStorage.setItem(
+                    ACTIVE_CHAT_TAB_STORAGE_KEY,
+                    currentChatTabId,
+                );
+            } else if (pathLooksNew && !currentChatTabId) {
+                sessionStorage.removeItem(ACTIVE_CHAT_TAB_STORAGE_KEY);
+            }
+        } catch {
+            /* ignore */
+        }
+    }, [stableRouteChatId, pathname, currentChatTabId]);
+
+    /**
+     * Tab id for POST /chat/stream. Must not rely on `chatId` from useParams alone — it can
+     * briefly read as "new" after clear/refetch while the browser URL is still /chat/{uuid}.
+     */
+    const getStreamChatTabId = useCallback((): string | undefined => {
+        const path =
+            typeof window !== "undefined" ? window.location.pathname : pathname ?? "";
+        let id = parseChatTabUuidFromPath(path);
+        if (!id) {
+            try {
+                const stored = sessionStorage.getItem(ACTIVE_CHAT_TAB_STORAGE_KEY);
+                if (stored && stored !== "new") id = stored;
+            } catch {
+                /* ignore */
+            }
+        }
+        if (!id && pathname) {
+            id = parseChatTabUuidFromPath(pathname);
+        }
+        if (!id) id = stableRouteChatId ?? routeChatTabPersistRef.current ?? undefined;
+        if (!id) id = currentChatTabIdRef.current ?? undefined;
+        if (!id && typeof chatId === "string") {
+            const t = chatId.trim();
+            if (t && t !== "new") id = t;
+        }
+        return id;
+    }, [pathname, stableRouteChatId, chatId]);
+
+    const [assistantMode, setAssistantMode] = useState<ChatAssistantMode>("ask");
+    const agentMode = assistantMode === "operator";
+
+    const setAssistantModePersist = useCallback((next: ChatAssistantMode) => {
+        setAssistantMode(next);
+        setStoredAssistantMode(next);
+    }, []);
     const [selectedModel, setSelectedModel] = useState<string>("default");
     const [settingsSheetOpen, setSettingsSheetOpen] = useState(false);
     const [enabledTones, setEnabledTones] = useState<string[]>([]);
     const [customInstructions, setCustomInstructions] = useState("");
     const [currentStatus, setCurrentStatus] = useState<string | null>(null);
+    /** Agent / LangGraph / tool steps shown in the streaming bubble (cumulative). */
+    const [agentStatusSteps, setAgentStatusSteps] = useState<string[]>([]);
+    const streamingResourceLinksRef = useRef<ChatResourceLink[]>([]);
+    const [streamingResourceLinks, setStreamingResourceLinks] = useState<ChatResourceLink[]>([]);
+
+    const clearAgentStatus = useCallback(() => {
+        setCurrentStatus(null);
+        setAgentStatusSteps([]);
+        streamingResourceLinksRef.current = [];
+        setStreamingResourceLinks([]);
+    }, []);
     const [selectedContext, setSelectedContext] = useState<{
         type: 'text' | null;
         id: number | null;
@@ -972,6 +1193,10 @@ export default function Chat() {
     const { data: settingsData, isLoading: settingsLoading } = useGetUserSettings();
     const updateUserSettings = useUpdateUserSettings();
     const hasInitializedModelRef = useRef(false);
+
+    useEffect(() => {
+        setAssistantMode(getStoredAssistantMode());
+    }, [chatId]);
 
     useEffect(() => {
         if (hasInitializedModelRef.current || !settingsData?.data) return;
@@ -985,9 +1210,7 @@ export default function Chat() {
         if (settingsData.data.enabled_tones != null) {
             setEnabledTones(settingsData.data.enabled_tones);
         }
-        if (settingsData.data.custom_instructions != null) {
-            setCustomInstructions(settingsData.data.custom_instructions);
-        }
+        setCustomInstructions(settingsData.data.custom_instructions ?? "");
     }, [settingsData?.data]);
 
     const handleToneToggle = useCallback(
@@ -1120,158 +1343,16 @@ export default function Chat() {
         router.push("/dashboard/articles/new");
     };
 
-    // Helper function to generate a meaningful title from the first question
-    const generateChatTitle = (question: string): string => {
-        if (!question || !question.trim()) {
-            console.log("generateChatTitle: empty question");
-            return "New Chat";
-        }
-
-        console.log("generateChatTitle: input question:", question.substring(0, 100));
-
-        // Remove context separator if present
-        let cleanQuestion = question;
-        if (question.includes(CONTEXT_SEPARATOR)) {
-            const parts = question.split(CONTEXT_SEPARATOR);
-            cleanQuestion = parts[1]?.trim() || parts[0]?.trim() || question;
-            console.log("generateChatTitle: after CONTEXT_SEPARATOR:", cleanQuestion.substring(0, 100));
-        }
-
-        // Remove context if it's in the format "context\n\nquestion"
-        // Only do this if the first part is clearly context (longer than 30 chars)
-        const parts = cleanQuestion.split('\n\n');
-        let actualQuestion = cleanQuestion.trim();
-        if (parts.length > 1 && parts[0].trim().length > 30) {
-            // First part looks like context, use the rest
-            actualQuestion = parts.slice(1).join('\n\n').trim();
-            console.log("generateChatTitle: after context removal:", actualQuestion.substring(0, 100));
-        }
-
-        // If still empty after processing, use the original
-        if (!actualQuestion || actualQuestion.length === 0) {
-            actualQuestion = cleanQuestion.trim();
-        }
-
-        // Take first line if multi-line, or first 60 chars for processing
-        const firstLine = actualQuestion.split('\n')[0].trim();
-        let title = firstLine.length > 0 && firstLine.length <= 60
-            ? firstLine
-            : actualQuestion.substring(0, 60).trim();
-
-        // Map common short greetings/questions to meaningful titles
-        const shortQuestionMap: Record<string, string> = {
-            'hi': 'Introduction',
-            'hello': 'Introduction',
-            'hey': 'Introduction',
-            'hey there': 'Introduction',
-            'hi there': 'Introduction',
-            'hello there': 'Introduction',
-            'what': 'Question',
-            'what?': 'Question',
-            'why': 'Question',
-            'why?': 'Question',
-            'how': 'Question',
-            'how?': 'Question',
-            'who': 'Question',
-            'who?': 'Question',
-            'when': 'Question',
-            'when?': 'Question',
-            'where': 'Question',
-            'where?': 'Question',
-            'help': 'Help',
-            'help?': 'Help',
-            'thanks': 'Thank You',
-            'thank you': 'Thank You',
-            'thanks!': 'Thank You',
-            'thank you!': 'Thank You',
-        };
-
-        // Check if it's a short question that we have a mapping for
-        const lowerTitle = title.toLowerCase().trim();
-        if (shortQuestionMap[lowerTitle]) {
-            console.log("generateChatTitle: mapped short question to:", shortQuestionMap[lowerTitle]);
-            return shortQuestionMap[lowerTitle];
-        }
-
-        // Remove common question starters and make it more title-like
-        // Remove question words at the start if they're standalone
-        const questionWordsRegex = new RegExp('^(what|why|how|who|when|where|can|could|should|would|will|is|are|do|does|did)\\s+', 'i');
-        title = title.replace(questionWordsRegex, '');
-
-        // Remove trailing punctuation and question marks
-        const punctuationRegex = new RegExp('[.,;:!?]+$');
-        title = title.replace(punctuationRegex, '');
-
-        // Remove common filler words/phrases at the start
-        const fillerWordsRegex = new RegExp('^(can you|could you|please|i want|i need|i would like|tell me|explain|describe)\\s+', 'i');
-        title = title.replace(fillerWordsRegex, '');
-
-        // If it starts with "what is" or "what are", remove those
-        const whatIsRegex = new RegExp('^what\\s+(is|are)\\s+', 'i');
-        title = title.replace(whatIsRegex, '');
-
-        // Capitalize first letter of each word for better title format
-        // But preserve acronyms and important capitalization
-        const wordsRegex = new RegExp('\\s+');
-        const words = title.split(wordsRegex);
-        const capitalizedWords = words.map((word, index) => {
-            // Keep acronyms (all caps) as-is
-            const acronymRegex = new RegExp('^[A-Z]+$');
-            if (word === word.toUpperCase() && word.length > 1 && acronymRegex.test(word)) {
-                return word;
-            }
-            // Capitalize first letter, lowercase the rest
-            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-        });
-        title = capitalizedWords.join(' ');
-
-        // Truncate to max 50 characters, but try to break at word boundary
-        if (title.length > 50) {
-            const truncated = title.substring(0, 50);
-            const lastSpace = truncated.lastIndexOf(' ');
-            // If we can break at a word boundary, do so
-            if (lastSpace > 30) {
-                title = truncated.substring(0, lastSpace);
-            } else {
-                title = truncated;
-            }
-        }
-
-        // Remove trailing punctuation again (in case truncation added some)
-        const finalPunctuationRegex = new RegExp('[.,;:!?]+$');
-        title = title.replace(finalPunctuationRegex, '').trim();
-
-        console.log("generateChatTitle: final title:", title);
-
-        // If empty or too short (less than 2 chars), use default
-        if (!title || title.length < 2) {
-            console.log("generateChatTitle: title too short, using default");
-            return "New Chat";
-        }
-
-        return title;
-    };
-
-    // Async function to rename chat tab (only for new chats, first response)
-    // This function ensures it only runs once per chat tab, even if called multiple times
-    const renameChatTabIfNeeded = async (chatTabId: string, firstQuestion: string, isNewChat: boolean) => { // UUID as string
-        // Early return checks - must pass all to proceed
+    // Async function to rename chat tab once per tab (first user message after tab exists).
+    // Do not use `chatId === "new"` as the guard: params can stay "new" until router.replace runs,
+    // which previously caused auto-rename on every message.
+    const renameChatTabIfNeeded = async (chatTabId: string, firstQuestion: string) => {
         if (!chatTabId || chatTabId.trim() === "") {
             console.log("Skipping rename - invalid chatTabId:", { chatTabId });
             return;
         }
 
-        // Allow rename for new chats OR if chat was cleared (not in renamed set (e.g., cleared chat)
-        // that can be renamed again when user sends first message after clearing)
-        const canRename = isNewChat || !hasRenamedChatRef.current.has(chatTabId);
-        if (!canRename) {
-            console.log("Skipping rename - not a new chat and already renamed:", { chatTabId, isNewChat });
-            return;
-        }
-
-        // Check if already renamed (completed) - this is now redundant but kept for safety
-        if (hasRenamedChatRef.current.has(chatTabId) && !isNewChat) {
-            console.log("Skipping rename - already renamed:", { chatTabId });
+        if (hasRenamedChatRef.current.has(chatTabId)) {
             return;
         }
 
@@ -1290,29 +1371,16 @@ export default function Chat() {
         isRenamingChatRef.current.add(chatTabId);
 
         try {
-            const newTitle = generateChatTitle(firstQuestion);
+            const newTitle = deriveAutomaticChatTabTitle(firstQuestion);
             console.log("Renaming chat tab:", { chatTabId, newTitle, originalQuestion: firstQuestion.substring(0, 100), questionLength: firstQuestion.length });
 
-            // Only rename if the title is different from default
-            if (newTitle && newTitle !== "New Chat") {
-                // Run asynchronously without blocking
+            if (newTitle.length >= CHAT_TAB_NAME_MIN_LENGTH) {
                 await updateChatTabName(chatTabId, newTitle);
                 console.log("Chat tab renamed successfully:", newTitle);
-
-                // Mark as renamed (completed) - only after successful rename
                 hasRenamedChatRef.current.add(chatTabId);
-
-                // Invalidate chat tabs to refresh the list with new name
-                // Use predicate to match all chatTabs queries regardless of tenant ID
-                queryClient.invalidateQueries({
-                    predicate: (query) => {
-                        const key = query.queryKey;
-                        return Array.isArray(key) && key.length >= 1 && key[0] === "chatTabs";
-                    }
-                });
+                // Do not invalidate React Query here — callers refresh the tab list after the stream
+                // ends so sidebar refetch cannot run during SSE chunks.
             } else {
-                console.log("Skipping rename - title is default or empty:", newTitle, "from question:", firstQuestion.substring(0, 50));
-                // Mark as renamed even if we skip (to prevent retrying with same question)
                 hasRenamedChatRef.current.add(chatTabId);
             }
         } catch (error) {
@@ -1333,12 +1401,74 @@ export default function Chat() {
     const isRenamingChatRef = useRef<Set<string>>(new Set()); // Track which chats are currently being renamed (UUID strings)
     const currentStreamingChatTabIdRef = useRef<string | null>(null); // Track chat tab ID for current stream (UUID string)
     const currentStreamingQuestionRef = useRef<string | null>(null); // Track question for current stream
-    const wasNewChatRef = useRef<boolean>(false); // Track if this stream started as a new chat
     const chatCreatedRef = useRef<boolean>(false); // Track if chat has been created (onStart called)
+    /** Set true synchronously when a stream starts (before React commits isStreaming) so history never loads mid-stream. */
+    const isStreamingRef = useRef(false);
+    useEffect(() => {
+        isStreamingRef.current = isStreaming;
+    }, [isStreaming]);
+
+    /** Sidebar deleted the open tab: clear UI (needed when URL stays `/chat/new` — no remount). */
+    useEffect(() => {
+        const onDeleted = (e: Event) => {
+            const detail = (e as CustomEvent<ChatTabDeletedDetail>).detail;
+            const deletedId = detail?.chatTabId;
+            if (!deletedId) return;
+            const urlTabId =
+                typeof chatId === "string" && chatId !== "new"
+                    ? chatId.trim()
+                    : "";
+            const activeTab =
+                urlTabId ||
+                (currentChatTabIdRef.current ?? currentChatTabId ?? "");
+            if (!activeTab) return;
+            if (activeTab.toLowerCase() !== deletedId.toLowerCase()) return;
+
+            abortControllerRef.current?.abort();
+            abortControllerRef.current = null;
+            isStreamingRef.current = false;
+            setIsStreaming(false);
+            setStreamingMessageId(null);
+            streamingMessageIdRef.current = null;
+            clearAgentStatus();
+
+            setMessages([]);
+            setCurrentChatTabId(null);
+            lastLoadedChatIdRef.current = null;
+            lastChatHistoryMessageCountRef.current = -1;
+            isCreatingNewChatRef.current = false;
+            chatCreatedRef.current = false;
+            try {
+                sessionStorage.removeItem(ACTIVE_CHAT_TAB_STORAGE_KEY);
+            } catch {
+                /* ignore */
+            }
+        };
+        window.addEventListener(
+            CHAT_TAB_DELETED_EVENT,
+            onDeleted as EventListener,
+        );
+        return () =>
+            window.removeEventListener(
+                CHAT_TAB_DELETED_EVENT,
+                onDeleted as EventListener,
+            );
+    }, [chatId, currentChatTabId]);
 
     // Load chat tabs to check if we should show landing page
     const currentTenantId = useAuthStore((s) => s.tenantId);
     const hydrated = useAuthStore((s) => s.hydrated);
+
+    /** Refresh sidebar chat tab list (e.g. after creating a tab or renaming). */
+    const invalidateChatTabsSidebar = useCallback(() => {
+        if (currentTenantId) {
+            void queryClient.invalidateQueries({ queryKey: ["chatTabs", currentTenantId] });
+        } else {
+            queryClient.invalidateQueries({
+                predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "chatTabs",
+            });
+        }
+    }, [currentTenantId, queryClient]);
 
     // Get brain space store values
     const { currentBrainSpaceId } = useBrainSpaceStore();
@@ -1402,14 +1532,20 @@ export default function Chat() {
 
     // Track if we're transitioning from "new" to a chat ID (new chat creation)
     useEffect(() => {
-        // Don't update flags if we're currently streaming (onStart already set them)
-        if (isStreaming) {
+        // Don't update flags if we're currently streaming (onStart already set them).
+        // Also check ref so we skip updates in the gap before React commits isStreaming=true.
+        if (isStreaming || isStreamingRef.current) {
             return;
         }
 
         // On page refresh, reset flags if we're on an existing chat (not "new")
-        // This ensures we don't incorrectly block history loading
-        if (chatId !== "new" && lastLoadedChatIdRef.current === null) {
+        // This ensures we don't incorrectly block history loading.
+        // Skip when a new chat is being created (lastLoaded can be unset briefly) — do not clear isCreatingNewChatRef.
+        if (
+            chatId !== "new" &&
+            lastLoadedChatIdRef.current === null &&
+            !isCreatingNewChatRef.current
+        ) {
             // This is a page refresh on an existing chat - reset flags
             isCreatingNewChatRef.current = false;
             chatCreatedRef.current = false;
@@ -1438,10 +1574,23 @@ export default function Chat() {
         }
     }, [chatId, isStreaming]);
 
-    // Load chat history - only when selecting an existing chat tab, not when creating a new chat
-    // Only enable if chatId is valid, not "new", tenant exists, and we're not creating a new chat
-    const shouldLoadHistory = !!(chatId && chatId !== "new" && currentTenantId && !isCreatingNewChatRef.current);
-    const { data: chatHistory, isLoading: isLoadingHistory, isFetching: isFetchingHistory, refetch: refetchHistory } = useQuery({
+    // Load chat history - only when selecting an existing chat tab, not when creating a new chat.
+    // Never fetch while streaming: URL can become /chat/{uuid} before React commits isStreaming, and
+    // ref-only guards do not re-run useQuery when isCreatingNewChatRef flips.
+    const shouldLoadHistory = !!(
+        chatId &&
+        chatId !== "new" &&
+        currentTenantId &&
+        !isCreatingNewChatRef.current &&
+        !isStreaming
+    );
+    const {
+        data: chatHistory,
+        isLoading: isLoadingHistory,
+        isFetching: isFetchingHistory,
+        isSuccess: isChatHistorySuccess,
+        refetch: refetchHistory,
+    } = useQuery({
         queryKey: ["chatHistory", chatId, currentTenantId],
         queryFn: async () => {
             if (chatId && chatId !== "new" && currentTenantId) {
@@ -1487,84 +1636,150 @@ export default function Chat() {
         staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
     });
 
+    // Tab was deleted (sidebar or elsewhere): history reports no tab — leave stale UI and go to new chat landing
+    useEffect(() => {
+        if (chatId === "new" || isStreaming) return;
+        if (!isChatHistorySuccess || !chatHistory) return;
+        if (chatHistory.chat_tab !== null) return;
+
+        setMessages([]);
+        setCurrentChatTabId(null);
+        lastLoadedChatIdRef.current = null;
+        lastChatHistoryMessageCountRef.current = -1;
+        queryClient.removeQueries({
+            queryKey: ["chatHistory", chatId, currentTenantId],
+        });
+        router.replace(CHAT_ENTRY_PATH);
+    }, [
+        chatId,
+        chatHistory,
+        isChatHistorySuccess,
+        isStreaming,
+        currentTenantId,
+        queryClient,
+        router,
+    ]);
+
     // Check for pending question from landing page and auto-send
     useEffect(() => {
         if (chatId === "new") {
             const pendingQuestion = sessionStorage.getItem("pendingChatQuestion");
-            const pendingAgentMode = sessionStorage.getItem("pendingChatAgentMode");
+            const pendingAssistantMode = sessionStorage.getItem("pendingChatAssistantMode");
+            const legacyPendingAgent = sessionStorage.getItem("pendingChatAgentMode");
 
             if (pendingQuestion && !isStreaming) {
                 // Clear the pending question immediately
                 sessionStorage.removeItem("pendingChatQuestion");
                 sessionStorage.removeItem("pendingChatAgentMode");
+                sessionStorage.removeItem("pendingChatAssistantMode");
 
-                // Set agent mode if it was set
-                if (pendingAgentMode === "true") {
-                    setAgentMode(true);
+                let resolvedAssistantMode: ChatAssistantMode = getStoredAssistantMode();
+                if (pendingAssistantMode === "ask" || pendingAssistantMode === "operator") {
+                    resolvedAssistantMode = pendingAssistantMode;
+                } else if (legacyPendingAgent !== null) {
+                    resolvedAssistantMode = legacyPendingAgent === "true" ? "operator" : "ask";
                 }
+                setAssistantMode(resolvedAssistantMode);
+                setStoredAssistantMode(resolvedAssistantMode);
+
+                const streamWithAgentMode = resolvedAssistantMode === "operator";
 
                 // Auto-send the message
                 const originalQuestion = pendingQuestion.trim();
                 if (originalQuestion) {
-                    // For pending questions, we don't have knowledge base context yet
-                    // Just use selected context if available
-                    const contextToSend = selectedContext.type === 'text' && selectedContext.text
-                        ? selectedContext.text
-                        : null;
-
-                    // Store question with context separator for display parsing
-                    const storedQuestion = contextToSend
-                        ? `${contextToSend}${CONTEXT_SEPARATOR}${originalQuestion}`
-                        : originalQuestion;
-
-                    // Prepare context object for backend API (separate from question)
-                    const contextForBackend = contextToSend
-                        ? { type: 'text' as const, text: contextToSend }
-                        : undefined;
-
-                    // Use original question without concatenation - context will be passed separately
-                    const questionForBackend = originalQuestion;
-
-                    // Add user message immediately
-                    const userMessage: ChatMessage = {
-                        id: Date.now(),
-                        chat_tab_id: "", // Will be updated with real UUID
-                        question: storedQuestion, // Store with separator for parsing
-                        answer: null,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                    };
-
-                    // Don't create bot message placeholder - will be created when we receive first chunk
-                    setMessages([userMessage]);
-                    // Don't set streamingMessageId yet - will be set in onStart
-
-                    // Clear context immediately after message is sent
-                    setSelectedContext({ type: null, id: null, name: null, text: null });
-
-                    // If we're on a new chat, mark it as creating BEFORE starting stream
-                    // This prevents the history query from starting when URL changes
-                    if (chatId === "new" || !currentChatTabId) {
-                        isCreatingNewChatRef.current = true;
-                        lastLoadedChatIdRef.current = "new";
-                    }
-
-                    // Start streaming
+                    // Same-frame exit from embedded ChatLandingPage (see shouldShowLandingPage) before any await.
+                    isStreamingRef.current = true;
                     setIsStreaming(true);
+                    clearAgentStatus();
 
-                    // Create abort controller for this stream
-                    const abortController = new AbortController();
-                    abortControllerRef.current = abortController;
+                    void (async () => {
+                        // For pending questions, we don't have knowledge base context yet
+                        const contextToSend = selectedContext.type === 'text' && selectedContext.text
+                            ? selectedContext.text
+                            : null;
 
-                    try {
-                        const controller = streamChat(
+                        const storedQuestion = contextToSend
+                            ? `${contextToSend}${CONTEXT_SEPARATOR}${originalQuestion}`
+                            : originalQuestion;
+
+                        const contextForBackend = contextToSend
+                            ? { type: 'text' as const, text: contextToSend }
+                            : undefined;
+
+                        const questionForBackend = originalQuestion;
+
+                        const optimisticUserMessageId = Date.now();
+                        let streamTabId: string;
+                        const reuseNewTabId =
+                            currentChatTabIdRef.current ?? currentChatTabId;
+                        if (reuseNewTabId) {
+                            streamTabId = reuseNewTabId;
+                            setMessages([
+                                {
+                                    id: optimisticUserMessageId,
+                                    chat_tab_id: streamTabId,
+                                    question: storedQuestion,
+                                    answer: null,
+                                    created_at: new Date().toISOString(),
+                                    updated_at: new Date().toISOString(),
+                                },
+                            ]);
+                        } else {
+                            setMessages([
+                                {
+                                    id: optimisticUserMessageId,
+                                    chat_tab_id: "",
+                                    question: storedQuestion,
+                                    answer: null,
+                                    created_at: new Date().toISOString(),
+                                    updated_at: new Date().toISOString(),
+                                },
+                            ]);
+                            try {
+                                const newTab = await createChatTab(
+                                    DEFAULT_CHAT_TAB_DISPLAY_NAME
+                                );
+                                streamTabId = newTab.id;
+                                setCurrentChatTabId(newTab.id);
+                                setMessages((prev) =>
+                                    prev.map((m) =>
+                                        m.id === optimisticUserMessageId
+                                            ? { ...m, chat_tab_id: newTab.id }
+                                            : m
+                                    )
+                                );
+                                invalidateChatTabsSidebar();
+                            } catch (err: unknown) {
+                                const msg =
+                                    err instanceof Error
+                                        ? err.message
+                                        : "Could not create chat";
+                                setMessages([]);
+                                isStreamingRef.current = false;
+                                setIsStreaming(false);
+                                toast.error(msg);
+                                return;
+                            }
+                        }
+                        setSelectedContext({ type: null, id: null, name: null, text: null });
+
+                        if (chatId === "new") {
+                            isCreatingNewChatRef.current = true;
+                            lastLoadedChatIdRef.current = "new";
+                        }
+
+                        const abortController = new AbortController();
+                        abortControllerRef.current = abortController;
+
+                        try {
+                            const controller = streamChat(
                             questionForBackend, // Send original question without context concatenation
-                            undefined, // No chat_tab_id - will create new one
-                            pendingAgentMode === "true",
+                            streamTabId,
+                            streamWithAgentMode,
                             contextForBackend, // Pass context separately so backend can use it in system prompt
                             {
                                 onStart: (messageId, chatTabId, streamId) => {
-                                    setCurrentStatus(null);
+                                    clearAgentStatus();
                                     // Mark chat as created
                                     chatCreatedRef.current = true;
                                     // Update with real IDs (chatTabId is UUID string)
@@ -1575,10 +1790,7 @@ export default function Chat() {
                                     currentStreamingChatTabIdRef.current = chatTabId;
                                     currentStreamingQuestionRef.current = originalQuestion;
 
-                                    // Track if this is a new chat (no existing chatTabId before)
-                                    const isNewChat = chatId === "new" || !previousChatTabId;
-                                    wasNewChatRef.current = isNewChat;
-                                    if (isNewChat) {
+                                    if (chatId === "new") {
                                         isCreatingNewChatRef.current = true;
                                     }
 
@@ -1605,23 +1817,6 @@ export default function Chat() {
                                         };
                                         return [...prev, botMessage];
                                     });
-
-                                    // Update URL without reload (only if we're still on /chat/new)
-                                    if (chatId === "new") {
-                                        // Mark that we're creating a new chat BEFORE updating URL
-                                        // This prevents history from loading when chatId changes
-                                        isCreatingNewChatRef.current = true;
-                                        lastLoadedChatIdRef.current = "new";
-                                        // Use window.history to update URL without reload
-                                        window.history.replaceState(null, "", `/chat/${chatTabId}`);
-                                    }
-
-                                    // Rename chat tab immediately when first question is sent (don't wait for response)
-                                    // This happens asynchronously and doesn't block the stream
-                                    if (isNewChat && chatTabId && originalQuestion) {
-                                        console.log("onStart - renaming chat tab immediately:", { chatTabId, question: originalQuestion.substring(0, 50) });
-                                        renameChatTabIfNeeded(chatTabId, originalQuestion, isNewChat);
-                                    }
                                 },
                                 onChunk: (content) => {
                                     setMessages((prev) => {
@@ -1666,39 +1861,78 @@ export default function Chat() {
                                     });
                                 },
                                 onStatus: (status, step) => {
-                                    // Always show status messages (not just in agent mode)
+                                    setAgentStatusSteps((prev) => [...prev, status]);
                                     setCurrentStatus(status);
                                 },
-                                onComplete: () => {
+                                onResourceCreated: (link) => {
+                                    streamingResourceLinksRef.current = [
+                                        ...streamingResourceLinksRef.current,
+                                        link,
+                                    ];
+                                    setStreamingResourceLinks([...streamingResourceLinksRef.current]);
+                                },
+                                onComplete: async () => {
+                                    const tabForRename = currentStreamingChatTabIdRef.current;
+                                    const qForRename = currentStreamingQuestionRef.current;
+
                                     const completedMessageId = streamingMessageIdRef.current;
+                                    const links = streamingResourceLinksRef.current;
+                                    if (completedMessageId != null && links.length > 0) {
+                                        setMessages((prev) =>
+                                            prev.map((m) =>
+                                                m.id === completedMessageId
+                                                    ? {
+                                                        ...m,
+                                                        resourceLinks: [
+                                                            ...(m.resourceLinks ?? []),
+                                                            ...links,
+                                                        ],
+                                                    }
+                                                    : m
+                                            )
+                                        );
+                                    }
+                                    streamingResourceLinksRef.current = [];
+                                    setStreamingResourceLinks([]);
                                     setIsStreaming(false);
                                     setStreamingMessageId(null);
-                                    setCurrentStatus(null);
+                                    clearAgentStatus();
                                     abortControllerRef.current = null;
-                                    // Invalidate chat tabs after completion to update the list (e.g., new chat created)
-                                    queryClient.invalidateQueries({
-                                        predicate: (query) => {
-                                            const key = query.queryKey;
-                                            return Array.isArray(key) && key.length >= 1 && key[0] === "chatTabs";
-                                        }
-                                    });
+
+                                    if (tabForRename && qForRename) {
+                                        await renameChatTabIfNeeded(tabForRename, qForRename);
+                                    }
+                                    invalidateChatTabsSidebar();
                                     // Clear refs
                                     currentStreamingChatTabIdRef.current = null;
                                     currentStreamingQuestionRef.current = null;
-                                    wasNewChatRef.current = false;
                                     chatCreatedRef.current = false;
                                 },
                                 onStop: async () => {
+                                    const tabId = currentStreamingChatTabIdRef.current;
+                                    const tabForRename = tabId;
+                                    const qForRename = currentStreamingQuestionRef.current;
+                                    if (tabForRename && qForRename) {
+                                        void renameChatTabIfNeeded(tabForRename, qForRename);
+                                    }
                                     setIsStreaming(false);
                                     setStreamingMessageId(null);
-                                    setCurrentStatus(null);
+                                    clearAgentStatus();
                                     abortControllerRef.current = null;
                                     toast.info("Response stopped. Partial response saved.");
                                     // Wait for backend to save, then refetch to get the saved partial response
                                     setTimeout(async () => {
-                                        if (chatId && chatId !== "new") {
+                                        const hid =
+                                            tabId && tabId !== "new"
+                                                ? tabId
+                                                : chatId && chatId !== "new"
+                                                  ? chatId
+                                                  : null;
+                                        if (hid) {
                                             try {
-                                                await refetchHistory();
+                                                await queryClient.invalidateQueries({
+                                                    queryKey: ["chatHistory", hid, currentTenantId],
+                                                });
                                             } catch (error) {
                                                 console.error("Error refetching history after stop:", error);
                                             }
@@ -1706,9 +1940,14 @@ export default function Chat() {
                                     }, 1000); // Increased delay to ensure backend has time to save
                                 },
                                 onError: (error) => {
+                                    const tabForRename = currentStreamingChatTabIdRef.current;
+                                    const qForRename = currentStreamingQuestionRef.current;
+                                    if (tabForRename && qForRename) {
+                                        void renameChatTabIfNeeded(tabForRename, qForRename);
+                                    }
                                     setIsStreaming(false);
                                     setStreamingMessageId(null);
-                                    setCurrentStatus(null);
+                                    clearAgentStatus();
                                     abortControllerRef.current = null;
                                     chatCreatedRef.current = false;
                                     // Clear context even on error (message was attempted to be sent)
@@ -1719,22 +1958,38 @@ export default function Chat() {
                             selectedModel
                         );
 
-                        abortControllerRef.current = controller;
-                    } catch (error: any) {
-                        setIsStreaming(false);
-                        setStreamingMessageId(null);
-                        chatCreatedRef.current = false;
-                        // Clear context even on error (message was attempted to be sent)
-                        setSelectedContext({ type: null, id: null, name: null, text: null });
-                        toast.error(`Failed to send message: ${error.message}`);
-                    }
+                            abortControllerRef.current = controller;
+                        } catch (error: any) {
+                            setIsStreaming(false);
+                            setStreamingMessageId(null);
+                            clearAgentStatus();
+                            chatCreatedRef.current = false;
+                            setSelectedContext({ type: null, id: null, name: null, text: null });
+                            toast.error(`Failed to send message: ${error.message}`);
+                        }
+                    })();
                 }
             }
         }
-    }, [chatId, isStreaming, router, queryClient, refetchHistory, selectedModel]);
+    }, [
+        chatId,
+        isStreaming,
+        router,
+        queryClient,
+        refetchHistory,
+        selectedModel,
+        clearAgentStatus,
+        currentTenantId,
+        invalidateChatTabsSidebar,
+    ]);
 
     // Update messages when history loads (only on initial load or when chatId changes)
     useEffect(() => {
+        // Never replace local streaming/partial UI with server history while a response is in flight.
+        if (isStreaming || isStreamingRef.current) {
+            return;
+        }
+
         // Check if this is a new chat (chatId changed)
         const isNewChat = lastLoadedChatIdRef.current !== chatId;
 
@@ -1744,6 +1999,10 @@ export default function Chat() {
 
             // If chatHistory exists but has no messages (cleared chat), clear local messages
             if (currentMessageCount === 0) {
+                // Keep tab id in sync when history is empty (clear-chat refetch) so the next send targets this chat
+                if (chatHistory.chat_tab?.id) {
+                    setCurrentChatTabId(chatHistory.chat_tab.id);
+                }
                 // Only clear messages if:
                 // 1. We're viewing this chat and not streaming
                 // 2. This is a transition from having messages to having no messages (cleared)
@@ -1783,15 +2042,24 @@ export default function Chat() {
                     // Add user message (question)
                     if (msg.question) {
                         formattedMessages.push({
-                            ...msg,
-                            answer: null, // Clear answer for user message display
+                            id: msg.id,
+                            chat_tab_id: msg.chat_tab_id,
+                            question: msg.question,
+                            answer: null,
+                            created_at: msg.created_at,
+                            updated_at: msg.updated_at,
                         });
                     }
-                    // Add bot response (answer) if exists
+                    // Add bot response (answer) if exists (resource links only on assistant row)
                     if (msg.answer) {
                         formattedMessages.push({
-                            ...msg,
-                            question: "", // Clear question for bot message display
+                            id: msg.id,
+                            chat_tab_id: msg.chat_tab_id,
+                            question: "",
+                            answer: msg.answer,
+                            created_at: msg.created_at,
+                            updated_at: msg.updated_at,
+                            resourceLinks: msg.resourceLinks,
                         });
                     }
                 });
@@ -1804,6 +2072,16 @@ export default function Chat() {
                 // Update currentChatTabId if available
                 if (chatHistory.chat_tab) {
                     setCurrentChatTabId(chatHistory.chat_tab.id);
+                    // Only mark as renamed if the tab already has a real title. Placeholder names
+                    // (e.g. backend "New Action", legacy numeric ids) must not pre-empt async rename
+                    // after the first message.
+                    if (
+                        chatHistory.messages &&
+                        chatHistory.messages.length > 0 &&
+                        !isPlaceholderChatTabName(chatHistory.chat_tab.name ?? "")
+                    ) {
+                        hasRenamedChatRef.current.add(chatHistory.chat_tab.id);
+                    }
                 }
             } else if (isCreatingNewChatRef.current && chatId !== "new") {
                 // If we just created a new chat, reset the flag after a longer delay
@@ -2024,7 +2302,9 @@ export default function Chat() {
         setInputValue("");
 
         // Backend handles routing and KB search: only runs vector search when category is "kb"
+        isStreamingRef.current = true;
         setIsStreaming(true);
+        clearAgentStatus();
 
         // Send only user-selected context (e.g. pasted/selected text). No frontend KB search.
         const contextToSend = selectedContext.type === 'text' && selectedContext.text
@@ -2038,18 +2318,74 @@ export default function Chat() {
         // Use original question without concatenation - context will be passed separately
         const questionForBackend = originalQuestion;
 
-        // Add user message immediately
-        const userMessage: ChatMessage = {
-            id: Date.now(), // Temporary ID
-            chat_tab_id: currentChatTabId || "", // UUID string
-            question: storedQuestion, // Store with separator for parsing
-            answer: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        };
+        const optimisticUserMessageId = Date.now();
+        let streamTabId: string;
+        let userMessageAlreadyAppended = false;
 
-        // Don't create bot message placeholder - will be created when we receive first chunk
-        setMessages((prev) => [...prev, userMessage]);
+        if (chatId === "new") {
+            const reuseNewTabId = currentChatTabIdRef.current ?? currentChatTabId;
+            if (reuseNewTabId) {
+                streamTabId = reuseNewTabId;
+            } else {
+                // Show user bubble before createChatTab returns (first message on /chat/new).
+                const optimisticUser: ChatMessage = {
+                    id: optimisticUserMessageId,
+                    chat_tab_id: "",
+                    question: storedQuestion,
+                    answer: null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                };
+                setMessages((prev) => [...prev, optimisticUser]);
+                userMessageAlreadyAppended = true;
+                try {
+                    const newTab = await createChatTab(DEFAULT_CHAT_TAB_DISPLAY_NAME);
+                    streamTabId = newTab.id;
+                    setCurrentChatTabId(newTab.id);
+                    setMessages((prev) =>
+                        prev.map((m) =>
+                            m.id === optimisticUserMessageId
+                                ? { ...m, chat_tab_id: newTab.id }
+                                : m
+                        )
+                    );
+                    invalidateChatTabsSidebar();
+                } catch (err: unknown) {
+                    const msg =
+                        err instanceof Error ? err.message : "Could not create chat";
+                    setMessages((prev) =>
+                        prev.filter((m) => m.id !== optimisticUserMessageId)
+                    );
+                    isStreamingRef.current = false;
+                    setIsStreaming(false);
+                    toast.error(msg);
+                    return;
+                }
+            }
+        } else {
+            const trimmedResolved = resolvedChatTabId.trim();
+            const fromSession = getStreamChatTabId();
+            const resolved = trimmedResolved !== "" ? trimmedResolved : (fromSession ?? "");
+            if (!resolved) {
+                isStreamingRef.current = false;
+                setIsStreaming(false);
+                toast.error("No chat tab selected.");
+                return;
+            }
+            streamTabId = resolved;
+        }
+
+        if (!userMessageAlreadyAppended) {
+            const userMessage: ChatMessage = {
+                id: optimisticUserMessageId,
+                chat_tab_id: streamTabId,
+                question: storedQuestion,
+                answer: null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+            setMessages((prev) => [...prev, userMessage]);
+        }
         // Don't set streamingMessageId yet - will be set in onStart
 
         // Clear context immediately after message is sent
@@ -2057,13 +2393,10 @@ export default function Chat() {
 
         // If we're on a new chat, mark it as creating BEFORE starting stream
         // This prevents the history query from starting when URL changes
-        if (chatId === "new" || !currentChatTabId) {
+        if (chatId === "new") {
             isCreatingNewChatRef.current = true;
             lastLoadedChatIdRef.current = "new";
         }
-
-        // Start streaming
-        setIsStreaming(true);
 
         // Create abort controller for this stream
         const abortController = new AbortController();
@@ -2079,12 +2412,12 @@ export default function Chat() {
 
             const controller = streamChat(
                 questionForBackend, // Send original question without context concatenation
-                currentChatTabId || undefined,
+                streamTabId,
                 agentMode,
                 contextForBackend, // Pass context separately so backend can use it in system prompt
                 {
                     onStart: (messageId, chatTabId, streamId) => {
-                        setCurrentStatus(null);
+                        clearAgentStatus();
                         // Mark chat as created
                         chatCreatedRef.current = true;
                         // Update with real IDs (chatTabId is UUID string)
@@ -2095,10 +2428,7 @@ export default function Chat() {
                         currentStreamingChatTabIdRef.current = chatTabId;
                         currentStreamingQuestionRef.current = originalQuestion;
 
-                        // Track if this is a new chat (no existing chatTabId before or we're on /chat/new)
-                        const isNewChat = chatId === "new" || !previousChatTabId;
-                        wasNewChatRef.current = isNewChat;
-                        if (isNewChat) {
+                        if (chatId === "new") {
                             isCreatingNewChatRef.current = true;
                         }
 
@@ -2125,34 +2455,19 @@ export default function Chat() {
                             };
                             return [...prev, botMessage];
                         });
-
-                        // Update URL without reload (only if we're still on /chat/new)
-                        if (chatId === "new") {
-                            // Mark that we're creating a new chat BEFORE updating URL
-                            // This prevents history from loading when chatId changes
-                            isCreatingNewChatRef.current = true;
-                            lastLoadedChatIdRef.current = "new";
-                            // Use window.history to update URL without reload
-                            window.history.replaceState(null, "", `/chat/${chatTabId}`);
-                        }
-
-                        // Rename chat tab immediately when first question is sent (don't wait for response)
-                        // This happens asynchronously and doesn't block the stream
-                        // Allow rename for new chats OR cleared chats (not in renamed set)
-                        const shouldRename = isNewChat || !hasRenamedChatRef.current.has(chatTabId);
-                        if (shouldRename && chatTabId && originalQuestion) {
-                            console.log("onStart - renaming chat tab immediately:", { chatTabId, question: originalQuestion.substring(0, 50), isNewChat });
-                            renameChatTabIfNeeded(chatTabId, originalQuestion, isNewChat);
-                        }
                     },
                     onChunk: (content) => {
+                        const tabForMessage =
+                            getStreamChatTabId() ??
+                            currentStreamingChatTabIdRef.current ??
+                            "";
                         setMessages((prev) => {
                             const currentStreamingId = streamingMessageIdRef.current;
                             if (!currentStreamingId) {
                                 // If no streaming ID yet, create bot message (shouldn't happen, but handle it)
                                 const botMessage: ChatMessage = {
                                     id: currentStreamingId || Date.now(),
-                                    chat_tab_id: currentChatTabId || "",
+                                    chat_tab_id: tabForMessage,
                                     question: "",
                                     answer: content,
                                     created_at: new Date().toISOString(),
@@ -2168,7 +2483,7 @@ export default function Chat() {
                                 // Bot message doesn't exist yet, create it
                                 const botMessage: ChatMessage = {
                                     id: currentStreamingId,
-                                    chat_tab_id: currentChatTabId || "",
+                                    chat_tab_id: tabForMessage,
                                     question: "",
                                     answer: content,
                                     created_at: new Date().toISOString(),
@@ -2188,40 +2503,79 @@ export default function Chat() {
                         });
                     },
                     onStatus: (status, step) => {
-                        // Always show status messages (not just in agent mode)
+                        setAgentStatusSteps((prev) => [...prev, status]);
                         setCurrentStatus(status);
                     },
-                    onComplete: () => {
+                    onResourceCreated: (link) => {
+                        streamingResourceLinksRef.current = [
+                            ...streamingResourceLinksRef.current,
+                            link,
+                        ];
+                        setStreamingResourceLinks([...streamingResourceLinksRef.current]);
+                    },
+                    onComplete: async () => {
+                        const tabForRename = currentStreamingChatTabIdRef.current;
+                        const qForRename = currentStreamingQuestionRef.current;
+
                         const completedMessageId = streamingMessageIdRef.current;
+                        const links = streamingResourceLinksRef.current;
+                        if (completedMessageId != null && links.length > 0) {
+                            setMessages((prev) =>
+                                prev.map((m) =>
+                                    m.id === completedMessageId
+                                        ? {
+                                            ...m,
+                                            resourceLinks: [
+                                                ...(m.resourceLinks ?? []),
+                                                ...links,
+                                            ],
+                                        }
+                                        : m
+                                )
+                            );
+                        }
+                        streamingResourceLinksRef.current = [];
+                        setStreamingResourceLinks([]);
                         setIsStreaming(false);
                         setStreamingMessageId(null);
-                        setCurrentStatus(null);
+                        clearAgentStatus();
                         abortControllerRef.current = null;
-                        // Invalidate chat tabs after completion to update the list (e.g., new chat created)
-                        queryClient.invalidateQueries({
-                            predicate: (query) => {
-                                const key = query.queryKey;
-                                return Array.isArray(key) && key.length >= 1 && key[0] === "chatTabs";
-                            }
-                        });
+
+                        if (tabForRename && qForRename) {
+                            await renameChatTabIfNeeded(tabForRename, qForRename);
+                        }
+                        invalidateChatTabsSidebar();
                         // Clear refs
                         currentStreamingChatTabIdRef.current = null;
                         currentStreamingQuestionRef.current = null;
-                        wasNewChatRef.current = false;
                         chatCreatedRef.current = false;
                     },
                     onStop: async () => {
+                        const tabId = currentStreamingChatTabIdRef.current;
+                        const tabForRename = tabId;
+                        const qForRename = currentStreamingQuestionRef.current;
+                        if (tabForRename && qForRename) {
+                            void renameChatTabIfNeeded(tabForRename, qForRename);
+                        }
                         setIsStreaming(false);
                         setStreamingMessageId(null);
-                        setCurrentStatus(null);
+                        clearAgentStatus();
                         abortControllerRef.current = null;
                         chatCreatedRef.current = false;
                         toast.info("Response stopped. Partial response saved.");
                         // Wait for backend to save, then refetch to get the saved partial response
                         setTimeout(async () => {
-                            if (chatId && chatId !== "new") {
+                            const hid =
+                                tabId && tabId !== "new"
+                                    ? tabId
+                                    : chatId && chatId !== "new"
+                                      ? chatId
+                                      : null;
+                            if (hid) {
                                 try {
-                                    await refetchHistory();
+                                    await queryClient.invalidateQueries({
+                                        queryKey: ["chatHistory", hid, currentTenantId],
+                                    });
                                 } catch (error) {
                                     console.error("Error refetching history after stop:", error);
                                 }
@@ -2229,9 +2583,14 @@ export default function Chat() {
                         }, 1000); // Increased delay to ensure backend has time to save
                     },
                     onError: (error) => {
+                        const tabForRename = currentStreamingChatTabIdRef.current;
+                        const qForRename = currentStreamingQuestionRef.current;
+                        if (tabForRename && qForRename) {
+                            void renameChatTabIfNeeded(tabForRename, qForRename);
+                        }
                         setIsStreaming(false);
                         setStreamingMessageId(null);
-                        setCurrentStatus(null);
+                        clearAgentStatus();
                         abortControllerRef.current = null;
                         toast.error(`Error: ${error}`);
                     },
@@ -2243,6 +2602,7 @@ export default function Chat() {
         } catch (error: any) {
             setIsStreaming(false);
             setStreamingMessageId(null);
+            clearAgentStatus();
             chatCreatedRef.current = false;
             // Clear context even on error (message was attempted to be sent)
             setSelectedContext({ type: null, id: null, name: null, text: null });
@@ -2343,6 +2703,16 @@ export default function Chat() {
                                 onCreateContent={handleCreateContent}
                                 isSelectedForContent={(selectedContentMessageIds ?? []).includes(msg.id)}
                                 currentStatus={currentStatus}
+                                statusSteps={
+                                    isStreaming && streamingMessageId === msg.id
+                                        ? agentStatusSteps
+                                        : undefined
+                                }
+                                resourceLinks={
+                                    isStreaming && streamingMessageId === msg.id
+                                        ? streamingResourceLinks
+                                        : msg.resourceLinks ?? []
+                                }
                                 messageRef={(node) => {
                                     if (node) {
                                         messageRefs.current.set(msg.id, node);
@@ -2513,49 +2883,11 @@ export default function Chat() {
                                         onChange={handleModelChange}
                                         disabled={isStreaming}
                                     />
-                                    {/* Agent/Chat Mode Toggle */}
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                disabled={isStreaming}
-                                                className="h-8 px-3 rounded-lg text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                                            >
-                                                {agentMode ? (
-                                                    <>
-                                                        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                                                        Agent
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-                                                        Chat
-                                                    </>
-                                                )}
-                                                <ChevronDown className="w-3.5 h-3.5 ml-1.5 opacity-60" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-36">
-                                            <DropdownMenuItem
-                                                onClick={() => setAgentMode(false)}
-                                                className="flex items-center gap-2 cursor-pointer"
-                                            >
-                                                <MessageSquare className="w-3.5 h-3.5 text-[#DB2B30]" />
-                                                <span>Chat Mode</span>
-                                                {!agentMode && <Check className="w-3 h-3 ml-auto text-[#DB2B30]" />}
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={() => setAgentMode(true)}
-                                                className="flex items-center gap-2 cursor-pointer"
-                                            >
-                                                <RefreshCw className="w-3.5 h-3.5 text-[#DB2B30]" />
-                                                <span>Agent Mode</span>
-                                                {agentMode && <Check className="w-3 h-3 ml-auto text-[#DB2B30]" />}
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                    <ChatAssistantModeDropdown
+                                        value={assistantMode}
+                                        onChange={setAssistantModePersist}
+                                        disabled={isStreaming}
+                                    />
 
                                     {isStreaming ? (
                                         <Button
@@ -2621,7 +2953,7 @@ export default function Chat() {
                                     disabled={settingsLoading || updateUserSettings.isPending}
                                     onClick={() =>
                                         updateUserSettings.mutate({
-                                            custom_instructions: customInstructions.trim() || null,
+                                            custom_instructions: customInstructions.trim(),
                                         })
                                     }
                                 >

@@ -18,7 +18,7 @@ import {
     SidebarMenuAction
 } from "@/components/ui/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, FolderOpen, Layers, FileText, Wrench, Sparkles, Settings, Building, Briefcase, BarChart3, Stethoscope, Compass, Network, Palette, Package, Megaphone, HelpCircle, Plus, Move, MoreVertical, Search, MoreHorizontal, Loader2, Route, Database, FileAudio, FileVideo } from "lucide-react";
+import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, FolderOpen, Layers, FileText, Wrench, Sparkles, Settings, Building, Briefcase, BarChart3, Stethoscope, Compass, Network, Palette, Package, Megaphone, HelpCircle, Plus, Move, MoreVertical, Search, MoreHorizontal, Loader2, Route, Database, FileAudio, FileVideo, Pencil } from "lucide-react";
 import { useSignOut, useUserTenants } from "@/src/hooks/useAuth";
 import { useOrganizationDetails } from "@/src/hooks/useOrganization";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -26,14 +26,21 @@ import { useAuthStore } from "@/src/store/useAuth";
 import { useUserPermissions, PERMISSIONS } from "@/src/hooks/useUserPermissions";
 import { useUserProfile } from "@/src/hooks/useProfile";
 import { useUserWorkspaces, useCreateUserWorkspace } from "@/src/hooks/useWorkspace";
-import { useUserCollections } from "@/src/hooks/useCollection";
-import { useMoveNote } from "@/src/hooks/useNotes";
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import api from "@/src/lib/axios";
-import routes from "@/src/lib/routes";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
-import { ChatTab } from "../../types/chat";
-import { getChatTabs, deleteChatTab, clearChatTab } from "@/src/api/chat";
+import {
+    ChatTab,
+    CHAT_TAB_NAME_MIN_LENGTH,
+    CHAT_TAB_NAME_MAX_LENGTH,
+    filterChatTabNameInput,
+    isValidChatTabName,
+} from "../../types/chat";
+import { getChatTabs, deleteChatTab, updateChatTabName } from "@/src/api/chat";
+import {
+    ACTIVE_CHAT_TAB_STORAGE_KEY,
+    CHAT_TAB_DELETED_EVENT,
+} from "@/src/lib/activeChatTabStorage";
+import { CHAT_ENTRY_PATH, CHAT_NEW_SESSION_PATH } from "@/src/lib/chatRoutes";
 import {
     Select,
     SelectContent,
@@ -52,6 +59,14 @@ import {
     AlertDialogTrigger,
     AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -76,19 +91,40 @@ function isMainDashboardRoute(pathname: string) {
     return pathname === "/dashboard" || pathname === "/dashboard/home";
 }
 
-function isBrainspacesPathActive(pathname: string) {
-    return pathname === "/dashboard/workspaces" || pathname.startsWith("/dashboard/workspaces/");
-}
+/**
+ * Single source of truth so nested KB routes don't light up Brainspaces + Collections + Content at once.
+ * Priority: note routes → collections → brainspace list / workspace (non-collection) paths.
+ */
+function getKnowledgeBankActiveSection(
+    pathname: string
+): "brainspaces" | "collections" | "content" | null {
+    if (!pathname.startsWith("/dashboard")) return null;
 
-function isCollectionsPathActive(pathname: string) {
-    if (pathname === "/dashboard/collections" || pathname.startsWith("/dashboard/collections/")) return true;
-    return pathname.includes("/dashboard/workspaces/") && pathname.includes("/collections");
-}
+    // Top-level Content hub
+    if (pathname === "/dashboard/notes" || pathname.startsWith("/dashboard/notes/")) {
+        return "content";
+    }
 
-function isContentNotesPathActive(pathname: string) {
-    if (pathname === "/dashboard/notes" || pathname.startsWith("/dashboard/notes/")) return true;
-    if (!pathname.startsWith("/dashboard")) return false;
-    return pathname.includes("/notes");
+    // Nested notes (…/collections/…/notes or …/notes/:id) — must win over collections/brainspaces
+    if (pathname.includes("/notes/") || pathname.endsWith("/notes")) {
+        return "content";
+    }
+
+    // Collections: global list or anything under workspace that is in the collections tree
+    if (
+        pathname === "/dashboard/collections" ||
+        pathname.startsWith("/dashboard/collections/") ||
+        (pathname.includes("/dashboard/workspaces/") && pathname.includes("/collections"))
+    ) {
+        return "collections";
+    }
+
+    // Brainspaces: list or workspace routes that are not already classified above
+    if (pathname === "/dashboard/workspaces" || pathname.startsWith("/dashboard/workspaces/")) {
+        return "brainspaces";
+    }
+
+    return null;
 }
 
 function isDataContextPathActive(
@@ -97,6 +133,13 @@ function isDataContextPathActive(
 ) {
     const base = `/dashboard/data-sources/${segment}`;
     return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+/** First segment after `/chat/` (ignores trailing slash); used to match delete vs current route. */
+function getOpenChatTabIdFromPathname(pathname: string | null): string | null {
+    if (!pathname) return null;
+    const m = pathname.match(/^\/chat\/([^/]+)/);
+    return m?.[1] ?? null;
 }
 
 export default function SidePanel() {
@@ -109,23 +152,13 @@ export default function SidePanel() {
     const { data: tenants } = useUserTenants();
     const { data: organization } = useOrganizationDetails(currentTenantId || 0);
     const { data: userProfile } = useUserProfile();
-    const { data: workspaces, isLoading: workspacesLoading, isError: workspacesError } = useUserWorkspaces();
-    // SidePanel needs all collections (not filtered by workspace) for the tree structure
-    // Pass undefined explicitly to fetch all collections (not filtered by workspace)
-    const { data: allCollections, isLoading: collectionsLoading, isError: collectionsError } = useUserCollections(undefined);
+    const { data: workspaces } = useUserWorkspaces();
     const { currentBrainSpaceId, setCurrentBrainSpaceId } = useBrainSpaceStore();
     const queryClient = useQueryClient();
     const { mutate: createWorkspace, isPending: isCreatingWorkspace } = useCreateUserWorkspace();
 
     // State for create brain space dialog
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
-
-    // State for move article dialog
-    const [moveDialogOpen, setMoveDialogOpen] = useState(false);
-    const [sourceCollectionId, setSourceCollectionId] = useState<number | null>(null);
-    const [selectedNoteIds, setSelectedNoteIds] = useState<number[]>([]);
-    const [targetCollectionId, setTargetCollectionId] = useState<string>("");
-    const { mutate: moveNote, isPending: isMovingNote } = useMoveNote();
 
     // Permission checks - hide elements until permissions are loaded and confirmed
     const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
@@ -152,7 +185,9 @@ export default function SidePanel() {
     // Chat-specific state
     const [chatsOpen, setChatsOpen] = useState(true);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [clearDialogOpen, setClearDialogOpen] = useState(false);
+    const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+    const [renameDraft, setRenameDraft] = useState("");
+    const [isRenamingChat, setIsRenamingChat] = useState(false);
     const [selectedChatId, setSelectedChatId] = useState<string | null>(null); // UUID as string
     const [loadingChatId, setLoadingChatId] = useState<string | null>(null); // UUID as string
 
@@ -169,6 +204,37 @@ export default function SidePanel() {
     // Get last message for each chat tab (for display)
     const getLastMessage = (chatTab: ChatTab): string => {
         return "Click to continue conversation";
+    };
+
+    const handleRenameChatSubmit = async () => {
+        const name = renameDraft.trim();
+        if (!name) {
+            toast.error("Please enter a name");
+            return;
+        }
+        if (!isValidChatTabName(name)) {
+            toast.error(
+                `Name must be ${CHAT_TAB_NAME_MIN_LENGTH}–${CHAT_TAB_NAME_MAX_LENGTH} characters, using letters, numbers, dashes, and spaces only`,
+            );
+            return;
+        }
+        if (!selectedChatId) return;
+        setIsRenamingChat(true);
+        try {
+            await updateChatTabName(selectedChatId, name);
+            await refetchChatTabs();
+            queryClient.invalidateQueries({ queryKey: ["chatHistory", selectedChatId] });
+            toast.success("Chat renamed");
+            setRenameDialogOpen(false);
+            setSelectedChatId(null);
+            setRenameDraft("");
+        } catch (error: unknown) {
+            const message =
+                error instanceof Error ? error.message : "Failed to rename chat";
+            toast.error(message);
+        } finally {
+            setIsRenamingChat(false);
+        }
     };
 
     const createForm = useForm<CreateBrainSpaceFormValues>({
@@ -206,14 +272,6 @@ export default function SidePanel() {
 
     // Get current brain space
     const currentBrainSpace = workspaces?.find(ws => ws.id === currentBrainSpaceId);
-
-    // Filter collections by selected brain space for counts (but keep all for tree structure)
-    // If no brainspace is selected, show 0 counts (not all collections)
-    const collections = useMemo(() => {
-        if (!allCollections) return [];
-        if (!currentBrainSpaceId) return []; // Show 0 if no brain space selected
-        return allCollections.filter(c => c.workspaceId === currentBrainSpaceId);
-    }, [allCollections, currentBrainSpaceId]);
 
     // Handle brain space selection
     const handleBrainSpaceChange = (value: string) => {
@@ -256,113 +314,6 @@ export default function SidePanel() {
             onError: (err: any) => {
                 toast.error(err?.message || "Request failed, please try again.");
             },
-        });
-    };
-
-    // Fetch notes count from all collections (needed for move functionality)
-    const allNoteQueries = useQueries({
-        queries: (allCollections || []).map((collection) => ({
-            queryKey: ["collectionNotes", collection.id, currentTenantId],
-            queryFn: async () => {
-                const { data } = await api.get(routes.notes.get, {
-                    params: { collection_id: collection.id },
-                });
-                return data.data.notes || [];
-            },
-            enabled: !!collection.id && !!currentTenantId && hydrated && !!allCollections && allCollections.length > 0,
-            refetchOnMount: true,
-            refetchOnWindowFocus: false,
-            staleTime: 0, // Always consider data stale to ensure fresh counts
-        })),
-    });
-
-    // Filter note queries by selected brain space for counts
-    const noteQueries = useMemo(() => {
-        if (!currentBrainSpaceId || !allCollections) return [];
-        const filteredCollectionIds = collections?.map(c => c.id) || [];
-        return allNoteQueries.filter((query, index) => {
-            const collection = allCollections[index];
-            return collection && filteredCollectionIds.includes(collection.id);
-        });
-    }, [allNoteQueries, allCollections, collections, currentBrainSpaceId]);
-
-    // Calculate total notes count from collections in the selected brain space
-    const totalNotesCount = noteQueries.reduce((total, query) => {
-        return total + (query.data?.length || 0);
-    }, 0);
-
-    // Get notes for a specific collection (use allCollections and allNoteQueries)
-    const getCollectionNotes = (collectionId: number) => {
-        const collectionIndex = allCollections?.findIndex(c => c.id === collectionId) ?? -1;
-        if (collectionIndex >= 0 && collectionIndex < allNoteQueries.length) {
-            const query = allNoteQueries[collectionIndex];
-            return query?.data || [];
-        }
-        return [];
-    };
-
-    // Handle move article click
-    const handleMoveArticleClick = (collectionId: number, e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setSourceCollectionId(collectionId);
-        setSelectedNoteIds([]);
-        setTargetCollectionId("");
-        setMoveDialogOpen(true);
-    };
-
-    // Handle move articles
-    const handleMoveArticles = () => {
-        if (!sourceCollectionId || !targetCollectionId || selectedNoteIds.length === 0) {
-            toast.error("Please select articles and a target collection");
-            return;
-        }
-
-        // Move all selected notes one by one
-        let successCount = 0;
-        let errorCount = 0;
-        const totalNotes = selectedNoteIds.length;
-
-        const movePromises = selectedNoteIds.map((noteId) => {
-            return new Promise<void>((resolve) => {
-                moveNote(
-                    {
-                        noteId,
-                        payload: { collection_id: Number(targetCollectionId) },
-                    },
-                    {
-                        onSuccess: (res) => {
-                            if (res?.status) {
-                                successCount++;
-                            } else {
-                                errorCount++;
-                            }
-                            resolve();
-                        },
-                        onError: () => {
-                            errorCount++;
-                            resolve();
-                        },
-                    }
-                );
-            });
-        });
-
-        Promise.all(movePromises).then(() => {
-            if (successCount === totalNotes) {
-                toast.success(`Successfully moved ${successCount} article(s)!`);
-            } else if (successCount > 0) {
-                toast.warning(`Moved ${successCount} article(s), but ${errorCount} failed.`);
-            } else {
-                toast.error("Failed to move articles.");
-            }
-            setMoveDialogOpen(false);
-            setSourceCollectionId(null);
-            setSelectedNoteIds([]);
-            setTargetCollectionId("");
-            // Invalidate queries to refresh the UI
-            queryClient.invalidateQueries({ queryKey: ["collectionNotes"] });
-            queryClient.invalidateQueries({ queryKey: ["userCollections"] });
         });
     };
 
@@ -476,12 +427,6 @@ export default function SidePanel() {
         });
     };
 
-    // Get collections for a specific workspace (use allCollections for tree structure)
-    const getWorkspaceCollections = (workspaceId: number) => {
-        return allCollections?.filter(c => c.workspaceId === workspaceId) || [];
-    };
-
-
     return (
         <>
             <Sidebar>
@@ -574,11 +519,11 @@ export default function SidePanel() {
                                     <SidebarMenuButton asChild>
                                         <Link
                                             href="/chat"
-                                            className={`px-2 py-1 rounded ${pathname === "/chat" || pathname === "/chat/new" ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
+                                            className={`px-2 py-1 rounded ${pathname === CHAT_ENTRY_PATH || pathname === CHAT_NEW_SESSION_PATH ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS
                                                 }`}
                                         >
                                             <MessageSquare className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                            New Chat
+                                            New Action
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
@@ -641,7 +586,7 @@ export default function SidePanel() {
                         </SidebarGroupContent>
                     </SidebarGroup>
 
-                    {/* Chat History */}
+                    {/* All Actions */}
                     {true && (
                         <SidebarGroup>
                             <SidebarGroupLabel className="text-black dark:text-[#FFFFFF]">
@@ -654,7 +599,7 @@ export default function SidePanel() {
                                     ) : (
                                         <ChevronUp className="h-4 w-4 -rotate-90" />
                                     )}
-                                    Chat History
+                                    All Actions
                                 </button>
                             </SidebarGroupLabel>
                             {chatsOpen && (
@@ -719,10 +664,16 @@ export default function SidePanel() {
                                                                                 e.preventDefault();
                                                                                 e.stopPropagation();
                                                                                 setSelectedChatId(chat.id);
-                                                                                setClearDialogOpen(true);
+                                                                                setRenameDraft(
+                                                                                    filterChatTabNameInput(
+                                                                                        chat.name,
+                                                                                    ),
+                                                                                );
+                                                                                setRenameDialogOpen(true);
                                                                             }}
                                                                         >
-                                                                            <span>Clear</span>
+                                                                            <Pencil className="mr-2 h-4 w-4" />
+                                                                            <span>Rename</span>
                                                                         </DropdownMenuItem>
                                                                         <DropdownMenuSeparator />
                                                                         <DropdownMenuItem
@@ -772,17 +723,10 @@ export default function SidePanel() {
                                         <SidebarMenuButton asChild>
                                             <Link
                                                 href="/dashboard/workspaces"
-                                                className={`flex items-center justify-between w-full rounded-md px-2 py-2 ${isBrainspacesPathActive(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                                className={`flex items-center gap-2 w-full rounded-md px-2 py-2 ${getKnowledgeBankActiveSection(pathname) === "brainspaces" ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
                                             >
-                                                <div className="flex items-center gap-2">
-                                                    <Brain className="h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                                    <span>Brainspaces</span>
-                                                </div>
-                                                {!workspacesLoading && workspaces && (
-                                                    <span className="text-xs text-muted-foreground ml-auto">
-                                                        ({workspaces.length})
-                                                    </span>
-                                                )}
+                                                <Brain className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                <span>Brainspaces</span>
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
@@ -791,17 +735,10 @@ export default function SidePanel() {
                                         <SidebarMenuButton asChild>
                                             <Link
                                                 href="/dashboard/collections"
-                                                className={`flex items-center justify-between w-full rounded-md px-2 py-2 ${isCollectionsPathActive(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                                className={`flex items-center gap-2 w-full rounded-md px-2 py-2 ${getKnowledgeBankActiveSection(pathname) === "collections" ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
                                             >
-                                                <div className="flex items-center gap-2">
-                                                    <Layers className="h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                                    <span>Collections</span>
-                                                </div>
-                                                {!collectionsLoading && collections && (
-                                                    <span className="text-xs text-muted-foreground ml-auto">
-                                                        ({collections.length})
-                                                    </span>
-                                                )}
+                                                <Layers className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                <span>Collections</span>
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
@@ -810,15 +747,10 @@ export default function SidePanel() {
                                         <SidebarMenuButton asChild>
                                             <Link
                                                 href="/dashboard/notes"
-                                                className={`flex items-center justify-between w-full rounded-md px-2 py-2 ${isContentNotesPathActive(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                                className={`flex items-center gap-2 w-full rounded-md px-2 py-2 ${getKnowledgeBankActiveSection(pathname) === "content" ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
                                             >
-                                                <div className="flex items-center gap-2">
-                                                    <FileText className="h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                                    <span>Content</span>
-                                                </div>
-                                                <span className="text-xs text-muted-foreground ml-auto">
-                                                    ({totalNotesCount})
-                                                </span>
+                                                <FileText className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                <span>Content</span>
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
@@ -1069,52 +1001,78 @@ export default function SidePanel() {
                 </SidebarFooter>
             </Sidebar>
 
-            {/* Clear Chat Confirmation Dialog */}
-            <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Clear Chat</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to clear all messages from this chat? This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={async () => {
-                                if (selectedChatId) {
-                                    const chatIdToClear = selectedChatId;
-                                    // Close dialog immediately
-                                    setClearDialogOpen(false);
-                                    setSelectedChatId(null);
-                                    setLoadingChatId(chatIdToClear);
-                                    try {
-                                        await clearChatTab(chatIdToClear);
-                                        toast.success("Chat cleared successfully");
-                                        // Invalidate chat history for this specific chat so it reloads with empty messages
-                                        queryClient.invalidateQueries({
-                                            predicate: (query) => {
-                                                const key = query.queryKey;
-                                                return Array.isArray(key) &&
-                                                    key.length >= 2 &&
-                                                    key[0] === "chatHistory" &&
-                                                    String(key[1]) === String(chatIdToClear);
-                                            }
-                                        });
-                                    } catch (error: any) {
-                                        toast.error(`Failed to clear chat: ${error.message || "Unknown error"}`);
-                                    } finally {
-                                        setLoadingChatId(null);
-                                    }
+            <Dialog
+                open={renameDialogOpen}
+                onOpenChange={(open) => {
+                    setRenameDialogOpen(open);
+                    if (!open) {
+                        setSelectedChatId(null);
+                        setRenameDraft("");
+                        setIsRenamingChat(false);
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Rename chat</DialogTitle>
+                        <DialogDescription>
+                            Use letters, numbers, dashes, and spaces (minimum{" "}
+                            {CHAT_TAB_NAME_MIN_LENGTH} characters). This appears in your chat history
+                            list.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-2 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <Label htmlFor="rename-chat-title">Name</Label>
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                                {renameDraft.length}/{CHAT_TAB_NAME_MAX_LENGTH} (min{" "}
+                                {CHAT_TAB_NAME_MIN_LENGTH})
+                            </span>
+                        </div>
+                        <Input
+                            id="rename-chat-title"
+                            value={renameDraft}
+                            onChange={(e) =>
+                                setRenameDraft(filterChatTabNameInput(e.target.value))
+                            }
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !isRenamingChat) {
+                                    e.preventDefault();
+                                    void handleRenameChatSubmit();
                                 }
                             }}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            placeholder="Chat name"
+                            maxLength={CHAT_TAB_NAME_MAX_LENGTH}
+                            autoFocus
+                            disabled={isRenamingChat}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setRenameDialogOpen(false)}
+                            disabled={isRenamingChat}
                         >
-                            Clear
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={() => void handleRenameChatSubmit()}
+                            disabled={isRenamingChat}
+                        >
+                            {isRenamingChat ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Saving
+                                </>
+                            ) : (
+                                "Save"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Delete Chat Confirmation Dialog */}
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -1142,9 +1100,48 @@ export default function SidePanel() {
                                         await refetchChatTabs();
                                         // Invalidate chat history for this specific chat (UUID string)
                                         queryClient.invalidateQueries({ queryKey: ["chatHistory", chatIdToDelete] });
-                                        // If we're on this chat page, redirect to landing page
-                                        if (pathname === `/chat/${chatIdToDelete}`) {
-                                            router.push("/chat");
+                                        // Viewing deleted tab: URL is `/chat/{uuid}` or `/chat/new` with tab in sessionStorage
+                                        const openTabId = getOpenChatTabIdFromPathname(pathname);
+                                        let viewingDeleted =
+                                            !!openTabId &&
+                                            openTabId.toLowerCase() ===
+                                                chatIdToDelete.toLowerCase();
+                                        if (!viewingDeleted) {
+                                            try {
+                                                const stored =
+                                                    typeof window !== "undefined"
+                                                        ? sessionStorage.getItem(
+                                                              ACTIVE_CHAT_TAB_STORAGE_KEY,
+                                                          )
+                                                        : null;
+                                                if (
+                                                    stored &&
+                                                    stored.toLowerCase() ===
+                                                        chatIdToDelete.toLowerCase()
+                                                ) {
+                                                    viewingDeleted = true;
+                                                }
+                                            } catch {
+                                                /* ignore */
+                                            }
+                                        }
+                                        if (viewingDeleted) {
+                                            queryClient.removeQueries({
+                                                queryKey: ["chatHistory", chatIdToDelete],
+                                            });
+                                            try {
+                                                sessionStorage.removeItem(
+                                                    ACTIVE_CHAT_TAB_STORAGE_KEY,
+                                                );
+                                            } catch {
+                                                /* ignore */
+                                            }
+                                            window.dispatchEvent(
+                                                new CustomEvent(CHAT_TAB_DELETED_EVENT, {
+                                                    detail: { chatTabId: chatIdToDelete },
+                                                }),
+                                            );
+                                            router.replace(CHAT_ENTRY_PATH);
                                         }
                                     } catch (error: any) {
                                         toast.error(`Failed to delete chat: ${error.message || "Unknown error"}`);

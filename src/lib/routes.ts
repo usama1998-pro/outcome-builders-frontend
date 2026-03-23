@@ -82,7 +82,6 @@ const routes = {
     stream: "/chat/stream",
     stop: "/chat/stop",
     delete: (chatTabId: string) => `/chat/tab/${chatTabId}`, // UUID as string
-    clear: (chatTabId: string) => `/chat/tab/${chatTabId}/clear`, // UUID as string
   },
   knowledgeBase: {
     search: "/knowledge-base/search",

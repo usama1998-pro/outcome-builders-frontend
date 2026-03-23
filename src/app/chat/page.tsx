@@ -23,6 +23,16 @@ import { useRouter } from "next/navigation";
 import { useUserProfile } from "@/src/hooks/useProfile";
 import { useGetUserSettings, useUpdateUserSettings } from "@/src/hooks/useUserSettings";
 import { ModelSelector } from "@/src/components/chat/ModelSelector";
+import {
+    getStoredAssistantMode,
+    setStoredAssistantMode,
+    type ChatAssistantMode,
+} from "@/src/lib/chatAgentModePreference";
+import {
+    CHAT_ENTRY_PATH,
+    CHAT_NEW_SESSION_PATH,
+} from "@/src/lib/chatRoutes";
+import { ChatAssistantModeDropdown } from "@/src/components/chat/ChatAssistantModeDropdown";
 
 interface QuickActionProps {
     href: string;
@@ -65,12 +75,18 @@ export default function Chat() {
     const [inputValue, setInputValue] = useState("");
     const [selectedModel, setSelectedModel] = useState<string>("default");
     const [settingsSheetOpen, setSettingsSheetOpen] = useState(false);
+    /** Operator → LangGraph agent; Ask → chat (matches /chat/[chatId]). */
+    const [assistantMode, setAssistantMode] = useState<ChatAssistantMode>("ask");
     const [enabledTones, setEnabledTones] = useState<string[]>([]);
     const [customInstructions, setCustomInstructions] = useState("");
     const { data: userProfile } = useUserProfile();
     const { data: settingsData, isLoading: settingsLoading } = useGetUserSettings();
     const updateUserSettings = useUpdateUserSettings();
     const hasInitializedModelRef = useRef(false);
+
+    useEffect(() => {
+        setAssistantMode(getStoredAssistantMode());
+    }, []);
 
     useEffect(() => {
         if (hasInitializedModelRef.current || !settingsData?.data) return;
@@ -84,10 +100,8 @@ export default function Chat() {
         if (settingsData.data.enabled_tones != null) {
             setEnabledTones(settingsData.data.enabled_tones);
         }
-        if (settingsData.data.custom_instructions != null) {
-            setCustomInstructions(settingsData.data.custom_instructions);
-        }
-    }, [settingsData?.data?.enabled_tones]);
+        setCustomInstructions(settingsData.data.custom_instructions ?? "");
+    }, [settingsData?.data]);
 
     const handleModelChange = useCallback(
         (slug: string) => {
@@ -181,18 +195,20 @@ export default function Chat() {
 
         // Store the question in sessionStorage so the chat page can pick it up
         sessionStorage.setItem("pendingChatQuestion", question);
-        sessionStorage.setItem("pendingChatAgentMode", "false");
+        sessionStorage.setItem("pendingChatAssistantMode", assistantMode);
+        sessionStorage.removeItem("pendingChatAgentMode");
+        setStoredAssistantMode(assistantMode);
 
-        // Navigate to new chat - the chat page will handle creating the tab and streaming
-        router.push("/chat/new");
+        // Session route — same `[chatId]` page as existing chats (`chatId === "new"`).
+        router.push(CHAT_NEW_SESSION_PATH);
     };
 
     const quickActions = [
         { href: "/dashboard/workspaces", label: "Build Workspace" },
-        { href: "/chat/new", label: "Plan & Work" },
-        { href: "/chat/new", label: "Research" },
+        { href: CHAT_ENTRY_PATH, label: "Plan & Work" },
+        { href: CHAT_ENTRY_PATH, label: "Research" },
         { href: "/dashboard/collections", label: "Organize Files" },
-        { href: "/chat/new", label: "Create Prompt" },
+        { href: CHAT_ENTRY_PATH, label: "Create Prompt" },
     ];
 
     return (
@@ -301,6 +317,22 @@ export default function Chat() {
 
                             {/* Right controls */}
                             <div className="flex items-center gap-2">
+                                <div
+                                    className="flex items-center pr-2 mr-0.5 border-r border-neutral-200 dark:border-neutral-700"
+                                    title={
+                                        assistantMode === "operator"
+                                            ? "Operator: structured steps and KB graph"
+                                            : "Ask: standard chat reply"
+                                    }
+                                >
+                                    <ChatAssistantModeDropdown
+                                        value={assistantMode}
+                                        onChange={(mode) => {
+                                            setAssistantMode(mode);
+                                            setStoredAssistantMode(mode);
+                                        }}
+                                    />
+                                </div>
                                 <ModelSelector
                                     value={selectedModel}
                                     onChange={handleModelChange}
@@ -357,7 +389,7 @@ export default function Chat() {
                                     disabled={settingsLoading || updateUserSettings.isPending}
                                     onClick={() =>
                                         updateUserSettings.mutate({
-                                            custom_instructions: customInstructions.trim() || null,
+                                            custom_instructions: customInstructions.trim(),
                                         })
                                     }
                                 >
