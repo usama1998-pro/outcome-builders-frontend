@@ -1,4 +1,5 @@
 import api from "../lib/axios";
+import { getUserFacingApiErrorMessage } from "../lib/apiErrorMessage";
 import routes from "../lib/routes";
 import {
   ChatTab,
@@ -67,14 +68,14 @@ export async function searchChatTabs(query: string): Promise<ChatTab[]> {
 }
 
 /**
- * Get chat history for a chat tab (last N messages)
+ * Get chat history for a chat tab (full thread; no server-side cap unless `limit` is passed).
  */
 export async function getChatHistory(
   chatTabId: string, // UUID as string
-  limit: number = 10,
+  limit?: number,
 ): Promise<ChatHistory> {
   const { data } = await api.get(routes.chat.history(chatTabId), {
-    params: { limit },
+    params: limit != null ? { limit } : {},
   });
   const raw = (data.data.messages || []) as Array<
     ChatMessage & { resource_links?: ChatResourceLink[] }
@@ -171,23 +172,26 @@ export function streamChat(
         headers,
         body: JSON.stringify(body),
         signal: abortController.signal,
+        // Hint for Chromium: keep chat stream ahead of background metadata requests.
+        priority: "high",
       });
 
       if (!response.ok) {
-        // Try to get error message from response
-        let errorMessage = `HTTP error! status: ${response.status}`;
+        const fallback = `HTTP error! status: ${response.status}`;
+        let errorMessage = fallback;
         try {
           const errorText = await response.text();
-          try {
-            const errorData = JSON.parse(errorText);
-            errorMessage =
-              errorData.detail || errorData.message || errorMessage;
-          } catch {
-            // If not JSON, use the text
-            if (errorText) errorMessage = errorText;
+          let parsed: unknown = errorText;
+          if (errorText) {
+            try {
+              parsed = JSON.parse(errorText);
+            } catch {
+              parsed = errorText;
+            }
           }
+          errorMessage = getUserFacingApiErrorMessage(parsed, fallback);
         } catch {
-          // If we can't read response, use default message
+          /* keep default */
         }
         throw new Error(errorMessage);
       }
@@ -284,7 +288,12 @@ export function streamChat(
 
                 case "error":
                   if (options?.onError) {
-                    options.onError(event.error || "Unknown error");
+                    options.onError(
+                      getUserFacingApiErrorMessage(
+                        event.error ?? "Unknown error",
+                        "Unknown error",
+                      ),
+                    );
                   }
                   return;
               }
@@ -313,7 +322,9 @@ export function streamChat(
         }
       } else {
         if (options?.onError) {
-          options.onError(error.message || "Stream error");
+          options.onError(
+            getUserFacingApiErrorMessage(error, "Stream error"),
+          );
         }
       }
     }

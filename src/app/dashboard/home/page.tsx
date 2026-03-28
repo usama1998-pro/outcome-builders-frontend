@@ -9,7 +9,11 @@ import {
     Users,
     Brain,
     TrendingUp,
-    ArrowRight
+    ArrowRight,
+    Contact,
+    Target,
+    Building2,
+    LayoutGrid,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -24,24 +28,24 @@ interface StatCardProps {
 function StatCard({ title, value, icon, gradient, delay }: StatCardProps) {
     return (
         <div
-            className={`relative overflow-hidden rounded-2xl p-6 ${gradient} transform transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl`}
+            className={`relative overflow-hidden rounded-xl p-4 ${gradient} transform transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl`}
             style={{ animationDelay: `${delay}ms` }}
         >
-            <div className="absolute top-0 right-0 w-24 h-24 opacity-10">
+            <div className="absolute top-0 right-0 w-20 h-20 opacity-10">
                 <div className="absolute inset-0 transform rotate-12 translate-x-6 -translate-y-6 scale-150">
                     {icon}
                 </div>
             </div>
             <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-sm">
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 rounded-lg bg-white/20 backdrop-blur-sm">
                         {icon}
                     </div>
                 </div>
-                <p className="text-white/80 text-xs font-medium uppercase tracking-wider mb-1">
+                <p className="text-white/80 text-[10px] sm:text-xs font-medium uppercase tracking-wider mb-0.5 line-clamp-2">
                     {title}
                 </p>
-                <p className="text-3xl font-bold text-white tabular-nums">
+                <p className="text-2xl font-bold text-white tabular-nums leading-tight">
                     {value.toLocaleString()}
                 </p>
             </div>
@@ -51,13 +55,13 @@ function StatCard({ title, value, icon, gradient, delay }: StatCardProps) {
 
 function StatCardSkeleton() {
     return (
-        <div className="relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 animate-pulse">
+        <div className="relative overflow-hidden rounded-xl p-4 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 animate-pulse">
             <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2.5 rounded-xl bg-white/20 w-10 h-10"></div>
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 rounded-lg bg-white/20 w-9 h-9"></div>
                 </div>
-                <div className="h-3 bg-white/20 rounded w-20 mb-2"></div>
-                <div className="h-8 bg-white/20 rounded w-16"></div>
+                <div className="h-2.5 bg-white/20 rounded w-16 mb-1.5"></div>
+                <div className="h-7 bg-white/20 rounded w-14"></div>
             </div>
         </div>
     );
@@ -66,40 +70,62 @@ function StatCardSkeleton() {
 export default function DashboardHome() {
     const { data: analytics, isLoading, isError } = useAnalytics();
 
-    const stats = analytics
-        ? [
-              {
-                  title: "Workspaces",
-                  value: analytics.total_workspaces,
-                  icon: <Layers className="w-5 h-5 text-white" />,
-                  gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
-              },
-              {
-                  title: "Collections",
-                  value: analytics.total_collections,
-                  icon: <FolderOpen className="w-5 h-5 text-white" />,
-                  gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
-              },
-              {
-                  title: "Content",
-                  value: analytics.total_notes,
-                  icon: <FileText className="w-5 h-5 text-white" />,
-                  gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
-              },
-              {
-                  title: "Members",
-                  value: analytics.total_members,
-                  icon: <Users className="w-5 h-5 text-white" />,
-                  gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
-              },
-              {
-                  title: "Trained Content",
-                  value: analytics.total_trained_notes,
-                  icon: <Brain className="w-5 h-5 text-white" />,
-                  gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
-              },
-          ]
-        : [];
+    const stats = [
+        {
+            title: "Workspaces",
+            value: analytics?.total_workspaces ?? 0,
+            icon: <Layers className="w-5 h-5 text-white" />,
+            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+        },
+        {
+            title: "Collections",
+            value: analytics?.total_collections ?? 0,
+            icon: <FolderOpen className="w-5 h-5 text-white" />,
+            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+        },
+        {
+            title: "Content",
+            value: analytics?.total_notes ?? 0,
+            icon: <FileText className="w-5 h-5 text-white" />,
+            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+        },
+        {
+            title: "Members",
+            value: analytics?.total_members ?? 0,
+            icon: <Users className="w-5 h-5 text-white" />,
+            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+        },
+        {
+            title: "Trained Content",
+            value: analytics?.total_trained_notes ?? 0,
+            icon: <Brain className="w-5 h-5 text-white" />,
+            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+        },
+        {
+            title: "Customer sources",
+            value: analytics?.total_customer_context_sources ?? 0,
+            icon: <Contact className="w-5 h-5 text-white" />,
+            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+        },
+        {
+            title: "Competitor sources",
+            value: analytics?.total_competitor_context_sources ?? 0,
+            icon: <Target className="w-5 h-5 text-white" />,
+            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+        },
+        {
+            title: "Company sources",
+            value: analytics?.total_company_context_sources ?? 0,
+            icon: <Building2 className="w-5 h-5 text-white" />,
+            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+        },
+        {
+            title: "Category sources",
+            value: analytics?.total_category_context_sources ?? 0,
+            icon: <LayoutGrid className="w-5 h-5 text-white" />,
+            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+        },
+    ];
 
     return (
         <RequireAuth>
@@ -119,9 +145,13 @@ export default function DashboardHome() {
 
                 {/* Analytics Section */}
                 <div className="px-8 pb-8">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                        {isLoading ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 min-w-0">
+                        {isLoading && !analytics ? (
                             <>
+                                <StatCardSkeleton />
+                                <StatCardSkeleton />
+                                <StatCardSkeleton />
+                                <StatCardSkeleton />
                                 <StatCardSkeleton />
                                 <StatCardSkeleton />
                                 <StatCardSkeleton />

@@ -1,9 +1,7 @@
 /**
  * Chat URL model:
- * - `CHAT_ENTRY_PATH` — landing + sidebar “New Action” (`app/chat/page.tsx`).
- * - `CHAT_NEW_SESSION_PATH` — same app shell as existing chats, but `chatId === "new"` for
- *   streaming (`app/chat/[chatId]/page.tsx`). Used when sending from the landing (pending
- *   question) so the composer + messages live in one route.
+ * - `CHAT_ENTRY_PATH` — new chat and landing (`app/chat/page.tsx` → `ChatClient` with `chatId === "new"`).
+ * - `CHAT_NEW_SESSION_PATH` — legacy; prefer `CHAT_ENTRY_PATH`. Kept for redirects and deep links.
  */
 export const CHAT_ENTRY_PATH = "/chat";
 export const CHAT_NEW_SESSION_PATH = "/chat/new";

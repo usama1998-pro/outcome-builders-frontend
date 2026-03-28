@@ -248,8 +248,26 @@ a {
   @apply text-base font-semibold mb-1 mt-2 first:mt-0;
 }
 
+/* Unordered lists: red square markers (brand) */
 .markdown-content ul {
-  @apply list-disc list-inside mb-2 space-y-1;
+  @apply list-none mb-2 space-y-1 pl-0;
+}
+
+.markdown-content ul > li {
+  @apply relative mb-1 last:mb-0;
+  padding-left: 1.25rem;
+  list-style: none;
+}
+
+.markdown-content ul > li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 0.5rem;
+  height: 0.5rem;
+  background-color: #db2b30;
+  border-radius: 0;
 }
 
 .markdown-content ol {

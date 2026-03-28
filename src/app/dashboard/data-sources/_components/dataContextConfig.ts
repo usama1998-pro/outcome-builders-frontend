@@ -1,13 +1,33 @@
 import { ResourceTypeId, RESOURCE_TYPES } from "./resourceTypes";
 
-export const DATA_CONTEXT_SLUGS = ["customer-context", "supplier-context", "process-context"] as const;
+export const DATA_CONTEXT_SLUGS = [
+  "company-context",
+  "customer-context",
+  "competitor-context",
+  "supplier-context",
+  "category-context",
+] as const;
 export type DataContextSlug = (typeof DATA_CONTEXT_SLUGS)[number];
 
-export const DATA_CONTEXTS: { slug: DataContextSlug; title: string; shortDescription: string }[] = [
+export const DATA_CONTEXTS: {
+  slug: DataContextSlug;
+  title: string;
+  shortDescription: string;
+}[] = [
+  {
+    slug: "company-context",
+    title: "Company Context",
+    shortDescription: "Company-level internal data resources",
+  },
   {
     slug: "customer-context",
     title: "Customer Context",
     shortDescription: "Customer-related data resources",
+  },
+  {
+    slug: "competitor-context",
+    title: "Competitor Context",
+    shortDescription: "Competitor and market intelligence data resources",
   },
   {
     slug: "supplier-context",
@@ -15,9 +35,9 @@ export const DATA_CONTEXTS: { slug: DataContextSlug; title: string; shortDescrip
     shortDescription: "Supplier and partner data resources",
   },
   {
-    slug: "process-context",
-    title: "Process Context",
-    shortDescription: "Process and operations data resources",
+    slug: "category-context",
+    title: "Category Context",
+    shortDescription: "Categorized business data resources",
   },
 ];
 

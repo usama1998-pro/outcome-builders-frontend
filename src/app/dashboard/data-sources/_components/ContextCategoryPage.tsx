@@ -9,6 +9,7 @@ import { LucideIcon, ChevronRight, Plus } from "lucide-react";
 import { RESOURCE_TYPES } from "./resourceTypes";
 import { DataContextSlug } from "./dataContextConfig";
 import AddResourceDialog from "./AddResourceDialog";
+import { useContextResourceCounts } from "@/src/hooks/useContextResourceCounts";
 
 type ContextCategoryPageProps = {
   title: string;
@@ -25,6 +26,7 @@ export default function ContextCategoryPage({
   contextSlug,
 }: ContextCategoryPageProps) {
   const [addResourceOpen, setAddResourceOpen] = useState(false);
+  const { data: counts, isLoading: countsLoading } = useContextResourceCounts(contextSlug);
 
   return (
     <RequireAuth>
@@ -53,6 +55,7 @@ export default function ContextCategoryPage({
           open={addResourceOpen}
           onOpenChange={setAddResourceOpen}
           contextName={title}
+          contextSlug={contextSlug}
           resourceType="files"
           allowTypeSelection
         />
@@ -65,18 +68,27 @@ export default function ContextCategoryPage({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {RESOURCE_TYPES.map(({ id, label, description: desc, icon: TypeIcon }) => {
               const href = `/dashboard/data-sources/${contextSlug}/${id}`;
+              const n = counts?.[id] ?? 0;
               return (
                 <Link key={id} href={href} className="group block">
                   <Card className="h-full transition-colors hover:border-[#DB2B30]/40 hover:bg-muted/50">
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
                           <div className="rounded-md bg-muted p-1.5">
                             <TypeIcon className="h-4 w-4 text-[#DB2B30]" />
                           </div>
                           <CardTitle className="text-base">{label}</CardTitle>
                         </div>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-[#DB2B30]" />
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span
+                            className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-foreground"
+                            title={`${n} resource${n === 1 ? "" : "s"}`}
+                          >
+                            {countsLoading ? "…" : n.toLocaleString()}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-[#DB2B30]" />
+                        </div>
                       </div>
                       <CardDescription className="text-xs">{desc}</CardDescription>
                     </CardHeader>

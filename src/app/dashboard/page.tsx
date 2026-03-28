@@ -4,13 +4,16 @@ import { useState, useEffect } from "react";
 import RequireAuth from "../../components/auth/requireAuth";
 import { useAnalytics } from "@/src/hooks/useAnalytics";
 import {
-    Layers,
     FolderOpen,
     FileText,
     Users,
     Brain,
     TrendingUp,
-    ArrowRight
+    ArrowRight,
+    Contact,
+    Target,
+    Building2,
+    LayoutGrid,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -18,31 +21,30 @@ interface StatCardProps {
     title: string;
     value: number;
     icon: React.ReactNode;
-    gradient: string;
     delay: number;
 }
 
-function StatCard({ title, value, icon, gradient, delay }: StatCardProps) {
+function StatCard({ title, value, icon, delay }: StatCardProps) {
     return (
         <div
-            className={`relative overflow-hidden rounded-2xl p-6 ${gradient} transform transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl`}
+            className="relative overflow-hidden rounded-xl p-4 bg-card border border-red-500/20 transform transition-all duration-500 hover:scale-[1.02] hover:border-red-500/40 hover:shadow-lg"
             style={{ animationDelay: `${delay}ms` }}
         >
-            <div className="absolute top-0 right-0 w-24 h-24 opacity-10">
+            <div className="absolute top-0 right-0 w-20 h-20 opacity-5">
                 <div className="absolute inset-0 transform rotate-12 translate-x-6 -translate-y-6 scale-150">
                     {icon}
                 </div>
             </div>
             <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-sm">
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20">
                         {icon}
                     </div>
                 </div>
-                <p className="text-white/80 text-xs font-medium uppercase tracking-wider mb-1">
+                <p className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider mb-0.5 line-clamp-2">
                     {title}
                 </p>
-                <p className="text-3xl font-bold text-white tabular-nums">
+                <p className="text-2xl font-bold text-foreground tabular-nums leading-tight">
                     {value.toLocaleString()}
                 </p>
             </div>
@@ -52,13 +54,13 @@ function StatCard({ title, value, icon, gradient, delay }: StatCardProps) {
 
 function StatCardSkeleton() {
     return (
-        <div className="relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-red-500/10 via-red-600/10 to-red-700/10 animate-pulse">
+        <div className="relative overflow-hidden rounded-2xl p-6 bg-card border border-red-500/20 animate-pulse">
             <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2.5 rounded-xl bg-white/20 w-10 h-10"></div>
+                    <div className="p-2.5 rounded-xl bg-muted w-10 h-10"></div>
                 </div>
-                <div className="h-3 bg-white/20 rounded w-20 mb-2"></div>
-                <div className="h-8 bg-white/20 rounded w-16"></div>
+                <div className="h-3 bg-muted rounded w-20 mb-2"></div>
+                <div className="h-8 bg-muted rounded w-16"></div>
             </div>
         </div>
     );
@@ -76,32 +78,47 @@ export default function Dashboard() {
         {
             title: "Brainspaces",
             value: analytics?.total_workspaces ?? 0,
-            icon: <Brain className="w-5 h-5 text-white" />,
-            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+            icon: <Brain className="w-5 h-5 text-red-500" />,
         },
         {
             title: "Collections",
             value: analytics?.total_collections ?? 0,
-            icon: <FolderOpen className="w-5 h-5 text-white" />,
-            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+            icon: <FolderOpen className="w-5 h-5 text-red-500" />,
         },
         {
             title: "Content",
             value: analytics?.total_notes ?? 0,
-            icon: <FileText className="w-5 h-5 text-white" />,
-            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+            icon: <FileText className="w-5 h-5 text-red-500" />,
         },
         {
             title: "Members",
             value: analytics?.total_members ?? 0,
-            icon: <Users className="w-5 h-5 text-white" />,
-            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+            icon: <Users className="w-5 h-5 text-red-500" />,
         },
         {
             title: "Trained Content",
             value: analytics?.total_trained_notes ?? 0,
-            icon: <Brain className="w-5 h-5 text-white" />,
-            gradient: "bg-gradient-to-br from-[#FF6B6B] via-[#FF3B3B] to-[#E10000]",
+            icon: <Brain className="w-5 h-5 text-red-500" />,
+        },
+        {
+            title: "Customer sources",
+            value: analytics?.total_customer_context_sources ?? 0,
+            icon: <Contact className="w-5 h-5 text-red-500" />,
+        },
+        {
+            title: "Competitor sources",
+            value: analytics?.total_competitor_context_sources ?? 0,
+            icon: <Target className="w-5 h-5 text-red-500" />,
+        },
+        {
+            title: "Company sources",
+            value: analytics?.total_company_context_sources ?? 0,
+            icon: <Building2 className="w-5 h-5 text-red-500" />,
+        },
+        {
+            title: "Category sources",
+            value: analytics?.total_category_context_sources ?? 0,
+            icon: <LayoutGrid className="w-5 h-5 text-red-500" />,
         },
     ];
 
@@ -123,9 +140,13 @@ export default function Dashboard() {
 
                 {/* Analytics Section */}
                 <div className="px-8 pb-8">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                        {!mounted || isLoading ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 min-w-0">
+                        {!mounted || (isLoading && !analytics) ? (
                             <>
+                                <StatCardSkeleton />
+                                <StatCardSkeleton />
+                                <StatCardSkeleton />
+                                <StatCardSkeleton />
                                 <StatCardSkeleton />
                                 <StatCardSkeleton />
                                 <StatCardSkeleton />
@@ -139,7 +160,6 @@ export default function Dashboard() {
                                     title={stat.title}
                                     value={stat.value}
                                     icon={stat.icon}
-                                    gradient={stat.gradient}
                                     delay={index * 100}
                                 />
                             ))
@@ -222,7 +242,7 @@ export default function Dashboard() {
                 <div className="px-8 pb-8">
                     <h2 className="text-lg font-semibold mb-4">Getting Started</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-5 rounded-xl bg-gradient-to-br from-red-500/5 to-red-700/5 border border-red-500/10">
+                        <div className="p-5 rounded-xl bg-card border border-red-500/20">
                             <div className="flex items-start gap-4">
                                 <div className="p-3 rounded-xl bg-red-500/10">
                                     <Brain className="w-6 h-6 text-red-500" />
@@ -236,7 +256,7 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        <div className="p-5 rounded-xl bg-gradient-to-br from-red-400/5 to-red-600/5 border border-red-400/10">
+                        <div className="p-5 rounded-xl bg-card border border-red-500/20">
                             <div className="flex items-start gap-4">
                                 <div className="p-3 rounded-xl bg-red-400/10">
                                     <FolderOpen className="w-6 h-6 text-red-400" />
@@ -250,7 +270,7 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        <div className="p-5 rounded-xl bg-gradient-to-br from-red-500/5 to-red-600/5 border border-red-500/10">
+                        <div className="p-5 rounded-xl bg-card border border-red-500/20">
                             <div className="flex items-start gap-4">
                                 <div className="p-3 rounded-xl bg-red-500/10">
                                     <FileText className="w-6 h-6 text-red-500" />
@@ -264,7 +284,7 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        <div className="p-5 rounded-xl bg-gradient-to-br from-red-600/5 to-red-800/5 border border-red-600/10">
+                        <div className="p-5 rounded-xl bg-card border border-red-500/20">
                             <div className="flex items-start gap-4">
                                 <div className="p-3 rounded-xl bg-red-600/10">
                                     <Brain className="w-6 h-6 text-red-600" />

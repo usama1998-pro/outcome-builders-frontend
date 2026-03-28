@@ -43,20 +43,26 @@ export async function searchKnowledgeBase(
     workspace_uuid?: string;
     collection_uuid?: string;
     user_uuid?: string;
-  }
+  },
 ): Promise<KnowledgeBaseSearchResponse> {
   const { data } = await api.post<{ data: KnowledgeBaseSearchResponse }>(
     routes.knowledgeBase.search,
     {
       query,
       query_properties: ["content"],
-      return_properties: ["content", "uuid", "collection_uuid", "workspace_uuid", "author", "type"],
+      return_properties: [
+        "content",
+        "uuid",
+        "collection_uuid",
+        "workspace_uuid",
+        "author",
+        "type",
+      ],
       limit,
       workspace_uuid: filters?.workspace_uuid,
       collection_uuid: filters?.collection_uuid,
       user_uuid: filters?.user_uuid,
-    }
+    },
   );
   return data.data;
 }
-

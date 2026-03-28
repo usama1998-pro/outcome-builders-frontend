@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useAuthStore } from "../store/useAuth";
+import { clearClientCaches } from "./queryClientBridge";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -67,7 +68,7 @@ api.interceptors.response.use(
         requestUrl.includes("/user/verify");
 
       if (!isAuthEndpoint) {
-        // Clear auth tokens
+        clearClientCaches();
         useAuthStore.getState().clearToken();
 
         // Redirect to signin page if we're in a browser environment

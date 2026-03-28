@@ -19,8 +19,10 @@ const routes = {
     },
     create: "/workspace",
     delete: (id: number) => `/workspace/${id}`,
-    assignments: (tenantId: number, userId: number) => `/workspace/assignments/${tenantId}/${userId}`,
-    updateAssignments: (tenantId: number) => `/workspace/assignments/${tenantId}`,
+    assignments: (tenantId: number, userId: number) =>
+      `/workspace/assignments/${tenantId}/${userId}`,
+    updateAssignments: (tenantId: number) =>
+      `/workspace/assignments/${tenantId}`,
     assignFromInvitation: "/workspace/assign-from-invitation",
     joinWithToken: "/workspace/join-with-token",
   },
@@ -34,7 +36,8 @@ const routes = {
     delete: (id: number) => `/collection/${id}`,
     members: (id: number) => `/collection/${id}/members`,
     addMember: (id: number) => `/collection/${id}/members`,
-    removeMember: (id: number, userId: number) => `/collection/${id}/members/${userId}`,
+    removeMember: (id: number, userId: number) =>
+      `/collection/${id}/members/${userId}`,
   },
   user: {
     account: "/user/profile",
@@ -45,14 +48,20 @@ const routes = {
     permissions: "/user/permissions",
     myPermissions: (tenantId: number) => `/user/my-permissions/${tenantId}`,
     customRoles: (tenantId: number) => `/user/custom-roles/${tenantId}`,
-    customRole: (tenantId: number, roleId: number) => `/user/custom-roles/${tenantId}/${roleId}`,
+    customRole: (tenantId: number, roleId: number) =>
+      `/user/custom-roles/${tenantId}/${roleId}`,
     invite: (tenantId: number) => `/user/invite/${tenantId}`,
-    removeMember: (tenantId: number, userId: number) => `/user/member/${tenantId}/${userId}`,
-    updateMember: (tenantId: number, userId: number) => `/user/member/${tenantId}/${userId}`,
+    removeMember: (tenantId: number, userId: number) =>
+      `/user/member/${tenantId}/${userId}`,
+    updateMember: (tenantId: number, userId: number) =>
+      `/user/member/${tenantId}/${userId}`,
     invitations: (tenantId: number) => `/user/invitations/${tenantId}`,
-    resendInvitation: (tenantId: number, invitationId: number) => `/user/invitations/${tenantId}/${invitationId}/resend`,
-    deleteInvitation: (tenantId: number, invitationId: number) => `/user/invitations/${tenantId}/${invitationId}`,
-    sendWorkspaceTokens: (tenantId: number, invitationId: number) => `/user/invitations/${tenantId}/${invitationId}/send-tokens`,
+    resendInvitation: (tenantId: number, invitationId: number) =>
+      `/user/invitations/${tenantId}/${invitationId}/resend`,
+    deleteInvitation: (tenantId: number, invitationId: number) =>
+      `/user/invitations/${tenantId}/${invitationId}`,
+    sendWorkspaceTokens: (tenantId: number, invitationId: number) =>
+      `/user/invitations/${tenantId}/${invitationId}/send-tokens`,
     settings: "/user/settings",
     updateSettings: "/user/settings",
   },
@@ -85,6 +94,20 @@ const routes = {
   },
   knowledgeBase: {
     search: "/knowledge-base/search",
+  },
+  businessContext: {
+    createNote: "/business-context/notes",
+    createMediaSource: "/business-context/media-sources",
+    listNotes: "/business-context/notes",
+    deleteNotesBulk: "/business-context/notes",
+    listMediaSources: "/business-context/media-sources",
+    updateNote: (id: number) => `/business-context/notes/${id}`,
+    updateMediaSource: (id: number) => `/business-context/media-sources/${id}`,
+    trainNote: (id: number) => `/business-context/notes/${id}/train`,
+    trainMediaSource: (id: number) => `/business-context/media-sources/${id}/train`,
+    deleteNote: (id: number) => `/business-context/notes/${id}`,
+    deleteMediaSourcesBulk: "/business-context/media-sources",
+    deleteMediaSource: (id: number) => `/business-context/media-sources/${id}`,
   },
 };
 

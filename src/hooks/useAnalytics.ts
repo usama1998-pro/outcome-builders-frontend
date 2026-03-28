@@ -9,6 +9,14 @@ export interface AnalyticsData {
   total_notes: number;
   total_members: number;
   total_trained_notes: number;
+  /** Business context notes + media for `customer-context` */
+  total_customer_context_sources?: number;
+  /** Business context notes + media for `competitor-context` */
+  total_competitor_context_sources?: number;
+  /** Business context notes + media for `company-context` */
+  total_company_context_sources?: number;
+  /** Business context notes + media for `category-context` */
+  total_category_context_sources?: number;
 }
 
 interface AnalyticsApiResponse {

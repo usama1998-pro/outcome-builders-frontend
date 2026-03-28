@@ -3,9 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuthStore } from "../store/useAuth"; // adjust path if needed
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { verifyToken } from "../api/auth";
 import api from "../lib/axios";
+import { clearClientCaches } from "../lib/queryClientBridge";
 import routes from "../lib/routes";
 import {
   //  VerifyPayload,
@@ -99,7 +100,6 @@ export function useLogin() {
   const setUserId = useAuthStore((s) => s.setUserId);
   const setTenantId = useAuthStore((s) => s.setTenantId);
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   return async (
     token: string,
@@ -108,7 +108,7 @@ export function useLogin() {
   ) => {
     if (token) {
       // Clear any cached data from previous user session
-      queryClient.clear();
+      clearClientCaches();
       
       setToken(token);
 
@@ -141,11 +141,9 @@ export function useLogin() {
 export function useSignOut() {
   const clearToken = useAuthStore((s) => s.clearToken);
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   return () => {
-    // Clear all cached query data to prevent stale permissions/data
-    queryClient.clear();
+    clearClientCaches();
     clearToken();
     router.push("/signin");
   };
@@ -161,6 +159,7 @@ export function useVerifyToken() {
     enabled: !!token, // only run if token exists
     retry: false,
     throwOnError() {
+      clearClientCaches();
       clearToken();
       return true; // re-throw to set isError
     },

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { resolveTitleFromUrl, titleFromFileName } from "./extractLinkTitle";
 import {
   Dialog,
   DialogContent,
@@ -15,11 +16,73 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { RESOURCE_TYPES, ResourceTypeId, getResourceType } from "./resourceTypes";
+import { DataContextSlug } from "./dataContextConfig";
+import { createBusinessContextMediaSource, createBusinessContextNote } from "@/src/api/businessContext";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+
+/** Combined accept for file picker + drag-drop (PDF, Word, plain text only). */
+const DOCUMENT_ACCEPT =
+  ".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
+
+const ALLOWED_DOC_EXT = new Set(["pdf", "doc", "docx", "txt"]);
+
+const ALLOWED_DOC_MIME = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+]);
+
+function isAllowedDocumentFile(file: File): boolean {
+  const ext = file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : "";
+  if (ext && ALLOWED_DOC_EXT.has(ext)) return true;
+  const t = (file.type || "").toLowerCase();
+  if (t && ALLOWED_DOC_MIME.has(t)) return true;
+  return false;
+}
+
+const VIDEO_ACCEPT = ".mp4,video/mp4";
+
+function isAllowedMp4Video(file: File): boolean {
+  const ext = file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : "";
+  if (ext === "mp4") return true;
+  return (file.type || "").toLowerCase() === "video/mp4";
+}
+
+/** Matches AUDIO_FORMATS — used when saving so uploads align with list preview expectations. */
+function isAllowedAudioFile(file: File): boolean {
+  const ext = file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : "";
+  const allowedExt = new Set(["mp3", "wav", "m4a", "aac", "ogg", "flac", "webm"]);
+  if (ext && allowedExt.has(ext)) return true;
+  const t = (file.type || "").toLowerCase();
+  if (t.startsWith("audio/")) return true;
+  if (t === "application/ogg") return true;
+  return false;
+}
+
+/** Label for UI after a file is chosen (extension / MIME). */
+function detectDocumentKind(file: File): string {
+  const ext = file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : "";
+  if (ext === "pdf" || file.type === "application/pdf") return "PDF";
+  if (
+    ext === "doc" ||
+    ext === "docx" ||
+    file.type === "application/msword" ||
+    file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
+    return "Word";
+  }
+  if (ext === "txt" || file.type === "text/plain") return "Plain text";
+  if (ext) return ext.toUpperCase();
+  return "Document";
+}
 
 type AddResourceDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contextName: string;
+  contextSlug: DataContextSlug;
   /**
    * When true (e.g. context overview), user picks type in the dialog.
    * When false (list page), `resourceType` is fixed.
@@ -27,27 +90,42 @@ type AddResourceDialogProps = {
   allowTypeSelection?: boolean;
   /** Initial/fixed resource type. On list pages this is the only type. */
   resourceType: ResourceTypeId;
+  /** Called after a resource is saved successfully (e.g. refresh list). */
+  onSaved?: () => void;
 };
 
 export default function AddResourceDialog({
   open,
   onOpenChange,
   contextName,
+  contextSlug,
   allowTypeSelection = false,
   resourceType,
+  onSaved,
 }: AddResourceDialogProps) {
+  const queryClient = useQueryClient();
   const [selectedType, setSelectedType] = useState<ResourceTypeId>(resourceType);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [primaryField, setPrimaryField] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const titleManuallyEditedRef = useRef(false);
 
   const effectiveType = allowTypeSelection ? selectedType : resourceType;
+  /** Video, audio, links: URL / upload first, then title (same flow as video). */
+  const linkFirstLayout =
+    effectiveType === "video" || effectiveType === "audio" || effectiveType === "links";
+  /** Upload / URL before title: video, audio, links, and document files. */
+  const sourceFirstLayout = linkFirstLayout || effectiveType === "files";
 
   useEffect(() => {
     if (open) {
       setTitle("");
       setDescription("");
       setPrimaryField("");
+      setSelectedFile(null);
+      titleManuallyEditedRef.current = false;
       if (allowTypeSelection) {
         setSelectedType(resourceType);
       }
@@ -58,11 +136,161 @@ export default function AddResourceDialog({
   useEffect(() => {
     if (open && allowTypeSelection) {
       setPrimaryField("");
+      setSelectedFile(null);
+      titleManuallyEditedRef.current = false;
     }
   }, [selectedType, open, allowTypeSelection]);
 
+  /** Video / audio / links: suggest title from URL (oEmbed or URL heuristic). */
+  useEffect(() => {
+    if (!open || !linkFirstLayout) return;
+    const url = primaryField.trim();
+    if (!url || titleManuallyEditedRef.current) return;
+
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        const resolved = await resolveTitleFromUrl(url);
+        if (!cancelled && !titleManuallyEditedRef.current && resolved) {
+          setTitle(resolved);
+        }
+      })();
+    }, 450);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [open, linkFirstLayout, primaryField]);
+
+  /** Video / audio: suggest title from file name when there is no URL. */
+  useEffect(() => {
+    if (!open || (effectiveType !== "video" && effectiveType !== "audio")) return;
+    if (titleManuallyEditedRef.current || primaryField.trim()) return;
+    if (!selectedFile) return;
+    const fromFile = titleFromFileName(selectedFile);
+    if (fromFile) setTitle(fromFile);
+  }, [open, effectiveType, primaryField, selectedFile]);
+
+  /** Files: suggest title from document file name (extension stripped). */
+  useEffect(() => {
+    if (!open || effectiveType !== "files") return;
+    if (titleManuallyEditedRef.current) return;
+    if (!selectedFile) return;
+    const fromFile = titleFromFileName(selectedFile);
+    if (fromFile) setTitle(fromFile);
+  }, [open, effectiveType, selectedFile]);
+
   const selected = getResourceType(effectiveType);
   const SelectedIcon = selected.icon;
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      if (effectiveType === "notes") {
+        if (!title.trim()) {
+          toast.error("Title is required");
+          return;
+        }
+        if (!primaryField.trim()) {
+          toast.error("Note content is required");
+          return;
+        }
+        await createBusinessContextNote({
+          title: title.trim(),
+          description: description.trim() || undefined,
+          content: primaryField.trim(),
+          context_slug: contextSlug,
+        });
+      } else {
+        if (effectiveType === "files") {
+          if (!selectedFile) {
+            toast.error("Please upload a document");
+            return;
+          }
+          if (!isAllowedDocumentFile(selectedFile)) {
+            toast.error("Only PDF, Word (.doc/.docx), and plain text (.txt) are allowed.");
+            return;
+          }
+        }
+        if (effectiveType === "links" && !primaryField.trim()) {
+          toast.error("URL is required");
+          return;
+        }
+        if (effectiveType === "video") {
+          if (!selectedFile && !primaryField.trim()) {
+            toast.error("Add an MP4 file or a video URL");
+            return;
+          }
+          if (selectedFile && !isAllowedMp4Video(selectedFile)) {
+            toast.error("Only MP4 video files are allowed.");
+            return;
+          }
+        }
+        if (effectiveType === "audio") {
+          if (!selectedFile && !primaryField.trim()) {
+            toast.error("Add an audio file or an audio URL");
+            return;
+          }
+          if (selectedFile && !isAllowedAudioFile(selectedFile)) {
+            toast.error("Unsupported audio file type.");
+            return;
+          }
+        }
+
+        let resolvedTitle = title.trim();
+        if (!resolvedTitle) {
+          const url = primaryField.trim();
+          if (url && (effectiveType === "video" || effectiveType === "links" || effectiveType === "audio")) {
+            resolvedTitle = (await resolveTitleFromUrl(url)) ?? "";
+          }
+          if (!resolvedTitle && effectiveType === "video" && selectedFile) {
+            resolvedTitle = titleFromFileName(selectedFile) ?? "";
+          }
+          if (!resolvedTitle && effectiveType === "audio" && selectedFile) {
+            resolvedTitle = titleFromFileName(selectedFile) ?? "";
+          }
+          if (!resolvedTitle && effectiveType === "files" && selectedFile) {
+            resolvedTitle = titleFromFileName(selectedFile) ?? "";
+          }
+        }
+        if (!resolvedTitle) {
+          toast.error(
+            effectiveType === "structured"
+              ? "Title is required"
+              : "Add a link or file so we can set a title, or enter a title.",
+          );
+          return;
+        }
+
+        const mediaPayload = {
+          title: resolvedTitle,
+          description: description.trim() || undefined,
+          context_slug: contextSlug,
+          resource_type: effectiveType,
+          source_url:
+            effectiveType === "links" || effectiveType === "video" || effectiveType === "audio"
+              ? primaryField.trim() || undefined
+              : undefined,
+          text_content: effectiveType === "structured" ? primaryField.trim() || undefined : undefined,
+          file:
+            effectiveType === "files" || effectiveType === "audio" || effectiveType === "video"
+              ? selectedFile || undefined
+              : undefined,
+        } as const;
+
+        await createBusinessContextMediaSource(mediaPayload);
+      }
+
+      toast.success(`${selected.label} saved successfully`);
+      void queryClient.invalidateQueries({ queryKey: ["contextResourceCounts"] });
+      onSaved?.();
+      onOpenChange(false);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || error?.message || "Failed to save resource");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -129,30 +357,88 @@ export default function AddResourceDialog({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="resource-title">Title</Label>
-              <Input
-                id="resource-title"
-                placeholder="Give this resource a name"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </div>
+            {sourceFirstLayout ? (
+              <>
+                <TypeSpecificFields
+                  resourceType={effectiveType}
+                  value={primaryField}
+                  onChange={setPrimaryField}
+                  selectedFile={selectedFile}
+                  onFileChange={setSelectedFile}
+                />
 
-            <div className="space-y-2">
-              <Label htmlFor="resource-description">Description (optional)</Label>
-              <Textarea
-                id="resource-description"
-                placeholder="Short summary or context"
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="resize-none"
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="resource-title">Title</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {effectiveType === "files"
+                      ? "Suggested from the uploaded file name (without extension). You can edit it."
+                      : effectiveType === "audio"
+                        ? "Taken from the link or file name when we can detect it (e.g. hosted audio, SoundCloud). You can edit it."
+                        : "Taken from the link or file name when we can detect it (e.g. YouTube, Vimeo). You can edit it."}
+                  </p>
+                  <Input
+                    id="resource-title"
+                    placeholder={
+                      effectiveType === "files"
+                        ? "Auto-filled from file name, or type a title"
+                        : "Auto-filled from link, or type a title"
+                    }
+                    value={title}
+                    onChange={(e) => {
+                      titleManuallyEditedRef.current = true;
+                      setTitle(e.target.value);
+                    }}
+                  />
+                </div>
 
-            {/* Type-specific primary field — same label row + input pattern */}
-            <TypeSpecificFields resourceType={effectiveType} value={primaryField} onChange={setPrimaryField} />
+                <div className="space-y-2">
+                  <Label htmlFor="resource-description">Description (optional)</Label>
+                  <Textarea
+                    id="resource-description"
+                    placeholder="Short summary or context"
+                    rows={3}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="resize-none"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="resource-title">Title</Label>
+                  <Input
+                    id="resource-title"
+                    placeholder="Give this resource a name"
+                    value={title}
+                    onChange={(e) => {
+                      titleManuallyEditedRef.current = true;
+                      setTitle(e.target.value);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="resource-description">Description (optional)</Label>
+                  <Textarea
+                    id="resource-description"
+                    placeholder="Short summary or context"
+                    rows={3}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="resize-none"
+                  />
+                </div>
+
+                <TypeSpecificFields
+                  resourceType={effectiveType}
+                  value={primaryField}
+                  onChange={setPrimaryField}
+                  selectedFile={selectedFile}
+                  onFileChange={setSelectedFile}
+                />
+              </>
+            )}
           </div>
         </div>
 
@@ -163,12 +449,10 @@ export default function AddResourceDialog({
           <Button
             type="button"
             className="bg-[#DB2B30] text-white hover:bg-[#B52227]"
-            onClick={() => {
-              // Placeholder: wire to API later
-              onOpenChange(false);
-            }}
+            disabled={isSaving}
+            onClick={handleSave}
           >
-            Add {selected.label}
+            {isSaving ? "Saving..." : `Add ${selected.label}`}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -176,217 +460,244 @@ export default function AddResourceDialog({
   );
 }
 
-const FILE_FORMATS = [
-  {
-    id: "pdf" as const,
-    label: "PDF",
-    shortLabel: "PDF",
-    extensions: ".pdf",
-    description: "Portable Document Format",
-    accept: "application/pdf,.pdf",
-  },
-  {
-    id: "word" as const,
-    label: "Word",
-    shortLabel: "Word",
-    extensions: ".doc, .docx",
-    description: "Microsoft Word documents",
-    accept: ".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  },
-  {
-    id: "txt" as const,
-    label: "Plain text",
-    shortLabel: "TXT",
-    extensions: ".txt",
-    description: "Unformatted text files",
-    accept: ".txt,text/plain",
-  },
-];
+/** File input accept list — aligned with `isAllowedAudioFile`. */
+const AUDIO_ACCEPT =
+  ".mp3,.wav,.m4a,.aac,.ogg,.flac,.webm,audio/mpeg,audio/mp3,audio/wav,audio/wave,audio/x-wav,audio/mp4,audio/aac,audio/x-m4a,audio/ogg,application/ogg,audio/flac,audio/webm";
 
-type FileFormatId = (typeof FILE_FORMATS)[number]["id"];
+function FileDropZone({
+  accept,
+  selectedFile,
+  onFileChange,
+  dropTitle,
+  dropSubtitle,
+  selectedExtra,
+}: {
+  accept: string;
+  selectedFile: File | null;
+  onFileChange: (file: File | null) => void;
+  dropTitle: string;
+  dropSubtitle?: string;
+  /** Shown after the filename, e.g. “Detected: PDF”. */
+  selectedExtra?: string | null;
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-const AUDIO_FORMATS = [
-  {
-    id: "mp3" as const,
-    label: "MP3",
-    extensions: ".mp3",
-    description: "Compressed audio, widely supported",
-    accept: ".mp3,audio/mpeg,audio/mp3",
-  },
-  {
-    id: "wav" as const,
-    label: "WAV",
-    extensions: ".wav",
-    description: "Uncompressed PCM audio",
-    accept: ".wav,audio/wav,audio/wave,audio/x-wav",
-  },
-  {
-    id: "m4a" as const,
-    label: "M4A / AAC",
-    extensions: ".m4a, .aac",
-    description: "Apple / AAC encoded audio",
-    accept: ".m4a,.aac,audio/mp4,audio/aac,audio/x-m4a",
-  },
-  {
-    id: "ogg" as const,
-    label: "OGG",
-    extensions: ".ogg",
-    description: "Ogg Vorbis (open format)",
-    accept: ".ogg,audio/ogg,application/ogg",
-  },
-  {
-    id: "flac" as const,
-    label: "FLAC",
-    extensions: ".flac",
-    description: "Lossless compressed audio",
-    accept: ".flac,audio/flac",
-  },
-  {
-    id: "webm" as const,
-    label: "WebM audio",
-    extensions: ".webm",
-    description: "Web-optimized container (audio track)",
-    accept: ".webm,audio/webm",
-  },
-];
+  const applyFile = (file: File | undefined | null) => {
+    if (file) onFileChange(file);
+  };
 
-type AudioFormatId = (typeof AUDIO_FORMATS)[number]["id"];
+  return (
+    <div className="space-y-2">
+      <input
+        ref={inputRef}
+        type="file"
+        className="sr-only"
+        tabIndex={-1}
+        accept={accept}
+        onChange={(e) => applyFile(e.target.files?.[0] ?? null)}
+      />
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragging(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragging(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragging(false);
+          applyFile(e.dataTransfer.files?.[0] ?? null);
+        }}
+        className={cn(
+          "flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed py-8 text-center text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#DB2B30]/40",
+          isDragging
+            ? "border-[#DB2B30] bg-[#DB2B30]/10"
+            : "border-muted-foreground/25 bg-background hover:border-[#DB2B30]/40 hover:bg-muted/30"
+        )}
+      >
+        <span className="font-medium text-foreground">{dropTitle}</span>
+        {dropSubtitle ? (
+          <span className="mt-1 text-xs text-muted-foreground">{dropSubtitle}</span>
+        ) : null}
+      </div>
+      {selectedFile ? (
+        <p className="text-xs text-muted-foreground">
+          Selected: <span className="font-medium text-foreground">{selectedFile.name}</span>
+          {selectedExtra ? (
+            <>
+              {" "}
+              · <span className="text-foreground">{selectedExtra}</span>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
-function AudioFormatUploadFields({
+/** Same structure as {@link VideoUploadFields}: upload first, then URL. */
+function AudioUploadFields({
   value,
   onChange,
+  selectedFile,
+  onFileChange,
 }: {
   value: string;
   onChange: (v: string) => void;
+  selectedFile: File | null;
+  onFileChange: (file: File | null) => void;
 }) {
-  const [format, setFormat] = useState<AudioFormatId>("mp3");
-  const meta = AUDIO_FORMATS.find((f) => f.id === format)!;
+  const applyAudio = (file: File | undefined | null) => {
+    if (!file) {
+      onFileChange(null);
+      return;
+    }
+    if (!isAllowedAudioFile(file)) {
+      toast.error("Unsupported audio file type.");
+      return;
+    }
+    onFileChange(file);
+  };
 
   return (
     <div className="space-y-4">
-      <div>
-        <Label className="mb-2 block text-sm font-medium">Audio format</Label>
-        <p className="mb-2 text-xs text-muted-foreground">
-          Pick the format you are uploading so the file picker and processing can match it.
-        </p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {AUDIO_FORMATS.map((f) => {
-            const active = format === f.id;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFormat(f.id)}
-                className={cn(
-                  "flex flex-col items-start rounded-lg border p-3 text-left text-sm transition-colors",
-                  active
-                    ? "border-[#DB2B30] bg-[#DB2B30]/10 ring-2 ring-[#DB2B30]/30"
-                    : "border-border bg-card hover:bg-muted/50"
-                )}
-              >
-                <span className={cn("font-semibold", active ? "text-[#DB2B30]" : "text-foreground")}>
-                  {f.label}
-                </span>
-                <span className="mt-0.5 text-xs text-muted-foreground">{f.extensions}</span>
-                <span className="mt-1 text-[11px] leading-tight text-muted-foreground">{f.description}</span>
-              </button>
-            );
-          })}
-        </div>
+      <div className="space-y-2">
+        <Label>Upload audio</Label>
+        <FileDropZone
+          accept={AUDIO_ACCEPT}
+          selectedFile={selectedFile}
+          onFileChange={applyAudio}
+          dropTitle="Drop an audio file here or click to browse"
+          dropSubtitle="MP3, WAV, M4A/AAC, OGG, FLAC, or WebM."
+        />
       </div>
 
       <div className="space-y-2">
-        <Label>Upload {meta.label} file</Label>
-        <div
-          className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-background py-8 text-center text-sm text-muted-foreground transition-colors hover:border-[#DB2B30]/40 hover:bg-muted/30"
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") e.preventDefault();
-          }}
-        >
-          <span className="font-medium text-foreground">
-            Drop your {meta.label} file here or click to browse
-          </span>
-          <span className="mt-1 text-xs">Accepted file extensions: {meta.extensions}</span>
-          <span className="mt-2 text-xs text-muted-foreground">
-            Upload will open a file picker filtered to this format when storage is connected.
-          </span>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="resource-audio-url">Or hosted audio URL (optional)</Label>
+        <Label htmlFor="resource-audio-url">Or audio URL</Label>
         <Input
           id="resource-audio-url"
           type="url"
-          placeholder="https://…"
+          placeholder="https://… (SoundCloud, direct link, or hosted audio)"
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />
         <p className="text-xs text-muted-foreground">
-          Use this if the audio is already hosted elsewhere instead of uploading a file.
+          Title is filled from the link when supported. Thumbnails appear in the list for common providers.
         </p>
       </div>
     </div>
   );
 }
 
-function FileFormatUploadFields() {
-  const [format, setFormat] = useState<FileFormatId>("pdf");
-  const meta = FILE_FORMATS.find((f) => f.id === format)!;
+function VideoUploadFields({
+  value,
+  onChange,
+  selectedFile,
+  onFileChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  selectedFile: File | null;
+  onFileChange: (file: File | null) => void;
+}) {
+  const applyMp4 = (file: File | undefined | null) => {
+    if (!file) {
+      onFileChange(null);
+      return;
+    }
+    if (!isAllowedMp4Video(file)) {
+      toast.error("Only MP4 video files are allowed.");
+      return;
+    }
+    onFileChange(file);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Upload MP4</Label>
+        <FileDropZone
+          accept={VIDEO_ACCEPT}
+          selectedFile={selectedFile}
+          onFileChange={applyMp4}
+          dropTitle="Drop an MP4 here or click to browse"
+          dropSubtitle="MP4 only."
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="resource-video-url">Or video URL</Label>
+        <Input
+          id="resource-video-url"
+          type="url"
+          placeholder="https://… (YouTube, Vimeo, or direct link)"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Title is filled from the link when supported. Thumbnails appear in the list for common providers.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function FileFormatUploadFields({
+  selectedFile,
+  onFileChange,
+}: {
+  selectedFile: File | null;
+  onFileChange: (file: File | null) => void;
+}) {
+  const applyDocument = (file: File | undefined | null) => {
+    if (!file) {
+      onFileChange(null);
+      return;
+    }
+    if (!isAllowedDocumentFile(file)) {
+      toast.error("Only PDF, Word (.doc/.docx), and plain text (.txt) are allowed.");
+      return;
+    }
+    onFileChange(file);
+  };
+
+  const detectedExtra = selectedFile ? `Detected: ${detectDocumentKind(selectedFile)}` : null;
 
   return (
     <div className="space-y-4">
       <div>
-        <Label className="mb-2 block text-sm font-medium">Document format</Label>
+        <Label className="mb-2 block text-sm font-medium">Document file</Label>
         <p className="mb-2 text-xs text-muted-foreground">
-          Choose the file type you are adding (not generic “data source” — pick PDF, Word, or text).
+          Only PDF, Microsoft Word (.doc, .docx), or plain text (.txt) are accepted. The title field below is
+          filled from the file name unless you change it.
         </p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {FILE_FORMATS.map((f) => {
-            const active = format === f.id;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFormat(f.id)}
-                className={cn(
-                  "flex flex-col items-start rounded-lg border p-3 text-left text-sm transition-colors",
-                  active
-                    ? "border-[#DB2B30] bg-[#DB2B30]/10 ring-2 ring-[#DB2B30]/30"
-                    : "border-border bg-card hover:bg-muted/50"
-                )}
-              >
-                <span className={cn("font-semibold", active ? "text-[#DB2B30]" : "text-foreground")}>
-                  {f.label}
-                </span>
-                <span className="mt-0.5 text-xs text-muted-foreground">{f.extensions}</span>
-                <span className="mt-1 text-[11px] leading-tight text-muted-foreground">{f.description}</span>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       <div className="space-y-2">
-        <Label>Upload {meta.label} file</Label>
-        <div
-          className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 bg-background py-8 text-center text-sm text-muted-foreground transition-colors hover:border-[#DB2B30]/40 hover:bg-muted/30"
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") e.preventDefault();
-          }}
-        >
-          <span className="font-medium text-foreground">
-            Drop {meta.label.toLowerCase()} here or click to browse
-          </span>
-          <span className="mt-1 text-xs">Accepted file extensions: {meta.extensions}</span>
-          <span className="mt-2 text-xs text-muted-foreground">
-            Upload will open a file picker filtered to this format when storage is connected.
-          </span>
-        </div>
+        <Label>Upload</Label>
+        <FileDropZone
+          accept={DOCUMENT_ACCEPT}
+          selectedFile={selectedFile}
+          onFileChange={applyDocument}
+          dropTitle="Drop your document here or click to browse"
+          dropSubtitle="PDF, Word (.doc, .docx), or plain text (.txt) only."
+          selectedExtra={detectedExtra}
+        />
       </div>
     </div>
   );
@@ -396,28 +707,36 @@ function TypeSpecificFields({
   resourceType,
   value,
   onChange,
+  selectedFile,
+  onFileChange,
 }: {
   resourceType: ResourceTypeId;
   value: string;
   onChange: (v: string) => void;
+  selectedFile: File | null;
+  onFileChange: (file: File | null) => void;
 }) {
   switch (resourceType) {
     case "files":
-      return <FileFormatUploadFields />;
+      return <FileFormatUploadFields selectedFile={selectedFile} onFileChange={onFileChange} />;
     case "video":
       return (
-        <div className="space-y-2">
-          <Label htmlFor="resource-video">Video URL or embed</Label>
-          <Input
-            id="resource-video"
-            placeholder="https://…"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-          />
-        </div>
+        <VideoUploadFields
+          value={value}
+          onChange={onChange}
+          selectedFile={selectedFile}
+          onFileChange={onFileChange}
+        />
       );
     case "audio":
-      return <AudioFormatUploadFields value={value} onChange={onChange} />;
+      return (
+        <AudioUploadFields
+          value={value}
+          onChange={onChange}
+          selectedFile={selectedFile}
+          onFileChange={onFileChange}
+        />
+      );
     case "links":
       return (
         <div className="space-y-2">
