@@ -10,17 +10,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MessageSquare, RefreshCw, ChevronDown, Check, ListTodo, Search } from "lucide-react";
 import type { ChatAssistantMode } from "@/src/lib/chatAgentModePreference";
+import { cn } from "@/lib/utils";
 
 type ChatAssistantModeDropdownProps = {
     value: ChatAssistantMode;
     onChange: (mode: ChatAssistantMode) => void;
     disabled?: boolean;
+    className?: string;
 };
 
 export function ChatAssistantModeDropdown({
     value,
     onChange,
     disabled,
+    className,
 }: ChatAssistantModeDropdownProps) {
     const isOperator = value === "operator";
 
@@ -32,7 +35,10 @@ export function ChatAssistantModeDropdown({
                     variant="ghost"
                     size="sm"
                     disabled={disabled}
-                    className="h-8 px-3 rounded-lg text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 min-w-[7.5rem] justify-between"
+                    className={cn(
+                        "h-8 px-3 rounded-lg text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 min-w-[7.5rem] justify-between",
+                        className,
+                    )}
                 >
                     <span className="inline-flex items-center gap-1.5">
                         {isOperator ? (

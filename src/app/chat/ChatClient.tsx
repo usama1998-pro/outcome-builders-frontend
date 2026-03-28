@@ -57,6 +57,7 @@ import { ExternalLinkCard } from "@/src/components/chat/ExternalLinkCard";
 import { DashboardLinkCard } from "@/src/components/chat/DashboardLinkCard";
 import { extractYoutubeVideoId } from "@/src/lib/youtubeUrl";
 import { preprocessAssistantMarkdownForLinkCards } from "@/src/lib/chatMarkdownPreprocess";
+import { cn } from "@/lib/utils";
 import { ChatLandingPage } from "./ChatLanding";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -2872,6 +2873,7 @@ export default function ChatClient({
             <div className="flex flex-col h-full w-full">
                 <ChatLandingPage
                     onMessageQueued={() => setLandingLaunchNonce((n) => n + 1)}
+                    embed={embed}
                 />
             </div>
         );
@@ -2891,6 +2893,7 @@ export default function ChatClient({
             <div className="flex flex-col h-full w-full">
                 <ChatLandingPage
                     onMessageQueued={() => setLandingLaunchNonce((n) => n + 1)}
+                    embed={embed}
                 />
             </div>
         );
@@ -2949,23 +2952,61 @@ export default function ChatClient({
 
             {/* Content selection bar */}
             {(selectedContentMessageIds ?? []).length > 0 && (
-                <div className="flex-shrink-0 px-4 sm:px-6 pb-2">
-                    <div className="max-w-4xl mx-auto">
-                        <div className="mb-2 px-3 py-2 rounded-lg border bg-white/80 dark:bg-muted/60 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 text-xs sm:text-sm text-black dark:text-muted-foreground">
-                                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#DB2B30]" />
-                                <span>
+                <div
+                    className={cn(
+                        "shrink-0 pb-2",
+                        embed ? "px-2" : "px-4 sm:px-6",
+                    )}
+                >
+                    <div className={cn("mx-auto", embed ? "max-w-full" : "max-w-4xl")}>
+                        <div
+                            className={cn(
+                                "mb-2 flex flex-nowrap items-center justify-between gap-2 rounded-lg border bg-white/80 dark:bg-muted/60",
+                                embed ? "px-2 py-1.5" : "gap-3 px-3 py-2",
+                            )}
+                        >
+                            <div
+                                className={cn(
+                                    "flex min-w-0 flex-1 items-center gap-1.5 text-black dark:text-muted-foreground",
+                                    embed ? "text-[11px] leading-tight" : "text-xs sm:text-sm",
+                                )}
+                            >
+                                <FileText
+                                    className={cn(
+                                        "shrink-0 text-[#DB2B30]",
+                                        embed ? "h-3 w-3" : "h-3.5 w-3.5 sm:h-4 sm:w-4",
+                                    )}
+                                />
+                                <span
+                                    className="min-w-0 truncate"
+                                    title={
+                                        `${(selectedContentMessageIds ?? []).length} ${
+                                            (selectedContentMessageIds ?? []).length === 1
+                                                ? "response selected"
+                                                : "responses selected"
+                                        } for content`
+                                    }
+                                >
                                     {(selectedContentMessageIds ?? []).length}{" "}
-                                    {(selectedContentMessageIds ?? []).length === 1 ? "response selected" : "responses selected"}{" "}
+                                    {(selectedContentMessageIds ?? []).length === 1
+                                        ? "response selected"
+                                        : "responses selected"}{" "}
                                     for content
                                 </span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div
+                                className={cn(
+                                    "flex shrink-0 items-center",
+                                    embed ? "gap-1" : "gap-2",
+                                )}
+                            >
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    className="h-7 px-2 text-xs"
+                                    className={cn(
+                                        embed ? "h-6 px-1.5 text-[10px]" : "h-7 px-2 text-xs",
+                                    )}
                                     onClick={() => setSelectedContentMessageIds([])}
                                 >
                                     Clear
@@ -2973,11 +3014,18 @@ export default function ChatClient({
                                 <Button
                                     type="button"
                                     size="sm"
-                                    className="h-7 px-3 text-xs bg-[#DB2B30] hover:bg-[#B52227] text-white"
+                                    className={cn(
+                                        "bg-[#DB2B30] text-white hover:bg-[#B52227]",
+                                        embed ? "h-6 gap-0.5 px-2 text-[10px]" : "h-7 px-3 text-xs",
+                                    )}
                                     onClick={handleCreateContentFromSelection}
                                 >
-                                    <PenTool className="h-3 w-3 mr-1" />
-                                    Select for Content
+                                    <PenTool
+                                        className={cn(
+                                            embed ? "h-2.5 w-2.5" : "mr-1 h-3 w-3",
+                                        )}
+                                    />
+                                    {embed ? "For content" : "Select for Content"}
                                 </Button>
                             </div>
                         </div>
@@ -2986,7 +3034,12 @@ export default function ChatClient({
             )}
 
             {/* Chat Input */}
-            <div className="flex-shrink-0 px-4 sm:px-6 py-4 sm:py-6 border-t bg-background/80 backdrop-blur-sm">
+            <div
+                className={cn(
+                    "flex-shrink-0 border-t bg-background/80 backdrop-blur-sm",
+                    embed ? "px-2 py-2" : "px-4 sm:px-6 py-4 sm:py-6",
+                )}
+            >
                 <div className="max-w-4xl mx-auto">
                     {/* Context Display - Above input (only shows when context is added) */}
                     {selectedContext.type === 'text' && selectedContext.name && (
@@ -3023,9 +3076,19 @@ export default function ChatClient({
                         noValidate
                     >
                         {/* Input Container - matching landing page style */}
-                        <div className="flex flex-col rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
+                        <div
+                            className={cn(
+                                "flex flex-col border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg overflow-hidden",
+                                embed ? "rounded-xl" : "rounded-2xl",
+                            )}
+                        >
                             {/* Input Row */}
-                            <div className="flex items-center px-5 py-4">
+                            <div
+                                className={cn(
+                                    "flex items-center",
+                                    embed ? "px-3 py-2" : "px-5 py-4",
+                                )}
+                            >
                                 <Input
                                     ref={inputRef}
                                     type="text"
@@ -3042,68 +3105,115 @@ export default function ChatClient({
                                         }
                                     }}
                                     disabled={isStreaming}
-                                    className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-[15px] text-neutral-700 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 px-2 py-2"
+                                    className={cn(
+                                        "flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-neutral-700 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500",
+                                        embed
+                                            ? "text-sm px-1.5 py-1"
+                                            : "text-[15px] px-2 py-2",
+                                    )}
                                 />
                             </div>
 
                             {/* Bottom Row - Icons and Controls */}
-                            <div className="flex items-center justify-between px-4 py-2.5 border-t border-neutral-100 dark:border-neutral-800">
+                            <div
+                                className={cn(
+                                    "flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 min-w-0 gap-1",
+                                    embed
+                                        ? "flex-wrap px-2 py-1.5"
+                                        : "px-4 py-2.5",
+                                )}
+                            >
                                 {/* Left icons */}
-                                <div className="flex items-center gap-1">
+                                <div
+                                    className={cn(
+                                        "flex items-center shrink-0",
+                                        embed ? "gap-0" : "gap-1",
+                                    )}
+                                >
                                     <button
                                         type="button"
                                         disabled={isStreaming}
-                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                        className={cn(
+                                            "inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50",
+                                            embed ? "h-6 w-6" : "h-8 w-8",
+                                        )}
                                         title="Attach file"
                                     >
-                                        <Paperclip className="w-[18px] h-[18px]" />
+                                        <Paperclip className={embed ? "w-[14px] h-[14px]" : "w-[18px] h-[18px]"} />
                                     </button>
                                     <button
                                         type="button"
                                         disabled={isStreaming}
-                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                        className={cn(
+                                            "inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50",
+                                            embed ? "h-6 w-6" : "h-8 w-8",
+                                        )}
                                         title="Add context"
                                     >
-                                        <AtSign className="w-[18px] h-[18px]" />
+                                        <AtSign className={embed ? "w-[14px] h-[14px]" : "w-[18px] h-[18px]"} />
                                     </button>
                                     <button
                                         type="button"
                                         disabled={isStreaming}
-                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                        className={cn(
+                                            "inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50",
+                                            embed ? "h-6 w-6" : "h-8 w-8",
+                                        )}
                                         title="Upload image"
                                     >
-                                        <ImageIcon className="w-[18px] h-[18px]" />
+                                        <ImageIcon className={embed ? "w-[14px] h-[14px]" : "w-[18px] h-[18px]"} />
                                     </button>
                                     <button
                                         type="button"
                                         disabled={isStreaming}
-                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                        className={cn(
+                                            "inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50",
+                                            embed ? "h-6 w-6" : "h-8 w-8",
+                                        )}
                                         title="Web search"
                                     >
-                                        <Globe className="w-[18px] h-[18px]" />
+                                        <Globe className={embed ? "w-[14px] h-[14px]" : "w-[18px] h-[18px]"} />
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setSettingsSheetOpen(true)}
                                         disabled={isStreaming}
-                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                        className={cn(
+                                            "inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50",
+                                            embed ? "h-6 w-6" : "h-8 w-8",
+                                        )}
                                         title="Settings"
                                     >
-                                        <SlidersHorizontal className="w-[18px] h-[18px]" />
+                                        <SlidersHorizontal className={embed ? "w-[14px] h-[14px]" : "w-[18px] h-[18px]"} />
                                     </button>
                                 </div>
 
                                 {/* Right controls */}
-                                <div className="flex items-center gap-2">
+                                <div
+                                    className={cn(
+                                        "flex items-center shrink-0",
+                                        embed ? "gap-1 ml-auto" : "gap-2",
+                                    )}
+                                >
                                     <ModelSelector
                                         value={selectedModel}
                                         onChange={handleModelChange}
                                         disabled={isStreaming}
+                                        className={
+                                            embed
+                                                ? "h-7 px-1.5 text-[10px] [&_span]:max-w-[3.25rem]"
+                                                : undefined
+                                        }
                                     />
                                     <ChatAssistantModeDropdown
                                         value={assistantMode}
                                         onChange={setAssistantModePersist}
                                         disabled={isStreaming}
+                                        className={
+                                            embed
+                                                ? "h-7 min-w-[4.25rem] px-1.5 text-[10px]"
+                                                : undefined
+                                        }
                                     />
 
                                     {isStreaming ? (
@@ -3112,18 +3222,24 @@ export default function ChatClient({
                                             onClick={handleStop}
                                             size="icon"
                                             variant="destructive"
-                                            className="h-9 w-9 rounded-full flex-shrink-0"
+                                            className={cn(
+                                                "rounded-full flex-shrink-0",
+                                                embed ? "h-7 w-7" : "h-9 w-9",
+                                            )}
                                         >
-                                            <Square className="h-4 w-4" />
+                                            <Square className={embed ? "h-3 w-3" : "h-4 w-4"} />
                                         </Button>
                                     ) : (
                                         <Button
                                             type="submit"
                                             size="icon"
                                             disabled={!inputValue.trim()}
-                                            className="h-9 w-9 rounded-full bg-[#DB2B30] hover:bg-[#B52227] dark:bg-[#DB2B30] dark:hover:bg-[#B52227] text-white disabled:opacity-30 disabled:bg-neutral-200 dark:disabled:bg-neutral-700 disabled:text-neutral-400 dark:disabled:text-neutral-500 transition-all flex-shrink-0"
+                                            className={cn(
+                                                "rounded-full bg-[#DB2B30] hover:bg-[#B52227] dark:bg-[#DB2B30] dark:hover:bg-[#B52227] text-white disabled:opacity-30 disabled:bg-neutral-200 dark:disabled:bg-neutral-700 disabled:text-neutral-400 dark:disabled:text-neutral-500 transition-all flex-shrink-0",
+                                                embed ? "h-7 w-7" : "h-9 w-9",
+                                            )}
                                         >
-                                            <Send className="h-4 w-4" />
+                                            <Send className={embed ? "h-3 w-3" : "h-4 w-4"} />
                                         </Button>
                                     )}
                                 </div>

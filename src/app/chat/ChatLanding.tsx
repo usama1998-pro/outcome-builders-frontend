@@ -30,6 +30,7 @@ import {
 } from "@/src/lib/chatAgentModePreference";
 import { CHAT_ENTRY_PATH } from "@/src/lib/chatRoutes";
 import { ChatAssistantModeDropdown } from "@/src/components/chat/ChatAssistantModeDropdown";
+import { cn } from "@/lib/utils";
 
 interface QuickActionProps {
     href: string;
@@ -46,7 +47,7 @@ function QuickAction({ href, label, delay }: QuickActionProps) {
         >
             <Link
                 href={href}
-                className="inline-flex items-center px-4 py-2 rounded-full border border-[#DB2B30] bg-transparent hover:bg-[#DB2B30] text-sm text-[#DB2B30] dark:text-white hover:text-white transition-colors shadow-sm"
+                className="inline-flex items-center rounded-full border border-[#DB2B30] bg-transparent px-4 py-2 text-sm text-[#DB2B30] shadow-sm transition-colors hover:bg-[#DB2B30] hover:text-white dark:text-white"
             >
                 {label}
             </Link>
@@ -56,9 +57,12 @@ function QuickAction({ href, label, delay }: QuickActionProps) {
 
 export function ChatLandingPage({
     onMessageQueued,
+    embed = false,
 }: {
     /** When set (embedded under `ChatClient`), stay on `/chat` and let the parent pick up `pendingChatQuestion`. */
     onMessageQueued?: () => void;
+    /** Dashboard side panel: compact layout so model/mode controls stay visible. */
+    embed?: boolean;
 }) {
     const router = useRouter();
     const [inputValue, setInputValue] = useState("");
@@ -199,30 +203,40 @@ export function ChatLandingPage({
     ];
 
     return (
-        <div className="flex flex-col justify-center items-center min-h-full w-full px-4 sm:px-6 lg:px-8 bg-white dark:bg-neutral-950">
+        <div
+            className={cn(
+                "flex min-h-full w-full flex-col justify-center items-center bg-white dark:bg-neutral-950",
+                embed ? "px-2" : "px-4 sm:px-6 lg:px-8",
+            )}
+        >
             <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
-                className="mb-10 flex flex-col items-center gap-3"
+                className={cn("flex flex-col items-center gap-3", embed ? "mb-4 gap-2" : "mb-10")}
             >
                 <div className="inline-flex items-center justify-center">
                     <Image
                         src="/assets/black-square-Icon.png"
                         alt="AI"
-                        width={64}
-                        height={64}
+                        width={embed ? 40 : 64}
+                        height={embed ? 40 : 64}
                         className="block dark:hidden"
                     />
                     <Image
                         src="/assets/white-square-Icon.png"
                         alt="AI"
-                        width={64}
-                        height={64}
+                        width={embed ? 40 : 64}
+                        height={embed ? 40 : 64}
                         className="hidden dark:block"
                     />
                 </div>
-                <h1 className="text-3xl sm:text-4xl font-semibold text-black dark:text-white tracking-tight text-center">
+                <h1
+                    className={cn(
+                        "font-semibold text-black dark:text-white tracking-tight text-center",
+                        embed ? "text-lg sm:text-xl" : "text-3xl sm:text-4xl",
+                    )}
+                >
                     {headingText}
                 </h1>
             </motion.div>
@@ -231,15 +245,20 @@ export function ChatLandingPage({
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.15 }}
-                className="w-full max-w-xl mb-8"
+                className={cn("mb-8 w-full max-w-xl", embed ? "mb-4" : "")}
             >
                 <form
                     onSubmit={handleSubmit}
                     className="relative"
                     noValidate
                 >
-                    <div className="flex flex-col rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
-                        <div className="flex items-center px-5 py-4">
+                    <div
+                        className={cn(
+                            "flex flex-col border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg overflow-hidden",
+                            embed ? "rounded-xl" : "rounded-2xl",
+                        )}
+                    >
+                        <div className={cn("flex items-center", embed ? "px-3 py-2" : "px-5 py-4")}>
                             <Input
                                 type="text"
                                 placeholder="Plan, @ for context, / for commands"
@@ -253,82 +272,160 @@ export function ChatLandingPage({
                                         }
                                     }
                                 }}
-                                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-[15px] text-black dark:text-neutral-200 placeholder:text-black dark:placeholder:text-neutral-500 px-2 py-2"
+                                className={cn(
+                                    "flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-black dark:text-neutral-200 placeholder:text-black dark:placeholder:text-neutral-500",
+                                    embed ? "text-sm px-1.5 py-1" : "text-[15px] px-2 py-2",
+                                )}
                             />
                         </div>
 
-                        <div className="flex items-center justify-between px-4 py-2.5 border-t border-neutral-100 dark:border-neutral-800">
-                            <div className="flex items-center gap-1">
-                                <button
-                                    type="button"
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                                    title="Attach file"
-                                >
-                                    <Paperclip className="w-[18px] h-[18px]" />
-                                </button>
-                                <button
-                                    type="button"
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                                    title="Add context"
-                                >
-                                    <AtSign className="w-[18px] h-[18px]" />
-                                </button>
-                                <button
-                                    type="button"
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                                    title="Upload image"
-                                >
-                                    <ImageIcon className="w-[18px] h-[18px]" />
-                                </button>
-                                <button
-                                    type="button"
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                                    title="Web search"
-                                >
-                                    <Globe className="w-[18px] h-[18px]" />
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setSettingsSheetOpen(true)}
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                                    title="Settings"
-                                >
-                                    <SlidersHorizontal className="w-[18px] h-[18px]" />
-                                </button>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <div
-                                    className="flex items-center pr-2 mr-0.5 border-r border-neutral-200 dark:border-neutral-700"
-                                    title={
-                                        assistantMode === "operator"
-                                            ? "Operator: structured steps and KB graph"
-                                            : "Ask: standard chat reply"
-                                    }
-                                >
-                                    <ChatAssistantModeDropdown
-                                        value={assistantMode}
-                                        onChange={(mode) => {
-                                            setAssistantMode(mode);
-                                            setStoredAssistantMode(mode);
-                                        }}
-                                    />
+                        {embed ? (
+                            <div className="flex min-w-0 flex-nowrap items-center justify-between gap-1 overflow-x-auto px-2 py-1.5 border-t border-neutral-100 dark:border-neutral-800">
+                                <div className="flex shrink-0 items-center gap-0">
+                                    <button
+                                        type="button"
+                                        className="h-6 w-6 inline-flex shrink-0 items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                        title="Attach file"
+                                    >
+                                        <Paperclip className="h-[14px] w-[14px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="h-6 w-6 inline-flex shrink-0 items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                        title="Add context"
+                                    >
+                                        <AtSign className="h-[14px] w-[14px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="h-6 w-6 inline-flex shrink-0 items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                        title="Upload image"
+                                    >
+                                        <ImageIcon className="h-[14px] w-[14px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="h-6 w-6 inline-flex shrink-0 items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                        title="Web search"
+                                    >
+                                        <Globe className="h-[14px] w-[14px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSettingsSheetOpen(true)}
+                                        className="h-6 w-6 inline-flex shrink-0 items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                        title="Settings"
+                                    >
+                                        <SlidersHorizontal className="h-[14px] w-[14px]" />
+                                    </button>
                                 </div>
-                                <ModelSelector
-                                    value={selectedModel}
-                                    onChange={handleModelChange}
-                                />
-
-                                <Button
-                                    type="submit"
-                                    size="icon"
-                                    disabled={!inputValue.trim()}
-                                    className="h-9 w-9 rounded-full bg-[#DB2B30] hover:bg-[#B52227] dark:bg-[#DB2B30] dark:hover:bg-[#B52227] text-white disabled:opacity-30 disabled:bg-neutral-200 dark:disabled:bg-neutral-700 disabled:text-neutral-400 dark:disabled:text-neutral-500 transition-all"
-                                >
-                                    <Send className="h-4 w-4" />
-                                </Button>
+                                <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
+                                    <div
+                                        className="flex shrink-0 items-center border-r border-neutral-200 pr-1 mr-0.5 dark:border-neutral-700"
+                                        title={
+                                            assistantMode === "operator"
+                                                ? "Operator: structured steps and KB graph"
+                                                : "Ask: standard chat reply"
+                                        }
+                                    >
+                                        <ChatAssistantModeDropdown
+                                            value={assistantMode}
+                                            onChange={(mode) => {
+                                                setAssistantMode(mode);
+                                                setStoredAssistantMode(mode);
+                                            }}
+                                            className="h-7 min-w-[4.25rem] px-1.5 text-[10px]"
+                                        />
+                                    </div>
+                                    <ModelSelector
+                                        value={selectedModel}
+                                        onChange={handleModelChange}
+                                        className="h-7 min-w-0 max-w-[5.5rem] shrink px-1.5 text-[10px] [&_span]:max-w-[4.5rem]"
+                                    />
+                                    <Button
+                                        type="submit"
+                                        size="icon"
+                                        disabled={!inputValue.trim()}
+                                        className="h-7 w-7 shrink-0 rounded-full bg-[#DB2B30] hover:bg-[#B52227] dark:bg-[#DB2B30] dark:hover:bg-[#B52227] text-white disabled:opacity-30 disabled:bg-neutral-200 dark:disabled:bg-neutral-700 disabled:text-neutral-400 dark:disabled:text-neutral-500 transition-all"
+                                    >
+                                        <Send className="h-3 w-3" />
+                                    </Button>
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="flex items-center justify-between px-4 py-2.5 border-t border-neutral-100 dark:border-neutral-800">
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                        title="Attach file"
+                                    >
+                                        <Paperclip className="w-[18px] h-[18px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                        title="Add context"
+                                    >
+                                        <AtSign className="w-[18px] h-[18px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                        title="Upload image"
+                                    >
+                                        <ImageIcon className="w-[18px] h-[18px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                        title="Web search"
+                                    >
+                                        <Globe className="w-[18px] h-[18px]" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSettingsSheetOpen(true)}
+                                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                                        title="Settings"
+                                    >
+                                        <SlidersHorizontal className="w-[18px] h-[18px]" />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <div
+                                        className="flex items-center pr-2 mr-0.5 border-r border-neutral-200 dark:border-neutral-700"
+                                        title={
+                                            assistantMode === "operator"
+                                                ? "Operator: structured steps and KB graph"
+                                                : "Ask: standard chat reply"
+                                        }
+                                    >
+                                        <ChatAssistantModeDropdown
+                                            value={assistantMode}
+                                            onChange={(mode) => {
+                                                setAssistantMode(mode);
+                                                setStoredAssistantMode(mode);
+                                            }}
+                                        />
+                                    </div>
+                                    <ModelSelector
+                                        value={selectedModel}
+                                        onChange={handleModelChange}
+                                    />
+
+                                    <Button
+                                        type="submit"
+                                        size="icon"
+                                        disabled={!inputValue.trim()}
+                                        className="h-9 w-9 rounded-full bg-[#DB2B30] hover:bg-[#B52227] dark:bg-[#DB2B30] dark:hover:bg-[#B52227] text-white disabled:opacity-30 disabled:bg-neutral-200 dark:disabled:bg-neutral-700 disabled:text-neutral-400 dark:disabled:text-neutral-500 transition-all"
+                                    >
+                                        <Send className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </form>
             </motion.div>
@@ -408,7 +505,7 @@ export function ChatLandingPage({
                 </SheetContent>
             </Sheet>
 
-            <div className="flex flex-wrap gap-2.5 justify-center max-w-xl">
+            <div className="flex max-w-xl flex-wrap justify-center gap-2.5">
                 {quickActions.map((action, index) => (
                     <QuickAction
                         key={action.label}
