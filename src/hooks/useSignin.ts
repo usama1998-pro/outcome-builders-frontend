@@ -14,6 +14,7 @@ interface SigninResponseData {
   requires_2fa?: boolean;
   can_resend_in?: number;
   message?: string;
+  is_superuser?: boolean;
 }
 
 export function useSignin() {
@@ -42,7 +43,12 @@ export function useSignin() {
       // No 2FA - proceed with normal login
       if (responseData.token) {
         toast.success("Sign in successful! Redirecting...");
-        await login(responseData.token, responseData.user_id);
+        await login(
+          responseData.token,
+          responseData.user_id,
+          "/dashboard",
+          responseData.is_superuser === true
+        );
       } else {
         toast.error("Sign in failed. No token received from server.");
       }

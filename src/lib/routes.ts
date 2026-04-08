@@ -74,6 +74,7 @@ const routes = {
   notes: {
     get: "/note",
     getById: (idOrUuid: number | string) => `/note/${idOrUuid}`,
+    contentTypes: "/note/content-types",
     create: "/note",
     update: (id: number) => `/note/${id}`,
     delete: (id: number) => `/note/${id}`,

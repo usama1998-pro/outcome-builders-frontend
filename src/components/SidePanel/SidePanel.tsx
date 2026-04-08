@@ -12,13 +12,10 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarMenuSub,
-    SidebarMenuSubItem,
-    SidebarMenuSubButton,
     SidebarMenuAction
 } from "@/components/ui/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, Layers, FileText, Settings, Building, Briefcase, BarChart3, Stethoscope, Compass, HelpCircle, Search, MoreHorizontal, Loader2, Route, Pencil, Rocket, LayoutGrid, Target, AppWindow } from "lucide-react";
+import { ChevronUp, ChevronDown, User2, Building2, Users, LayoutDashboard, Brain, MessageSquare, Layers, FileText, Settings, Building, Briefcase, BarChart3, Stethoscope, Compass, HelpCircle, Search, MoreHorizontal, Loader2, Route, Pencil, Rocket, LayoutGrid, Target, AppWindow, Shield, Lightbulb } from "lucide-react";
 import { useSignOut, useUserTenants } from "@/src/hooks/useAuth";
 import { useOrganizationDetails } from "@/src/hooks/useOrganization";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -78,6 +75,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
+import { SiNotion, SiGoogledrive } from "react-icons/si";
+import { FaMicrosoft } from "react-icons/fa6";
 
 const createBrainSpaceSchema = z.object({
     name: z.string().min(1, "Name is required").max(100, "Name is too long"),
@@ -135,6 +134,11 @@ function isDataContextPathActive(pathname: string, segment: DataContextSlug) {
     return pathname === base || pathname.startsWith(`${base}/`);
 }
 
+function isComingSoonDataSourcePathActive(pathname: string, segment: "notion" | "google-drive" | "onedrive") {
+    const base = `/dashboard/data-sources/${segment}`;
+    return pathname === base || pathname.startsWith(`${base}/`);
+}
+
 function isStrategyPath(pathname: string) {
     return (
         pathname === "/dashboard/direction" ||
@@ -162,6 +166,10 @@ function getOpenChatTabIdFromPathname(pathname: string | null): string | null {
     return m?.[1] ?? null;
 }
 
+function isAdminHubRoute(pathname: string) {
+    return pathname === "/dashboard/admin" || pathname.startsWith("/dashboard/admin/");
+}
+
 export default function SidePanel() {
     const pathname = usePathname();
     const router = useRouter();
@@ -181,7 +189,7 @@ export default function SidePanel() {
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
     // Permission checks - hide elements until permissions are loaded and confirmed
-    const { hasPermission, isOwnerOrAdmin, isLoading: permissionsLoading } = useUserPermissions();
+    const { hasPermission, isOwnerOrAdmin, isSuperuser, role, isLoading: permissionsLoading } = useUserPermissions();
     const canCreateBrainspace = !permissionsLoading && (
         hasPermission(PERMISSIONS.BRAINSPACE_CREATE) || isOwnerOrAdmin
     );
@@ -360,6 +368,9 @@ export default function SidePanel() {
         hasPermission(PERMISSIONS.USER_INVITE) ||
         isOwnerOrAdmin
     );
+    const canViewAdminOption =
+        !permissionsLoading &&
+        (isSuperuser || role?.toLowerCase() === "superuser");
 
     // Find the current tenant
     const currentTenant = tenants?.find((t) => t.id === currentTenantId);
@@ -398,8 +409,9 @@ export default function SidePanel() {
             "business-dashboard",
             "command-center",
             "knowledge-bank",
-            "building-tools",
             "business-context",
+            "building-tools",
+            "connected-tools",
             "embedded-intelligence",
         ])
     );
@@ -461,20 +473,52 @@ export default function SidePanel() {
                 <SidebarContent>
                     {/* Organization Switcher */}
                     <div className="px-4 py-4 border-b">
-                        {tenants && tenants.length > 0 ? (
+                        {isSuperuser ? (
+                            <div className="flex items-center w-full">
+                                <div className="h-12 flex items-center justify-center shrink-0 w-full">
+                                    <img
+                                        src="/assets/Primary-Line-Logo-Black.png"
+                                        alt="Outcome Builders"
+                                        className="block dark:hidden h-10 w-auto max-w-full object-contain"
+                                    />
+                                    <img
+                                        src="/assets/Primary-Line-Logo-White.png"
+                                        alt="Outcome Builders"
+                                        className="hidden dark:block h-10 w-auto max-w-full object-contain"
+                                    />
+                                </div>
+                            </div>
+                        ) : tenants && tenants.length > 0 ? (
                             <div className="flex items-center gap-2 w-full">
                                 {/* Platform icon (outside dropdown) */}
-                                <div className="h-8 w-8 flex items-center justify-center shrink-0">
-                                    <img
-                                        src="/assets/OB-Logo-Black.png"
-                                        alt="Outcome Builders"
-                                        className="block dark:hidden h-6 w-6 object-contain"
-                                    />
-                                    <img
-                                        src="/assets/OB-Logo-White.png"
-                                        alt="Outcome Builders"
-                                        className="hidden dark:block h-6 w-6 object-contain"
-                                    />
+                                <div className={`h-8 flex items-center justify-center shrink-0 ${isSuperuser ? "w-24" : "w-8"}`}>
+                                    {isSuperuser ? (
+                                        <>
+                                            <img
+                                                src="/assets/Primary-Line-Logo-Black.png"
+                                                alt="Outcome Builders"
+                                                className="block dark:hidden h-6 w-auto object-contain"
+                                            />
+                                            <img
+                                                src="/assets/Primary-Line-Logo-White.png"
+                                                alt="Outcome Builders"
+                                                className="hidden dark:block h-6 w-auto object-contain"
+                                            />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <img
+                                                src="/assets/OB-Logo-Black.png"
+                                                alt="Outcome Builders"
+                                                className="block dark:hidden h-6 w-6 object-contain"
+                                            />
+                                            <img
+                                                src="/assets/OB-Logo-White.png"
+                                                alt="Outcome Builders"
+                                                className="hidden dark:block h-6 w-6 object-contain"
+                                            />
+                                        </>
+                                    )}
                                 </div>
 
                                 <span className="text-muted-foreground shrink-0">|</span>
@@ -589,6 +633,30 @@ export default function SidePanel() {
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/insights"
+                                                className={`px-2 py-1 rounded ${pathname === "/dashboard/insights" || pathname.startsWith("/dashboard/insights/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <Lightbulb className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Insights
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                    {canViewAdminOption && (
+                                        <SidebarMenuItem>
+                                            <SidebarMenuButton asChild>
+                                                <Link
+                                                    href="/dashboard/admin"
+                                                    className={`px-2 py-1 rounded ${isAdminHubRoute(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                                >
+                                                    <Shield className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                    Admin
+                                                </Link>
+                                            </SidebarMenuButton>
+                                        </SidebarMenuItem>
+                                    )}
                                 </SidebarMenu>
                             </SidebarGroupContent>
                         )}
@@ -811,65 +879,6 @@ export default function SidePanel() {
                         )}
                     </SidebarGroup>
 
-                    {/* Building Tools (Diagnosis + former Strategy & Execution areas) */}
-                    <SidebarGroup className="border-t border-border pt-3 mt-1">
-                        <SidebarGroupLabel className="text-black dark:text-[#FFFFFF] pb-2 mb-1">
-                            <button
-                                type="button"
-                                onClick={() => toggleSection("building-tools")}
-                                className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
-                            >
-                                {expandedSections.has("building-tools") ? (
-                                    <ChevronDown className="h-4 w-4 shrink-0" />
-                                ) : (
-                                    <ChevronUp className="h-4 w-4 shrink-0 -rotate-90" />
-                                )}
-                                Building Tools
-                            </button>
-                        </SidebarGroupLabel>
-                        {expandedSections.has("building-tools") && (
-                            <SidebarGroupContent>
-                                <SidebarMenu>
-                                    <SidebarMenuItem>
-                                        <SidebarMenuButton asChild>
-                                            <Link
-                                                href="/dashboard/diagnosis"
-                                                className={`px-2 py-1 rounded ${pathname === "/dashboard/diagnosis" || pathname.startsWith("/dashboard/diagnosis/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
-                                            >
-                                                <Stethoscope className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                                Diagnosis
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-
-                                    <SidebarMenuItem>
-                                        <SidebarMenuButton asChild>
-                                            <Link
-                                                href="/dashboard/direction"
-                                                className={`px-2 py-1 rounded ${isStrategyPath(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
-                                            >
-                                                <Compass className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                                Strategy
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-
-                                    <SidebarMenuItem>
-                                        <SidebarMenuButton asChild>
-                                            <Link
-                                                href="/dashboard/brand"
-                                                className={`px-2 py-1 rounded ${isExecutionPath(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
-                                            >
-                                                <Rocket className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                                Execution
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                </SidebarMenu>
-                            </SidebarGroupContent>
-                        )}
-                    </SidebarGroup>
-
                     {/* Business Context (former Data Resources) */}
                     <SidebarGroup className="border-t border-border pt-3 mt-1">
                         <SidebarGroupLabel className="text-black dark:text-[#FFFFFF] pb-2 mb-1">
@@ -938,6 +947,122 @@ export default function SidePanel() {
                         )}
                     </SidebarGroup>
 
+                    {/* Building Tools (Diagnosis + former Strategy & Execution areas) */}
+                    <SidebarGroup className="border-t border-border pt-3 mt-1">
+                        <SidebarGroupLabel className="text-black dark:text-[#FFFFFF] pb-2 mb-1">
+                            <button
+                                type="button"
+                                onClick={() => toggleSection("building-tools")}
+                                className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
+                            >
+                                {expandedSections.has("building-tools") ? (
+                                    <ChevronDown className="h-4 w-4 shrink-0" />
+                                ) : (
+                                    <ChevronUp className="h-4 w-4 shrink-0 -rotate-90" />
+                                )}
+                                Building Tools
+                            </button>
+                        </SidebarGroupLabel>
+                        {expandedSections.has("building-tools") && (
+                            <SidebarGroupContent>
+                                <SidebarMenu>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/diagnosis"
+                                                className={`px-2 py-1 rounded ${pathname === "/dashboard/diagnosis" || pathname.startsWith("/dashboard/diagnosis/") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <Stethoscope className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Diagnosis
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/direction"
+                                                className={`px-2 py-1 rounded ${isStrategyPath(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <Compass className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Strategy
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/brand"
+                                                className={`px-2 py-1 rounded ${isExecutionPath(pathname) ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <Rocket className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                Execution
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        )}
+                    </SidebarGroup>
+
+                    {/* Connected tools */}
+                    <SidebarGroup className="border-t border-border pt-3 mt-1">
+                        <SidebarGroupLabel className="text-black dark:text-[#FFFFFF] pb-2 mb-1">
+                            <button
+                                type="button"
+                                onClick={() => toggleSection("connected-tools")}
+                                className="flex items-center gap-2 w-full text-left text-black dark:text-[#FFFFFF]"
+                            >
+                                {expandedSections.has("connected-tools") ? (
+                                    <ChevronDown className="h-4 w-4 shrink-0" />
+                                ) : (
+                                    <ChevronUp className="h-4 w-4 shrink-0 -rotate-90" />
+                                )}
+                                Connected Tools
+                            </button>
+                        </SidebarGroupLabel>
+                        {expandedSections.has("connected-tools") && (
+                            <SidebarGroupContent>
+                                <SidebarMenu>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/data-sources/notion"
+                                                className={`flex items-center gap-2 w-full rounded-md px-2 py-2 ${isComingSoonDataSourcePathActive(pathname, "notion") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <SiNotion className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                <span>Notion</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/data-sources/google-drive"
+                                                className={`flex items-center gap-2 w-full rounded-md px-2 py-2 ${isComingSoonDataSourcePathActive(pathname, "google-drive") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <SiGoogledrive className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                <span>Google Drive</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                    <SidebarMenuItem>
+                                        <SidebarMenuButton asChild>
+                                            <Link
+                                                href="/dashboard/data-sources/onedrive"
+                                                className={`flex items-center gap-2 w-full rounded-md px-2 py-2 ${isComingSoonDataSourcePathActive(pathname, "onedrive") ? SIDEBAR_ACTIVE_CLASS : SIDEBAR_HOVER_CLASS}`}
+                                            >
+                                                <FaMicrosoft className="h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                <span>OneDrive</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        )}
+                    </SidebarGroup>
+
                     {/* Embedded Intelligence */}
                     <SidebarGroup className="border-t border-border pt-3 mt-1">
                         <SidebarGroupLabel className="text-black dark:text-[#FFFFFF] pb-2 mb-1">
@@ -998,7 +1123,7 @@ export default function SidePanel() {
                                             Profile
                                         </Link>
                                     </DropdownMenuItem>
-                                    {tenants && tenants.length > 0 && (
+                                    {!isSuperuser && tenants && tenants.length > 0 && (
                                         <DropdownMenuItem asChild>
                                             <Link href="/dashboard/organization">
                                                 <Building className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
@@ -1006,7 +1131,7 @@ export default function SidePanel() {
                                             </Link>
                                         </DropdownMenuItem>
                                     )}
-                                    {canViewTeam && (
+                                    {!isSuperuser && canViewTeam && (
                                         <DropdownMenuItem asChild>
                                             <Link href="/dashboard/admins">
                                                 <Users className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
@@ -1014,12 +1139,14 @@ export default function SidePanel() {
                                             </Link>
                                         </DropdownMenuItem>
                                     )}
-                                    <DropdownMenuItem asChild>
-                                        <Link href="/dashboard/faq">
-                                            <HelpCircle className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
-                                            FAQ
-                                        </Link>
-                                    </DropdownMenuItem>
+                                    {!isSuperuser && (
+                                        <DropdownMenuItem asChild>
+                                            <Link href="/dashboard/faq">
+                                                <HelpCircle className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />
+                                                FAQ
+                                            </Link>
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem asChild>
                                         <Link href="/dashboard/settings">
                                             <Settings className="mr-2 h-4 w-4 text-[#DB2B30] dark:text-white" />

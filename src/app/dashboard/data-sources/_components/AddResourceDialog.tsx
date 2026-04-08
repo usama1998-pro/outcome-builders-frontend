@@ -61,6 +61,18 @@ function isAllowedAudioFile(file: File): boolean {
   return false;
 }
 
+/** Business Context uploads: documents, MP4, and audio files. */
+const MAX_BUSINESS_CONTEXT_FILE_BYTES = 1.5 * 1024 * 1024;
+
+/** Returns false and shows a toast if the file exceeds {@link MAX_BUSINESS_CONTEXT_FILE_BYTES}. */
+function assertWithinBusinessContextFileLimit(file: File): boolean {
+  if (file.size > MAX_BUSINESS_CONTEXT_FILE_BYTES) {
+    toast.error("File size must be 1.5 MB or less.");
+    return false;
+  }
+  return true;
+}
+
 /** Label for UI after a file is chosen (extension / MIME). */
 function detectDocumentKind(file: File): string {
   const ext = file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : "";
@@ -211,6 +223,7 @@ export default function AddResourceDialog({
             toast.error("Only PDF, Word (.doc/.docx), and plain text (.txt) are allowed.");
             return;
           }
+          if (!assertWithinBusinessContextFileLimit(selectedFile)) return;
         }
         if (effectiveType === "links" && !primaryField.trim()) {
           toast.error("URL is required");
@@ -225,6 +238,7 @@ export default function AddResourceDialog({
             toast.error("Only MP4 video files are allowed.");
             return;
           }
+          if (selectedFile && !assertWithinBusinessContextFileLimit(selectedFile)) return;
         }
         if (effectiveType === "audio") {
           if (!selectedFile && !primaryField.trim()) {
@@ -235,6 +249,7 @@ export default function AddResourceDialog({
             toast.error("Unsupported audio file type.");
             return;
           }
+          if (selectedFile && !assertWithinBusinessContextFileLimit(selectedFile)) return;
         }
 
         let resolvedTitle = title.trim();
@@ -571,6 +586,7 @@ function AudioUploadFields({
       toast.error("Unsupported audio file type.");
       return;
     }
+    if (!assertWithinBusinessContextFileLimit(file)) return;
     onFileChange(file);
   };
 
@@ -583,7 +599,7 @@ function AudioUploadFields({
           selectedFile={selectedFile}
           onFileChange={applyAudio}
           dropTitle="Drop an audio file here or click to browse"
-          dropSubtitle="MP3, WAV, M4A/AAC, OGG, FLAC, or WebM."
+          dropSubtitle="MP3, WAV, M4A/AAC, OGG, FLAC, or WebM. Max 1.5 MB per file."
         />
       </div>
 
@@ -624,6 +640,7 @@ function VideoUploadFields({
       toast.error("Only MP4 video files are allowed.");
       return;
     }
+    if (!assertWithinBusinessContextFileLimit(file)) return;
     onFileChange(file);
   };
 
@@ -636,7 +653,7 @@ function VideoUploadFields({
           selectedFile={selectedFile}
           onFileChange={applyMp4}
           dropTitle="Drop an MP4 here or click to browse"
-          dropSubtitle="MP4 only."
+          dropSubtitle="MP4 only. Max 1.5 MB."
         />
       </div>
 
@@ -673,6 +690,7 @@ function FileFormatUploadFields({
       toast.error("Only PDF, Word (.doc/.docx), and plain text (.txt) are allowed.");
       return;
     }
+    if (!assertWithinBusinessContextFileLimit(file)) return;
     onFileChange(file);
   };
 
@@ -683,8 +701,8 @@ function FileFormatUploadFields({
       <div>
         <Label className="mb-2 block text-sm font-medium">Document file</Label>
         <p className="mb-2 text-xs text-muted-foreground">
-          Only PDF, Microsoft Word (.doc, .docx), or plain text (.txt) are accepted. The title field below is
-          filled from the file name unless you change it.
+          Only PDF, Microsoft Word (.doc, .docx), or plain text (.txt) are accepted. Maximum file size is 1.5
+          MB. The title field below is filled from the file name unless you change it.
         </p>
       </div>
 
@@ -695,7 +713,7 @@ function FileFormatUploadFields({
           selectedFile={selectedFile}
           onFileChange={applyDocument}
           dropTitle="Drop your document here or click to browse"
-          dropSubtitle="PDF, Word (.doc, .docx), or plain text (.txt) only."
+          dropSubtitle="PDF, Word (.doc, .docx), or plain text (.txt) only. Max 1.5 MB."
           selectedExtra={detectedExtra}
         />
       </div>

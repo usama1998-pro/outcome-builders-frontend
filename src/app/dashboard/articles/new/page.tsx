@@ -16,7 +16,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useUserCollections, useCreateUserCollection } from "@/src/hooks/useCollection";
-import { useCreateNote, useUpdateNote, useNote } from "@/src/hooks/useNotes";
+import { useCreateNote, useUpdateNote, useNote, useContentTypes } from "@/src/hooks/useNotes";
 import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
 import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
 import { toast } from "sonner";
@@ -31,6 +31,10 @@ function NewArticlePageContent() {
     const { mutate: createNote, isPending: isCreating } = useCreateNote();
     const { mutate: updateNote, isPending: isUpdating } = useUpdateNote();
     const { mutate: createCollection, isPending: isCreatingCollection } = useCreateUserCollection();
+
+    const contentTypeSlug = searchParams.get("content_type");
+    const { data: contentTypes } = useContentTypes();
+    const templateAppliedRef = useRef(false);
 
     // Get noteId from URL if editing
     const noteIdParam = searchParams.get("noteId");
@@ -81,13 +85,19 @@ function NewArticlePageContent() {
         },
     });
 
-    // Prevent body scrolling when component mounts
     useEffect(() => {
-        document.body.style.overflow = 'hidden';
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
-    }, []);
+        if (!editor || editingNoteId || !contentTypeSlug || templateAppliedRef.current) return;
+        // Chat → editor loads body from sessionStorage; don't replace with empty template
+        if (typeof window !== "undefined" && sessionStorage.getItem("pendingContent")) {
+            templateAppliedRef.current = true;
+            return;
+        }
+        const def = contentTypes?.find((c) => c.id === contentTypeSlug);
+        if (!def) return;
+        editor.commands.setContent(def.template);
+        setTitle((t) => (t.trim() ? t : def.title));
+        templateAppliedRef.current = true;
+    }, [editor, editingNoteId, contentTypeSlug, contentTypes]);
 
     // Simple markdown to HTML converter
     const markdownToHtml = (markdown: string): string => {
@@ -282,13 +292,6 @@ function NewArticlePageContent() {
         // Set saving flag
         isSavingRef.current = true;
 
-        const payload = {
-            title: articleTitle,
-            content: content,
-            collection_id: Number(collectionIdToUse),
-            visibility: "private" as const, // Articles are private by default (draft mode)
-        };
-
         // Use ref to get the latest noteId value (important for callbacks)
         const currentNoteId = noteIdRef.current;
 
@@ -297,7 +300,9 @@ function NewArticlePageContent() {
             updateNote(
                 {
                     note_id: currentNoteId,
-                    ...payload,
+                    title: articleTitle,
+                    content: content,
+                    visibility: "private",
                 },
                 {
                     onSuccess: (res) => {
@@ -314,7 +319,15 @@ function NewArticlePageContent() {
             );
         } else {
             // Create new draft
-            createNote(payload, {
+            createNote(
+                {
+                    title: articleTitle,
+                    content: content,
+                    collection_id: Number(collectionIdToUse),
+                    visibility: "private",
+                    ...(contentTypeSlug ? { content_type: contentTypeSlug } : {}),
+                },
+                {
                 onSuccess: (res) => {
                     if (res?.status) {
                         // Extract note ID from response - check multiple possible structures
@@ -324,25 +337,30 @@ function NewArticlePageContent() {
                         console.log("Create note response:", res);
                         console.log("Response data:", responseData);
                         
-                        // Try various response structures
-                        let newNoteId = responseData?.id || 
-                                       responseData?.note?.id || 
-                                       responseData?.data?.id ||
-                                       responseData?.data?.note?.id ||
-                                       (responseData?.note && typeof responseData.note === 'object' && responseData.note.id) ||
-                                       (responseData?.data?.note && typeof responseData.data.note === 'object' && responseData.data.note.id);
-                        
+                        // Try various response structures (use || only — mixing ?? with || breaks the parser)
+                        let newNoteId =
+                            responseData?.note?.id ||
+                            responseData?.id ||
+                            responseData?.data?.note?.id ||
+                            responseData?.data?.id ||
+                            (responseData?.note &&
+                                typeof responseData.note === "object" &&
+                                responseData.note.id) ||
+                            (responseData?.data?.note &&
+                                typeof responseData.data.note === "object" &&
+                                responseData.data.note.id);
+
                         // If still not found, check the entire response object
                         if (!newNoteId && (res as any).id) {
                             newNoteId = (res as any).id;
                         }
-                        
+
                         // Also check if the response has a nested structure
                         if (!newNoteId && responseData) {
                             // Try to find id in any nested object
                             const findId = (obj: any): number | null => {
-                                if (!obj || typeof obj !== 'object') return null;
-                                if (obj.id && typeof obj.id === 'number') return obj.id;
+                                if (!obj || typeof obj !== "object") return null;
+                                if (obj.id && typeof obj.id === "number") return obj.id;
                                 for (const key in obj) {
                                     if (obj.hasOwnProperty(key)) {
                                         const found = findId(obj[key]);
@@ -353,7 +371,7 @@ function NewArticlePageContent() {
                             };
                             newNoteId = findId(responseData);
                         }
-                        
+
                         if (newNoteId) {
                             const noteIdNum = Number(newNoteId);
                             console.log("Extracted note ID:", noteIdNum);
@@ -379,9 +397,10 @@ function NewArticlePageContent() {
                     // Silent fail for autosave, but log for debugging
                     console.error("Autosave failed:", error);
                 },
-            });
+            }
+            );
         }
-    }, [title, editor, selectedCollectionId, createNote, updateNote, router, ensureCollectionExists]);
+    }, [title, editor, selectedCollectionId, contentTypeSlug, createNote, updateNote, router, ensureCollectionExists]);
 
     // Manual save with toast notification
     const handleSaveDraft = useCallback(async () => {
@@ -416,13 +435,6 @@ function NewArticlePageContent() {
         // Set saving flag
         isSavingRef.current = true;
 
-        const payload = {
-            title: articleTitle,
-            content: content,
-            collection_id: Number(collectionIdToUse),
-            visibility: "private" as const, // Articles are private by default (draft mode)
-        };
-
         // Use ref to get the latest noteId value (important for callbacks)
         const currentNoteId = noteIdRef.current;
 
@@ -431,7 +443,9 @@ function NewArticlePageContent() {
             updateNote(
                 {
                     note_id: currentNoteId,
-                    ...payload,
+                    title: articleTitle,
+                    content: content,
+                    visibility: "private",
                 },
                 {
                     onSuccess: (res) => {
@@ -451,7 +465,15 @@ function NewArticlePageContent() {
             );
         } else {
             // Create new draft
-            createNote(payload, {
+            createNote(
+                {
+                    title: articleTitle,
+                    content: content,
+                    collection_id: Number(collectionIdToUse),
+                    visibility: "private",
+                    ...(contentTypeSlug ? { content_type: contentTypeSlug } : {}),
+                },
+                {
                 onSuccess: (res) => {
                     if (res?.status) {
                         // Extract note ID from response - check multiple possible structures
@@ -461,25 +483,30 @@ function NewArticlePageContent() {
                         console.log("Create note response (manual save):", res);
                         console.log("Response data:", responseData);
                         
-                        // Try various response structures
-                        let newNoteId = responseData?.id || 
-                                       responseData?.note?.id || 
-                                       responseData?.data?.id ||
-                                       responseData?.data?.note?.id ||
-                                       (responseData?.note && typeof responseData.note === 'object' && responseData.note.id) ||
-                                       (responseData?.data?.note && typeof responseData.data.note === 'object' && responseData.data.note.id);
-                        
+                        // Try various response structures (use || only — mixing ?? with || breaks the parser)
+                        let newNoteId =
+                            responseData?.note?.id ||
+                            responseData?.id ||
+                            responseData?.data?.note?.id ||
+                            responseData?.data?.id ||
+                            (responseData?.note &&
+                                typeof responseData.note === "object" &&
+                                responseData.note.id) ||
+                            (responseData?.data?.note &&
+                                typeof responseData.data.note === "object" &&
+                                responseData.data.note.id);
+
                         // If still not found, check the entire response object
                         if (!newNoteId && (res as any).id) {
                             newNoteId = (res as any).id;
                         }
-                        
+
                         // Also check if the response has a nested structure
                         if (!newNoteId && responseData) {
                             // Try to find id in any nested object
                             const findId = (obj: any): number | null => {
-                                if (!obj || typeof obj !== 'object') return null;
-                                if (obj.id && typeof obj.id === 'number') return obj.id;
+                                if (!obj || typeof obj !== "object") return null;
+                                if (obj.id && typeof obj.id === "number") return obj.id;
                                 for (const key in obj) {
                                     if (obj.hasOwnProperty(key)) {
                                         const found = findId(obj[key]);
@@ -490,7 +517,7 @@ function NewArticlePageContent() {
                             };
                             newNoteId = findId(responseData);
                         }
-                        
+
                         if (newNoteId) {
                             const noteIdNum = Number(newNoteId);
                             console.log("Extracted note ID (manual save):", noteIdNum);
@@ -517,9 +544,10 @@ function NewArticlePageContent() {
                     isSavingRef.current = false;
                     toast.error("Failed to save article");
                 },
-            });
+            }
+            );
         }
-    }, [title, editor, selectedCollectionId, createNote, updateNote, router, ensureCollectionExists]);
+    }, [title, editor, selectedCollectionId, contentTypeSlug, createNote, updateNote, router, ensureCollectionExists]);
 
     // Handle back button - save as draft
     const handleBack = useCallback(() => {
@@ -587,19 +615,14 @@ function NewArticlePageContent() {
 
         const content = editor?.getHTML() || "<p></p>";
 
-        const payload = {
-            title: title.trim(),
-            content: content,
-            collection_id: Number(collectionIdToUse),
-            visibility: "private" as const, // Articles are private by default
-        };
-
         if (noteId) {
             // Update existing article
             updateNote(
                 {
                     note_id: noteId,
-                    ...payload,
+                    title: title.trim(),
+                    content: content,
+                    visibility: "private",
                 },
                 {
                     onSuccess: async (res) => {
@@ -626,10 +649,19 @@ function NewArticlePageContent() {
             );
         } else {
             // Create new article
-            createNote(payload, {
+            createNote(
+                {
+                    title: title.trim(),
+                    content: content,
+                    collection_id: Number(collectionIdToUse),
+                    visibility: "private",
+                    ...(contentTypeSlug ? { content_type: contentTypeSlug } : {}),
+                },
+                {
                 onSuccess: async (res) => {
                     if (res?.status) {
-                        const newNoteId = (res.data as any)?.id || (res.data as any)?.note?.id;
+                        const d = res.data as { note?: { id: number } } | undefined;
+                        const newNoteId = d?.note?.id;
                         if (newNoteId) {
                             setNoteId(newNoteId);
                             toast.success("Article published!");
@@ -652,7 +684,8 @@ function NewArticlePageContent() {
                     const error = err as { message?: string };
                     toast.error(error?.message || "Request failed, please try again.");
                 },
-            });
+            }
+            );
         }
     };
 
@@ -674,7 +707,7 @@ function NewArticlePageContent() {
 
     return (
         <RequireAuth>
-            <div className="flex flex-col w-full h-screen bg-background overflow-hidden">
+            <div className="flex flex-col w-full min-h-0 h-full bg-background overflow-hidden">
                 {/* Header with Title and Actions */}
                 <div className="px-8 pt-3 pb-3 border-b flex-shrink-0 bg-background z-10">
                     <div className="flex items-center gap-4">
@@ -845,12 +878,10 @@ function NewArticlePageContent() {
                             </Button>
                         </div>
 
-                        {/* Editor Content - Scrollable */}
+                        {/* Editor Content — single scroll region (avoid nested scroll with layout main) */}
                         <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 bg-background">
-                            <div className="max-w-4xl mx-auto p-4 py-8">
-                                <div className="min-h-[calc(100vh-300px)]">
-                                    <EditorContent editor={editor} />
-                                </div>
+                            <div className="max-w-4xl mx-auto p-4 py-8 pb-16">
+                                <EditorContent editor={editor} />
                             </div>
                         </div>
                 </div>

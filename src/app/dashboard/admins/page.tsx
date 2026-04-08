@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,8 +120,9 @@ const categoryConfig: Record<string, { icon: React.ReactNode; gradient: string; 
     },
 };
 
-export default function AdminsPage() {
+function AdminsPageContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const currentTenantId = useAuthStore((s) => s.tenantId);
     const { data: organization, isLoading, isError, error } = useOrganizationDetails(currentTenantId || 0);
 
@@ -138,6 +139,22 @@ export default function AdminsPage() {
     const canManageAdmins = hasPermission(PERMISSIONS.ADMIN_MANAGE) || isOwnerOrAdmin;
     const canManageRoles = hasPermission(PERMISSIONS.ROLE_MANAGE) || isOwnerOrAdmin;
     const canInviteUsers = hasPermission(PERMISSIONS.USER_INVITE) || isOwnerOrAdmin;
+
+    const teamTab = useMemo(() => {
+        const t = searchParams.get("tab");
+        if (t === "roles" && canManageRoles) return "roles";
+        if (t === "invitations" && canInviteUsers) return "invitations";
+        if (t === "admins") return "admins";
+        return "admins";
+    }, [searchParams, canManageRoles, canInviteUsers]);
+
+    const setTeamTab = (value: string) => {
+        if (value === "admins") {
+            router.replace("/dashboard/admins");
+        } else {
+            router.replace(`/dashboard/admins?tab=${value}`);
+        }
+    };
 
     // Check if user can access this page at all
     const canAccessPage = hasPermission(PERMISSIONS.ADMIN_MANAGE) ||
@@ -566,7 +583,7 @@ export default function AdminsPage() {
                     </div>
                 </div>
 
-                <Tabs defaultValue="admins" className="w-full flex flex-col items-center">
+                <Tabs value={teamTab} onValueChange={setTeamTab} className="w-full flex flex-col items-center">
                         <TabsList className={`grid w-full max-w-2xl ${canManageRoles ? "grid-cols-3" : "grid-cols-2"}`}>
                         <TabsTrigger value="admins" className="flex items-center gap-2">
                             <Users className="h-4 w-4 text-[#DB2B30]" />
@@ -1408,5 +1425,21 @@ export default function AdminsPage() {
                 </AlertDialog>
             </div>
         </RequireAuth>
+    );
+}
+
+export default function AdminsPage() {
+    return (
+        <Suspense
+            fallback={
+                <RequireAuth>
+                    <div className="w-full h-full flex items-center justify-center p-5">
+                        <BlocksLoader />
+                    </div>
+                </RequireAuth>
+            }
+        >
+            <AdminsPageContent />
+        </Suspense>
     );
 }

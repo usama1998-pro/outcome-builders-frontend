@@ -6,7 +6,7 @@ import { NotesList } from "@/src/components/List/Notes/NotesList";
 import { useParams, useRouter } from "next/navigation";
 import { FaPlus } from "react-icons/fa";
 import { FileText, Plus, Sparkles, BookOpen } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useCollectionNotes } from "@/src/hooks/useNotes";
 import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
 import { useUserCollections } from "@/src/hooks/useCollection";
@@ -16,6 +16,7 @@ import RequireAuth from "@/src/components/auth/requireAuth";
 import { useNotePermissions } from "@/src/hooks/useNotePermissions";
 import { Input } from "@/components/ui/input";
 import { useBrainSpaceStore } from "@/src/store/useBrainSpace";
+import CreateContentTypeDialog from "@/src/components/Content/CreateContentTypeDialog";
 
 export default function NotesPage() {
     const router = useRouter();
@@ -31,6 +32,12 @@ export default function NotesPage() {
 
     const { data: notes, isLoading, isError, error, refetch } = useCollectionNotes(collectionIdParam ?? null);
     const [searchQuery, setSearchQuery] = useState("");
+    const [createContentOpen, setCreateContentOpen] = useState(false);
+
+    const collectionOptions = useMemo(() => {
+        if (!collection) return [];
+        return [{ id: collection.id, title: collection.title }];
+    }, [collection]);
 
     useEffect(() => {
         if (workspaceIdNum && workspaceIdNum !== currentBrainSpaceId) {
@@ -48,6 +55,19 @@ export default function NotesPage() {
     return (
         <RequireAuth>
             <div className="flex flex-col items-center justify-center p-4">
+                {collection && (
+                    <CreateContentTypeDialog
+                        open={createContentOpen}
+                        onOpenChange={setCreateContentOpen}
+                        lockCollectionId={collection.id}
+                        collections={collectionOptions}
+                        onContinue={({ contentTypeId, collectionId }) => {
+                            router.push(
+                                `/dashboard/articles/new?collection_id=${collectionId}&content_type=${encodeURIComponent(contentTypeId)}`
+                            );
+                        }}
+                    />
+                )}
                 <nav className="sticky top-0 z-[60] w-[90%] mx-auto self-center px-15 flex justify-between items-center bg-background border-b border-border py-3">
                     <Input
                         type="text"
@@ -58,12 +78,8 @@ export default function NotesPage() {
                     />
 
                     {canCreateNote && collection && (
-                        <Button
-                            onClick={() => {
-                                router.push(`/dashboard/articles/new?collection_id=${collection.id}`);
-                            }}
-                        >
-                            <FaPlus className="mr-2" /> New Article
+                        <Button onClick={() => setCreateContentOpen(true)}>
+                            <FaPlus className="mr-2" /> Create Content
                         </Button>
                     )}
                 </nav>
@@ -147,13 +163,11 @@ export default function NotesPage() {
 
                             {canCreateNote && (
                                 <Button
-                                    onClick={() => {
-                                        router.push(`/dashboard/articles/new?collection_id=${collection.id}`);
-                                    }}
+                                    onClick={() => setCreateContentOpen(true)}
                                     className="bg-[#DB2B30] hover:bg-[#B52227] text-white shadow-lg hover:shadow-xl transition-all"
                                 >
                                     <Plus className="w-4 h-4 mr-2" />
-                                    Create Your First Article
+                                    Create Your First Content
                                 </Button>
                             )}
 

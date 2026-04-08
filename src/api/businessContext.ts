@@ -48,6 +48,7 @@ export type BusinessContextNoteListItem = {
   description?: string | null;
   context_slug: string;
   created_at: string | null;
+  is_trained?: boolean;
 };
 
 export type BusinessContextMediaListItem = {
@@ -64,6 +65,18 @@ export type BusinessContextMediaListItem = {
   /** Populated for audio uploads when duration is detected server-side. */
   duration_seconds?: number | null;
   created_at: string | null;
+  is_trained?: boolean;
+};
+
+/** Response shape from POST .../train (matches SuccessResponse). */
+export type BusinessContextTrainResponse = {
+  status?: boolean;
+  message?: string;
+  data?: {
+    id: number;
+    is_trained: boolean;
+    message: string;
+  };
 };
 
 export type PaginatedList<T> = {
@@ -146,14 +159,16 @@ export async function updateBusinessContextMediaSourceTitle(mediaId: number, pay
   return data?.data;
 }
 
-export async function trainBusinessContextNote(noteId: number) {
-  const { data } = await api.post(routes.businessContext.trainNote(noteId));
-  return data?.data;
+export async function trainBusinessContextNote(noteId: number): Promise<BusinessContextTrainResponse | undefined> {
+  const { data } = await api.post<BusinessContextTrainResponse>(routes.businessContext.trainNote(noteId));
+  return data;
 }
 
-export async function trainBusinessContextMediaSource(mediaId: number) {
-  const { data } = await api.post(routes.businessContext.trainMediaSource(mediaId));
-  return data?.data;
+export async function trainBusinessContextMediaSource(
+  mediaId: number,
+): Promise<BusinessContextTrainResponse | undefined> {
+  const { data } = await api.post<BusinessContextTrainResponse>(routes.businessContext.trainMediaSource(mediaId));
+  return data;
 }
 
 export async function deleteBusinessContextNote(noteId: number) {

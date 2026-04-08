@@ -4,12 +4,22 @@ import routes from "../lib/routes";
 import Notes from "../types/notes";
 import { useAuthStore } from "../store/useAuth";
 
+export interface ContentTypeItem {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  required: boolean;
+  template: string;
+}
+
 interface NoteApiItem {
   id: number;
   uuid?: string | null;
   title: string;
   content: string;
   collection_id: number;
+  content_type?: string | null;
   created_at: string | null;
   created_by: number;
   file_name: string | null;
@@ -40,6 +50,7 @@ interface CreateNotePayload {
   content: string;
   collection_id: number;
   visibility?: "private" | "public" | "shared";
+  content_type?: string;
   file?: File | null;
 }
 
@@ -68,6 +79,7 @@ interface SingleNoteApiItem {
   title: string;
   content: string;
   collection_id: number;
+  content_type?: string | null;
   user_id: number;
   created_at: string | null;
   is_pinned: boolean;
@@ -111,6 +123,7 @@ async function fetchCollectionNotes(collectionIdOrUuid: number | string): Promis
     id: n.id,
     uuid: n.uuid ?? null,
     title: n.title,
+    content_type: n.content_type,
     createdAt: n.created_at ?? "",
     createdBy: String(n.created_by || n.user_id || ""),
     fileName: n.file_name,
@@ -137,6 +150,10 @@ async function createNote(
   formData.append("content", payload.content);
   formData.append("collection_id", String(payload.collection_id));
   formData.append("visibility", payload.visibility || "private");
+
+  if (payload.content_type) {
+    formData.append("content_type", payload.content_type);
+  }
 
   if (payload.file) {
     formData.append("file", payload.file);
@@ -193,6 +210,30 @@ async function deleteNote(
 ): Promise<{ status: boolean; message: string }> {
   const { data } = await api.delete(routes.notes.delete(payload.note_id));
   return data;
+}
+
+interface ContentTypesApiResponse {
+  status: boolean;
+  message: string;
+  data: {
+    content_types: ContentTypeItem[];
+  };
+}
+
+async function fetchContentTypes(): Promise<ContentTypeItem[]> {
+  const { data } = await api.get<ContentTypesApiResponse>(routes.notes.contentTypes);
+  return data.data.content_types;
+}
+
+export function useContentTypes() {
+  const tenantId = useAuthStore((state) => state.tenantId);
+  const hydrated = useAuthStore((state) => state.hydrated);
+  return useQuery<ContentTypeItem[], Error>({
+    queryKey: ["noteContentTypes", tenantId],
+    queryFn: fetchContentTypes,
+    enabled: !!tenantId && hydrated,
+    staleTime: 1000 * 60 * 60,
+  });
 }
 
 // ------------------ // Hooks // ------------------

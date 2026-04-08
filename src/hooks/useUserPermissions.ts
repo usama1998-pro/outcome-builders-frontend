@@ -10,6 +10,7 @@ export interface UserPermissions {
   permissions: string[];
   is_owner: boolean;
   is_admin: boolean;
+  is_superuser?: boolean;
 }
 
 interface PermissionsApiResponse {
@@ -32,6 +33,7 @@ export function useUserPermissions() {
   const tenantId = useAuthStore((state) => state.tenantId);
   const userId = useAuthStore((state) => state.userId);
   const hydrated = useAuthStore((state) => state.hydrated);
+  const storeIsSuperuser = useAuthStore((state) => state.isSuperuser);
 
   const queryEnabled = !!tenantId && !!userId && hydrated;
 
@@ -51,24 +53,29 @@ export function useUserPermissions() {
   const isLoading = !hydrated || !tenantId || !userId || queryLoading;
 
   // Helper functions for checking permissions
+  const isSuperuser = storeIsSuperuser || data?.is_superuser === true;
+
   const hasPermission = (permission: string): boolean => {
+    if (isSuperuser) return true;
     if (!data) return false;
     return data.permissions.includes(permission);
   };
 
   const hasAnyPermission = (permissions: string[]): boolean => {
+    if (isSuperuser) return true;
     if (!data || !data.permissions || !Array.isArray(data.permissions)) return false;
     return permissions.some((p) => data.permissions.includes(p));
   };
 
   const hasAllPermissions = (permissions: string[]): boolean => {
+    if (isSuperuser) return true;
     if (!data) return false;
     return permissions.every((p) => data.permissions.includes(p));
   };
 
   const isOwner = data?.is_owner ?? false;
   const isAdmin = data?.is_admin ?? false;
-  const isOwnerOrAdmin = isOwner || isAdmin;
+  const isOwnerOrAdmin = isOwner || isAdmin || isSuperuser;
 
   return {
     data,
@@ -79,6 +86,7 @@ export function useUserPermissions() {
     permissions: data?.permissions ?? [],
     isOwner,
     isAdmin,
+    isSuperuser,
     isOwnerOrAdmin,
     hasPermission,
     hasAnyPermission,

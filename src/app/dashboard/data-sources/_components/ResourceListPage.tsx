@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import type { LucideIcon } from "lucide-react";
 import {
+  Brain,
   Braces,
   ChevronLeft,
   ChevronRight,
@@ -241,6 +242,8 @@ type ListRow = {
   id: string;
   name: string;
   updated: string;
+  /** Notes + document files: knowledge-base training state */
+  isTrained?: boolean;
   fileTypeLabel?: string;
   sizeLabel?: string;
   /** Audio list: formatted duration (uploads with detected length). */
@@ -314,6 +317,8 @@ export default function ResourceListPage({ contextSlug, resourceTypeId }: Resour
   const isVideo = resourceTypeId === "video";
   const isNotes = resourceTypeId === "notes";
   const isLinks = resourceTypeId === "links";
+  /** Train/Untrain matches workspace notes: only notes (content) and document files. */
+  const supportsTrain = isNotes || isFiles;
   /** Multi-select + bulk remove (files, video, audio, notes, links). */
   const supportsBulkSelect = isFiles || isVideo || isAudio || isNotes || isLinks;
   const tableColCount = isFiles
@@ -413,6 +418,7 @@ export default function ResourceListPage({ contextSlug, resourceTypeId }: Resour
         id: String(n.id),
         name: n.title,
         updated: formatUpdated(n.created_at),
+        isTrained: n.is_trained === true,
         format: { variant: "note" as const },
       }));
     } else {
@@ -421,6 +427,7 @@ export default function ResourceListPage({ contextSlug, resourceTypeId }: Resour
         id: String(m.id),
         name: m.title,
         updated: formatUpdated(m.created_at),
+        isTrained: m.is_trained === true,
         fileTypeLabel: isFiles ? documentTypeLabel(m.file_type, m.file_name) : undefined,
         sizeLabel:
           isFiles || resourceTypeId === "audio" ? formatFileSizeDisplay(m.file_size) : undefined,
@@ -522,17 +529,22 @@ export default function ResourceListPage({ contextSlug, resourceTypeId }: Resour
   const handleTrain = async (id: number) => {
     setTrainPendingId(id);
     try {
-      if (resourceTypeId === "notes") {
-        await trainBusinessContextNote(id);
-      } else {
-        await trainBusinessContextMediaSource(id);
-      }
-      toast.success("Training queued for this resource");
+      const res =
+        resourceTypeId === "notes"
+          ? await trainBusinessContextNote(id)
+          : await trainBusinessContextMediaSource(id);
+      const successMsg = res?.data?.message ?? res?.message;
+      toast.success(
+        typeof successMsg === "string" && successMsg.trim()
+          ? successMsg
+          : "Training updated successfully.",
+      );
       void queryClient.invalidateQueries({
         queryKey: ["businessContextResources", contextSlug, resourceTypeId],
       });
+      void queryClient.invalidateQueries({ queryKey: ["contextResourceCounts"] });
     } catch (err: unknown) {
-      toast.error(getApiErrorDetail(err) ?? "Failed to queue training");
+      toast.error(getApiErrorDetail(err) ?? "Failed to update training");
     } finally {
       setTrainPendingId(null);
     }
@@ -804,7 +816,19 @@ export default function ResourceListPage({ contextSlug, resourceTypeId }: Resour
                     ) : null}
                     <TableCell className="font-medium">
                       <div className="min-w-0">
-                        <div>{row.name}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="min-w-0 break-words">{row.name}</span>
+                          {supportsTrain && trainPendingId === Number(row.id) ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                              Training…
+                            </span>
+                          ) : supportsTrain && row.isTrained ? (
+                            <span className="shrink-0 rounded-md border border-[#DB2B30]/35 bg-[#DB2B30]/10 px-2 py-0.5 text-xs font-medium text-[#DB2B30]">
+                              Trained
+                            </span>
+                          ) : null}
+                        </div>
                         {isFiles && (row.fileTypeLabel || row.sizeLabel) ? (
                           <div className="mt-1 text-xs text-muted-foreground sm:hidden">
                             {[row.fileTypeLabel, row.sizeLabel].filter(Boolean).join(" · ")}
@@ -895,19 +919,45 @@ export default function ResourceListPage({ contextSlug, resourceTypeId }: Resour
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuContent align="end" className="w-48">
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
+                            disabled={supportsTrain && !!row.isTrained}
+                            title={
+                              supportsTrain && row.isTrained
+                                ? "Untrain this resource before removing it."
+                                : undefined
+                            }
                             onClick={() => setDeleteTarget({ id: Number(row.id), name: row.name })}
                           >
                             Remove
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled={trainPendingId === Number(row.id)}
-                            onClick={() => void handleTrain(Number(row.id))}
-                          >
-                            Train
-                          </DropdownMenuItem>
+                          {supportsTrain ? (
+                            <DropdownMenuItem
+                              className={cn(
+                                "cursor-pointer",
+                                row.isTrained ? "text-[#DB2B30] focus:text-[#DB2B30]" : "",
+                                trainPendingId === Number(row.id) ? "opacity-60" : "",
+                              )}
+                              disabled={trainPendingId === Number(row.id)}
+                              onClick={() => void handleTrain(Number(row.id))}
+                            >
+                              {trainPendingId === Number(row.id) ? (
+                                <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                              ) : (
+                                <Brain className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+                              )}
+                              {trainPendingId === Number(row.id)
+                                ? "Processing…"
+                                : isNotes
+                                  ? row.isTrained
+                                    ? "Untrain content"
+                                    : "Train content"
+                                  : row.isTrained
+                                    ? "Untrain file"
+                                    : "Train file"}
+                            </DropdownMenuItem>
+                          ) : null}
                           <DropdownMenuItem
                             onClick={() => {
                               setRenameTarget({ id: Number(row.id), name: row.name });

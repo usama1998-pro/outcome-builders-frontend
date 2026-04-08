@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { useUserCollections } from "@/src/hooks/useCollection";
 import { useNotePermissions } from "@/src/hooks/useNotePermissions";
-import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import api from "@/src/lib/axios";
 import routes from "@/src/lib/routes";
 import Notes from "@/src/types/notes";
@@ -45,7 +45,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { useDeleteNote, useToggleTrainNote, useCreateNote, useMoveNote } from "@/src/hooks/useNotes";
+import { useDeleteNote, useToggleTrainNote, useMoveNote } from "@/src/hooks/useNotes";
 import { useUserWorkspaces } from "@/src/hooks/useWorkspace";
 import { FileText, Plus, Sparkles, BookOpen, RefreshCw, FolderKanban, Copy, Pencil, Loader2 } from "lucide-react";
 import {
@@ -56,7 +56,6 @@ import {
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
     Select,
     SelectContent,
@@ -64,10 +63,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { useRouter } from "next/navigation";
+import CreateContentTypeDialog from "@/src/components/Content/CreateContentTypeDialog";
 
 interface NoteWithCollection extends Notes {
     collectionId: number;
@@ -77,14 +74,6 @@ interface NoteWithCollection extends Notes {
     workspaceName: string;
 }
 
-
-const createNoteSchema = z.object({
-    title: z.string().min(1, "Title is required").max(200, "Title is too long"),
-    content: z.string().min(1, "Content is required"),
-    collection_id: z.string().min(1, "Please select a collection"),
-});
-
-type CreateNoteFormValues = z.infer<typeof createNoteSchema>;
 
 function AllNotesList({ notes, searchQuery = "" }: { notes: NoteWithCollection[]; searchQuery?: string }) {
     const { mutate: deleteNote, isPending: isDeleting } = useDeleteNote();
@@ -567,10 +556,7 @@ export default function AllNotesPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const tenantId = useAuthStore((state) => state.tenantId);
     const hydrated = useAuthStore((state) => state.hydrated);
-    const userId = useAuthStore((state) => state.userId);
-    const [open, setOpen] = useState(false);
-    const queryClient = useQueryClient();
-    const { mutate: createNote, isPending } = useCreateNote();
+    const [createContentOpen, setCreateContentOpen] = useState(false);
 
     // Collections are already filtered by backend based on workspace_id
     const filteredCollections = collections || [];
@@ -578,20 +564,10 @@ export default function AllNotesPage() {
     // Use shared permission hook (no collectionId for side menu - checks global permissions)
     const { canCreateNote, permissionsLoading, hasAnyNotePermission, isOwnerOrAdmin, permissions, refetchPermissions } = useNotePermissions();
 
-    const form = useForm<CreateNoteFormValues>({
-        resolver: zodResolver(createNoteSchema),
-        defaultValues: {
-            title: "",
-            content: "",
-            collection_id: "",
-        },
-    });
-
-    const onSubmit = (values: CreateNoteFormValues) => {
-        // Redirect to the new article editor instead of creating directly
-        setOpen(false);
-        router.push(`/dashboard/articles/new?collection_id=${values.collection_id}`);
-    };
+    const collectionOptions = useMemo(
+        () => filteredCollections.map((c) => ({ id: c.id, title: c.title })),
+        [filteredCollections]
+    );
 
     // Fetch notes for filtered collections using useQueries
     const noteQueries = useQueries({
@@ -644,6 +620,16 @@ export default function AllNotesPage() {
     return (
         <RequireAuth>
             <div className="flex flex-col items-center justify-center p-4">
+                <CreateContentTypeDialog
+                    open={createContentOpen}
+                    onOpenChange={setCreateContentOpen}
+                    collections={collectionOptions}
+                    onContinue={({ contentTypeId, collectionId }) => {
+                        router.push(
+                            `/dashboard/articles/new?collection_id=${collectionId}&content_type=${encodeURIComponent(contentTypeId)}`
+                        );
+                    }}
+                />
 
                 <nav className="sticky top-0 z-[60] w-[90%] mx-auto self-center px-15 flex justify-between items-center bg-background border-b border-border py-3">
                     <Input
@@ -655,20 +641,9 @@ export default function AllNotesPage() {
                     />
 
                     {filteredCollections && filteredCollections.length > 0 && !permissionsLoading && canCreateNote && (
-                        <Button
-                            className="gap-2"
-                            onClick={() => {
-                                // If only one collection, redirect with it pre-selected
-                                if (filteredCollections.length === 1) {
-                                    router.push(`/dashboard/articles/new?collection_id=${filteredCollections[0].id}`);
-                                } else {
-                                    // Otherwise, just go to editor and let user select
-                                    router.push(`/dashboard/articles/new`);
-                                }
-                            }}
-                        >
+                        <Button className="gap-2" onClick={() => setCreateContentOpen(true)}>
                             <Plus className="h-4 w-4" />
-                            Create Article
+                            Create Content
                         </Button>
                     )}
                 </nav>
@@ -726,19 +701,11 @@ No content has been created yet. Start documenting your knowledge by creating yo
 
                             {filteredCollections && filteredCollections.length > 0 && canCreateNote && (
                                 <Button
-                                    onClick={() => {
-                                        // If only one collection, redirect with it pre-selected
-                                        if (filteredCollections.length === 1) {
-                                            router.push(`/dashboard/articles/new?collection_id=${filteredCollections[0].id}`);
-                                        } else {
-                                            // Otherwise, just go to editor and let user select
-                                            router.push(`/dashboard/articles/new`);
-                                        }
-                                    }}
+                                    onClick={() => setCreateContentOpen(true)}
                                     className="bg-[#DB2B30] hover:bg-[#B52227] text-white shadow-lg hover:shadow-xl transition-all"
                                 >
                                     <Plus className="w-4 h-4 mr-2" />
-                                    Create Your First Article
+                                    Create Your First Content
                                 </Button>
                             )}
 

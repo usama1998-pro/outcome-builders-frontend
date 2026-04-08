@@ -100,7 +100,12 @@ function TwoFAVerificationContent() {
             
             if (response?.data?.token) {
                 toast.success("Verification successful!");
-                await login(response.data.token, response.data.user_id);
+                await login(
+                    response.data.token,
+                    response.data.user_id,
+                    "/dashboard",
+                    (response.data as { is_superuser?: boolean }).is_superuser === true
+                );
             } else {
                 toast.error("Verification failed. Please try again.");
             }

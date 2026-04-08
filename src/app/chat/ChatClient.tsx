@@ -59,6 +59,7 @@ import { extractYoutubeVideoId } from "@/src/lib/youtubeUrl";
 import { preprocessAssistantMarkdownForLinkCards } from "@/src/lib/chatMarkdownPreprocess";
 import { cn } from "@/lib/utils";
 import { ChatLandingPage } from "./ChatLanding";
+import CreateContentFromChatDialog from "@/src/components/Content/CreateContentFromChatDialog";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -1395,6 +1396,9 @@ export default function ChatClient({
     };
 
     const [selectedContentMessageIds, setSelectedContentMessageIds] = useState<number[]>([]);
+    const [contentTypeDialogOpen, setContentTypeDialogOpen] = useState(false);
+    const [pendingChatArticleText, setPendingChatArticleText] = useState("");
+    const [conversationTextForInference, setConversationTextForInference] = useState("");
 
     // Clicking "Select for Content" on a message now toggles it in the multi-select list.
     // The actual content is created from the bottom selection bar.
@@ -1409,8 +1413,9 @@ export default function ChatClient({
     };
 
     const handleCreateContentFromSelection = () => {
+        const ids = selectedContentMessageIds ?? [];
         const selectedMessagesInOrder = messages.filter(
-            (msg) => msg.answer && !msg.question && (selectedContentMessageIds ?? []).includes(msg.id)
+            (msg) => msg.answer && !msg.question && ids.includes(msg.id)
         );
 
         const combinedContent = selectedMessagesInOrder
@@ -1423,9 +1428,43 @@ export default function ChatClient({
             return;
         }
 
-        sessionStorage.setItem("pendingContent", combinedContent);
+        // User question(s) + assistant answer(s) for content-type suggestion
+        const inferenceParts: string[] = [];
+        for (const ai of selectedMessagesInOrder) {
+            const idx = messages.findIndex((m) => m.id === ai.id);
+            if (idx > 0) {
+                const prev = messages[idx - 1];
+                if (prev?.question?.trim()) {
+                    inferenceParts.push(prev.question.trim());
+                }
+            }
+            if (ai.answer?.trim()) inferenceParts.push(ai.answer.trim());
+        }
+        const inferenceText = inferenceParts.join("\n\n") || combinedContent;
+
+        setPendingChatArticleText(combinedContent);
+        setConversationTextForInference(inferenceText);
+        setContentTypeDialogOpen(true);
+    };
+
+    const handleConfirmContentTypeFromChat = (contentTypeId: string) => {
+        if (!pendingChatArticleText.trim()) {
+            toast.error("No content to save.");
+            return;
+        }
+        sessionStorage.setItem("pendingContent", pendingChatArticleText);
         setSelectedContentMessageIds([]);
-        router.push("/dashboard/articles/new");
+        setPendingChatArticleText("");
+        setConversationTextForInference("");
+        router.push(`/dashboard/articles/new?content_type=${encodeURIComponent(contentTypeId)}`);
+    };
+
+    const handleContentTypeDialogOpenChange = (open: boolean) => {
+        setContentTypeDialogOpen(open);
+        if (!open) {
+            setPendingChatArticleText("");
+            setConversationTextForInference("");
+        }
     };
 
     // Async function to rename chat tab once per tab (first user message after tab exists).
@@ -3025,7 +3064,7 @@ export default function ChatClient({
                                             embed ? "h-2.5 w-2.5" : "mr-1 h-3 w-3",
                                         )}
                                     />
-                                    {embed ? "For content" : "Select for Content"}
+                                    {embed ? "Type & editor" : "Create content"}
                                 </Button>
                             </div>
                         </div>
@@ -3319,6 +3358,13 @@ export default function ChatClient({
                     </div>
                 </SheetContent>
             </Sheet>
+
+            <CreateContentFromChatDialog
+                open={contentTypeDialogOpen}
+                onOpenChange={handleContentTypeDialogOpenChange}
+                conversationText={conversationTextForInference}
+                onConfirm={handleConfirmContentTypeFromChat}
+            />
         </div>
     );
 }

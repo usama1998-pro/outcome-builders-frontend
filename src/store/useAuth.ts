@@ -10,6 +10,7 @@ type AuthState = {
   token: string | null;
   userId: number | null;
   tenantId: number | null;
+  isSuperuser: boolean;
   hydrated: boolean;
   onboarding: OnboardingState;
   pendingWorkspaceIds: number[] | null;  // Workspace IDs to assign after onboarding
@@ -17,6 +18,7 @@ type AuthState = {
   setToken: (token: string) => void;
   setUserId: (userId: number) => void;
   setTenantId: (tenantId: number) => void;
+  setIsSuperuser: (value: boolean) => void;
   setOnboardingPath: (path: string) => void;
   setPendingWorkspaceIds: (workspaceIds: number[]) => void;
   setWorkspaceJoiningToken: (token: string) => void;
@@ -29,6 +31,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   token: null,
   userId: null,
   tenantId: null,
+  isSuperuser: false,
   hydrated: false,
   pendingWorkspaceIds: null,
   workspaceJoiningToken: null,
@@ -51,6 +54,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   setTenantId: (tenantId) => {
     localStorage.setItem("tenant_id", String(tenantId));
     set({ tenantId });
+  },
+
+  setIsSuperuser: (value) => {
+    localStorage.setItem("is_superuser", value ? "true" : "false");
+    set({ isSuperuser: value });
   },
 
   setPendingWorkspaceIds: (workspaceIds) => {
@@ -87,6 +95,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem("access_token");
     localStorage.removeItem("user_id");
     localStorage.removeItem("tenant_id");
+    localStorage.removeItem("is_superuser");
     localStorage.removeItem("onboarding_state");
     localStorage.removeItem("pending_workspace_ids");
     localStorage.removeItem("workspace_joining_token");
@@ -94,6 +103,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       token: null,
       userId: null,
       tenantId: null,
+      isSuperuser: false,
       pendingWorkspaceIds: null,
       workspaceJoiningToken: null,
       onboarding: { isComplete: true, lastPath: null, lastVisit: null },
@@ -104,6 +114,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     const storedToken = localStorage.getItem("access_token");
     const storedUserId = localStorage.getItem("user_id");
     const storedTenantId = localStorage.getItem("tenant_id");
+    const storedIsSuperuser = localStorage.getItem("is_superuser") === "true";
     const storedOnboarding = localStorage.getItem("onboarding_state");
     const storedPendingWorkspaceIds = localStorage.getItem("pending_workspace_ids");
     const storedWorkspaceJoiningToken = localStorage.getItem("workspace_joining_token");
@@ -148,6 +159,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         token: null,
         userId: null,
         tenantId: null,
+        isSuperuser: false,
         hydrated: true,
         pendingWorkspaceIds: null,
         workspaceJoiningToken: null,
@@ -171,6 +183,30 @@ export const useAuthStore = create<AuthState>((set) => ({
       const data = await res.json();
 
       if (res.ok && data.status === true) {
+        let isSuperuser = storedIsSuperuser;
+        try {
+          const profileRes = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/user/profile`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${storedToken}`,
+              },
+            }
+          );
+          const profileJson = await profileRes.json();
+          if (profileRes.ok && profileJson?.data?.is_superuser === true) {
+            isSuperuser = true;
+            localStorage.setItem("is_superuser", "true");
+          } else if (profileRes.ok && profileJson?.data?.is_superuser === false) {
+            isSuperuser = false;
+            localStorage.setItem("is_superuser", "false");
+          }
+        } catch {
+          // keep storedIsSuperuser
+        }
+
         console.log(
           "[hydrate] Token valid, setting tenantId:",
           storedTenantId ? Number(storedTenantId) : null
@@ -179,6 +215,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           token: storedToken,
           userId: storedUserId ? Number(storedUserId) : null,
           tenantId: storedTenantId ? Number(storedTenantId) : null,
+          isSuperuser,
           hydrated: true,
           pendingWorkspaceIds: pendingWorkspaceIds,
           workspaceJoiningToken: workspaceJoiningToken,
@@ -190,6 +227,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         localStorage.removeItem("access_token");
         localStorage.removeItem("user_id");
         localStorage.removeItem("tenant_id");
+        localStorage.removeItem("is_superuser");
         localStorage.removeItem("onboarding_state");
         localStorage.removeItem("pending_workspace_ids");
         localStorage.removeItem("workspace_joining_token");
@@ -197,6 +235,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           token: null,
           userId: null,
           tenantId: null,
+          isSuperuser: false,
           hydrated: true,
           pendingWorkspaceIds: null,
           workspaceJoiningToken: null,
@@ -208,6 +247,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       localStorage.removeItem("access_token");
       localStorage.removeItem("user_id");
       localStorage.removeItem("tenant_id");
+      localStorage.removeItem("is_superuser");
       localStorage.removeItem("onboarding_state");
       localStorage.removeItem("pending_workspace_ids");
       localStorage.removeItem("workspace_joining_token");
@@ -215,6 +255,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         token: null,
         userId: null,
         tenantId: null,
+        isSuperuser: false,
         hydrated: true,
         pendingWorkspaceIds: null,
         workspaceJoiningToken: null,

@@ -8,8 +8,9 @@ interface UserProfile {
   status: boolean;
   message: string;
   data: {
-    id: 1;
+    id: number;
     email: string;
+    is_superuser?: boolean;
     full_name: string;
     description: string;
     profile_picture?: string;

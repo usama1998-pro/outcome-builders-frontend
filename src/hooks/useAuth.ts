@@ -99,12 +99,14 @@ export function useLogin() {
   const { setToken } = useAuth();
   const setUserId = useAuthStore((s) => s.setUserId);
   const setTenantId = useAuthStore((s) => s.setTenantId);
+  const setIsSuperuser = useAuthStore((s) => s.setIsSuperuser);
   const router = useRouter();
 
   return async (
     token: string,
     userId?: number,
-    redirectTo: string = "/dashboard"
+    redirectTo: string = "/dashboard",
+    isSuperuser?: boolean
   ) => {
     if (token) {
       // Clear any cached data from previous user session
@@ -115,6 +117,10 @@ export function useLogin() {
       // Set user_id if provided
       if (userId) {
         setUserId(userId);
+      }
+
+      if (typeof isSuperuser === "boolean") {
+        setIsSuperuser(isSuperuser);
       }
 
       // Fetch user's tenants and set the first one

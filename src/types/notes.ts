@@ -2,6 +2,7 @@ export default interface Notes {
     id: number;
     uuid?: string | null;
     title: string;
+    content_type?: string | null;
     createdAt: string;
     createdBy: string;
     fileName?: string | null;

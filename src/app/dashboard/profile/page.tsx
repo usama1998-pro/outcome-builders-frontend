@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,7 +143,19 @@ export default function DashboardProfile() {
                                     <h1 className="font-bold">{data?.data.full_name || "No name set"}</h1>
                                 )}
                                 <p>{data?.data.email}</p>
-                                <p className="text-[#DB2B30]">Premium</p>
+                                <div className="flex flex-col items-center gap-2 mt-1">
+                                    {data?.data.is_superuser ? (
+                                        <Badge
+                                            variant="outline"
+                                            className="border-amber-600/60 bg-amber-500/10 text-amber-800 dark:border-amber-500/50 dark:bg-amber-500/15 dark:text-amber-200"
+                                        >
+                                            Platform super admin
+                                        </Badge>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">Standard account</p>
+                                    )}
+                                    <p className="text-[#DB2B30]">Premium</p>
+                                </div>
                             </div>
 
                             <div className="w-full flex flex-col items-center justify-center">
